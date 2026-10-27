@@ -48,7 +48,7 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 ## Using the widget
 
 - **Toolbar**: documents shown (all / only related), indirect relations, extra fields, highlight search,
-  Fit / zoom, Table / Graph, SVG and PNG download, Refresh (reloads the page and re-runs the analysis).
+  Fit / zoom, Table / Graph, SVG download, Refresh (reloads the page and re-runs the analysis).
 - **Click a document** to open it. **Hover a line** for counts and coverage; **click a line** for the
   list of linked work items (up to 30).
 - **PDF export / print**: the widget renders a static graph and a relations table (no JavaScript).
@@ -58,6 +58,6 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 - One project only; links to documents of other projects are ignored.
 - Documents are read through the Open API data service. Permission filtering for viewers who
   cannot read some documents has not been checked yet (see SPEC §10).
-- The PNG export depends on the browser allowing SVG-to-canvas drawing (spike V6, pending).
+- There is no PNG export (browsers block it on Polarion pages). Use the SVG download, or the PDF export of the page.
 - A document whose author user was deleted shows the author as "(unknown user)". Branch or derived documents whose
   source document cannot be read are ignored, and so are links to unreadable work items.
