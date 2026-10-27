@@ -117,7 +117,7 @@ context (F15), non-LiveDoc documents.
 | # | Risk | Mitigation |
 |---|---|---|
 | R1 | `$transaction.objects.searchBySql` resolves **objects** (by `C_URI`), so it cannot return aggregate rows (doc pair + count) | Spike. Options: (a) one SQL per document returning related `MODULE` URIs, with counts via count queries (≤100 × kinds), (b) SQL returning link-source work item URIs then grouping in Velocity by `getModule`, (c) a DB API available to widgets returning raw rows |
-| R2 | Exact `MODULE` column names (`FK_URI_BRANCHEDFROM`, `FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`) found in the published DB schema docs, not checked on 2512/2606 | Check the SDK DB schema docs on the target server, tracker `SQL:` queries and REST document resources (spike A1–A3) |
+| R2 ✅ (2512) | Exact `MODULE` column names (`FK_URI_BRANCHEDFROM`, `FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`) found in the published DB schema docs, not checked on 2512/2606 | Check the SDK DB schema docs on the target server, tracker `SQL:` queries and REST document resources (spike A1–A3) |
 | R3 | Exact Velocity syntax to load widget `resources/` JS/CSS (SDK macro) | Check Widget SDK PDF on the target server. Fallback: inline the JS in `render.vm` |
 | R4 | Link direction for `duplicates` / `branched_from` / `derived_from` | Inspect `STRUCT_WORKITEM_LINKEDWORKITEMS` on sample documents |
 | R5 | SQL firewall (`invalidCommands`) may block `GROUP BY`/`COUNT`/`DISTINCT` variants | Test queries on the target server |
@@ -143,3 +143,5 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | One line per document pair, labelled with kind(s) | PO |
 | 2026-10-27 | Spike tests (SQL + test widget) handed to PO for execution on 2512 | `docs/spike-tests.md` |
 | 2026-10-27 | No direct DB access for the PO: spike uses tracker `SQL:(...)` queries, the test widget and REST calls instead | PO |
+| 2026-10-27 | Spike A1: MODULE branching/derivation columns confirmed in the 2512 schema; V1 passed | `docs/A1_FullDBSchema.pdf`, `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
+| 2026-10-27 | Spike test set: project `VforIA`, original `SRS_Test` with copies/branches B–G | `docs/spike-tests.md` §0 |

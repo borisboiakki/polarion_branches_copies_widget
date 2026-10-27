@@ -57,11 +57,14 @@ Verified through web search (2026-10-27):
   (e.g. json-editor, aad-synchronizer, interceptor-manager, generic). No SBB widget repo found; they are
   useful as a **Java/Maven build and packaging reference**, not as a widget reference.
 
-- Published DB schema docs (testdrive SDK) list `MODULE.FK_URI_BRANCHEDFROM`, `MODULE.FK_URI_DERIVEDFROM`,
-  `MODULE.C_DERIVEDFROMLINKROLE` (seen in search results; not yet checked on 2512/2606).
+- **Verified on the PO's 2512 schema docs (`docs/A1_FullDBSchema.pdf`)**: `MODULE.FK_URI_BRANCHEDFROM`,
+  `MODULE.FK_URI_DERIVEDFROM`, `MODULE.C_DERIVEDFROMLINKROLE`, `MODULE.C_MODULEFOLDER`, `MODULE.C_MODULENAME`,
+  `WORKITEM.FK_URI_MODULE`; table `STRUCT_WORKITEM_LINKEDWORKITEMSDERIVED` also exists.
+- **Verified by spike V1 on 2512**: widget context classes, `$date.systemTime`, `isPdf()` true in PDF export,
+  reflection method listing blocked.
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
-- That the `MODULE` columns above exist unchanged in 2512/2606.
+- That the `MODULE` columns above exist unchanged in 2606.
 - Velocity syntax/macro for loading `resources/` JS/CSS in a widget (Widget SDK mentions such macros).
 - Whether `searchBySql` can return aggregate rows (it resolves objects by `C_URI`). See SPEC §9 R1.
 - Whether the Widget SDK extension point is suitable for our needs vs. Velocity.
@@ -85,7 +88,8 @@ spike/bwSpike/                 diagnostic test widget (spike/bwSpike.zip = uploa
 
 - Develop on the branch assigned for the session; commit small, descriptive commits; do not open PRs unless asked.
 - Update `SPECIFICATION.md` (open questions / decisions log) whenever a requirement is clarified.
-- No customer or project-specific data in the repo.
+- No customer or project-specific data in the repo. Exception agreed with the PO: the spike test set on the sandbox
+  project `VforIA` (`SRS_Test` and its copies/branches) and the results the PO commits under `docs/`.
 - **Velocity dialect (verified on the PO's 2512 instance):** Polarion's widget parser behaves like **Velocity 1.4**
   (both errors seen on the instance reproduce exactly with velocity-1.4.jar). Details in guide §3.1.9. Therefore:
   - no map literals `{}` → use `$objectFactory.newMap()`; list literals `[]` are fine

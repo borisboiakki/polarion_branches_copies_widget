@@ -1781,8 +1781,12 @@ Composite PK `(C_PROJECT, C_TYPE, C_ENUMID, C_ID)`. `C_NAME`, `C_SORTORDER`, `C_
 **BASELINE**:
 `C_PK`/`C_URI`/`C_REV`/`C_DELETED`, `C_ID`, `C_NAME`, `C_DESCRIPTION`, `C_LOCATION`, `C_BASEREVISION`, `FK_PROJECT`/`FK_URI_PROJECT`, `FK_AUTHOR`/`FK_URI_AUTHOR`, `FK_BASEOBJECT`/`FK_URI_BASEOBJECT`
 
-**MODULE** (LiveDoc), partial: `C_PK`/`C_URI`/`C_REV`/`C_DELETED`, `C_ID`, `C_TITLE`, `FK_PROJECT`/`FK_URI_PROJECT`; branching/reuse metadata `FK_BRANCHEDFROM`/`FK_URI_BRANCHEDFROM`, `FK_DERIVEDFROM`/`FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`, `C_DERIVEDFIELDS`. Work items reference their containing document through `WORKITEM.FK_URI_MODULE`.
-> The branching/reuse columns are taken from Siemens' published DB schema documentation (testdrive SDK) and are **not yet verified on 2512**. Check `TablesReferenceDetails.html` on your server.
+**MODULE** (LiveDoc), verified in the 2512 schema documentation: `C_PK`/`C_URI`/`C_REV`/`C_DELETED`, `C_ID`, `C_TITLE`, `C_TYPE`, `C_STATUS`, `C_CREATED`, `C_UPDATED`, `C_LOCATION`, `C_MODULEFOLDER` (space), `C_MODULENAME`, `C_MODULELOCATION`, `C_MODULEABSOLUTELOCATION`, `C_STRUCTURELINKROLE`, `FK_AUTHOR`/`FK_URI_AUTHOR`, `FK_UPDATEDBY`/`FK_URI_UPDATEDBY`, `FK_PROJECT`/`FK_URI_PROJECT`; branching/reuse metadata `FK_BRANCHEDFROM`/`FK_URI_BRANCHEDFROM`, `C_BRANCHEDWITHQUERY`, `C_BRANCHEDWITHINITIALIZEDFIELDS`, `FK_DERIVEDFROM`/`FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`, `C_DERIVEDFIELDS`, `FK_VARIANT`/`FK_URI_VARIANT`. Work items reference their containing document through `WORKITEM.FK_URI_MODULE`.
+> Work items that a branched document only *references* (not overwritten) keep `FK_URI_MODULE` pointing to the original document, so a branch without overwritten items is visible only through `MODULE.FK_URI_BRANCHEDFROM` (expected; being verified).
+
+**STRUCT_WORKITEM_LINKEDWORKITEMSDERIVED**: same columns as `STRUCT_WORKITEM_LINKEDWORKITEMS` (present in the 2512 schema). Its exact semantics (reverse/back-link view) are not yet verified. Query `STRUCT_WORKITEM_LINKEDWORKITEMS` for links as stored on the source item.
+
+> The 2512 schema documentation lists `C_DELETED` as `CHAR(1)`. If `C_DELETED IS NOT TRUE` (§7.5) is rejected on your server, compare with the stored values instead.
 
 **Document signature tables** (used in §7.9): `MODULE`, `DOCUMENTWORKFLOWSIGNATURE`, `STRUCT_DOCUMENTWORKFLOWSIGNATURE_SIGNATURES` (`FK_URI_SIGNEDBY`, `C_VERDICT`).
 
