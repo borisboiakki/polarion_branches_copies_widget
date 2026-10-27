@@ -163,9 +163,9 @@
   Widget.prototype.documentRows = function () {
     var deg = {};
     this.edges.forEach(function (e) { deg[e.o] = (deg[e.o] || 0) + 1; deg[e.c] = (deg[e.c] || 0) + 1; });
-    var rows = [['Space', 'Document', 'Title', 'Type', 'Status', 'Author', 'Created', 'Updated', 'Work items', 'Relations shown']];
+    var rows = [['Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items', 'Relations shown']];
     this.shownDocs().forEach(function (n) {
-      rows.push([n.space, n.id, n.title, n.type, n.status, n.author, n.created, n.updated,
+      rows.push([n.space, n.id, n.title, n.type, n.status, n.created, n.updated,
         n.items < 0 ? '' : n.items, deg[n.key] || 0]);
     });
     return rows;
@@ -202,7 +202,7 @@
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: this.relationRows(), links: relLinks,
         widths: [14, 28, 34, 22, 14, 28, 34, 10, 10, 10, 10, 10, 9, 11, 12, 12] },
-      { name: 'Documents', rows: this.documentRows(), links: docLinks, widths: [14, 28, 40, 14, 14, 20, 18, 18, 11, 11] },
+      { name: 'Documents', rows: this.documentRows(), links: docLinks, widths: [14, 28, 40, 14, 14, 18, 18, 11, 11] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 14, 14, 10] }
     ]);
   };

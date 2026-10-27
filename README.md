@@ -6,9 +6,11 @@ between them, deduced from work item links. They share one client core, one buil
 | Widget | What it shows | Status | Docs |
 |---|---|---|---|
 | **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | 0.2.x, in use on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
-| **docCoverage** — Document Coverage | For selected documents and link roles, which document covers which, with link counts, coverage % and uncovered items | planned | (to come) |
+| **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | 0.1.0, to be validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
 
 ![docBranches preview rendered from the VforIA test set (mock data)](docs/docBranches/preview-graph.png)
+
+![docCoverage preview rendered from the mock coverage set](docs/docCoverage/preview-graph.png)
 
 ## Common features
 
@@ -59,6 +61,7 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 | `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vcheck.sh` | Build, tests, Velocity 1.4 parse check |
 | `tools/vtest/<widget>/` | Velocity 1.4 harness with mock Polarion objects (`WidgetHarness.java`) and browser check (`browser-check.js`) |
 | `tests/v0.1.x/` | Spike of docBranches 0.1.x, kept for reference: test plan with the findings, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
+| `tests/docCoverage-v0.1.x/` | Spike of docCoverage 0.1.x: test plan C1–C4 and diagnostic widget `cvSpike` (see its [README](tests/docCoverage-v0.1.x/README.md)) |
 | `CLAUDE.md` | Instructions for Claude Code working in this repo |
 | `Polarion_Development_Guide.md` | Polarion development best practices (baseline: Polarion 2512) |
 

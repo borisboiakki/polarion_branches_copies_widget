@@ -16,8 +16,7 @@
   var HASH = String.fromCharCode(35);
   var INDIRECT_COLOR = 'rgb(150,150,150)';
   var EXTRA_FIELDS = [
-    ['type', 'Type'], ['status', 'Status'], ['author', 'Author'],
-    ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
+    ['type', 'Type'], ['status', 'Status'], ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
   ];
   var NODE_W = 240;
   var LINE_H = 15;
@@ -124,7 +123,7 @@
       var d = nEls[i].dataset;
       var n = {
         key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
-        type: d.type || '', status: d.status || '', author: d.author || '',
+        type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
         el: nEls[i]
@@ -522,9 +521,14 @@
         'stroke-dasharray': e.indirect ? '4,4' : (cat.dash || null),
         opacity: e.indirect ? 0.7 : 1
       }, g);
-      svg('polygon', { points: (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5), fill: color }, g);
+      // Arrow head at the target document, or at the origin when the widget draws arrows backwards
+      // (docCoverage: origin = upstream on the left, arrow in the link direction downstream -> upstream).
+      var head = self.arrowAtOrigin ?
+        (x1 + 10) + ',' + (y1 - 5) + ' ' + x1 + ',' + y1 + ' ' + (x1 + 10) + ',' + (y1 + 5) :
+        (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5);
+      svg('polygon', { points: head, fill: color }, g);
       var hit = svg('path', { d: d, fill: 'none', stroke: 'rgb(0,0,0)', 'stroke-opacity': 0, 'stroke-width': 12, 'class': 'bw-hit' }, g);
-      // Label near the arrow head so that each label sits next to its target document.
+      // Label near the target end (one per edge there, while several edges can share an origin).
       var lt = 0.8;
       var mx = bez(x1, c1x, c2x, x2, lt);
       var my = bez(y1, c1y, c2y, y2, lt) - 3;
@@ -534,6 +538,9 @@
       var t = svg('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-family': FONT, 'font-size': 11, fill: color }, lg, label);
       try {
         var bb = t.getBBox();
+        // Keep the label clear of the target document box.
+        var over = bb.x + bb.width + 6 - x2;
+        if (over > 0) { setAttrs(t, { x: mx - over }); bb = t.getBBox(); }
         setAttrs(bg, { x: bb.x - 3, y: bb.y - 1, width: bb.width + 6, height: bb.height + 2 });
       } catch (err) { /* not rendered yet */ }
       [hit, lg].forEach(function (target) {

@@ -1,0 +1,427 @@
+## Document Coverage - spike tests (C1-C4). Read-only diagnostics, one test per widget instance.
+## See tests/docCoverage-v0.1.x/spike-tests.md for what each test checks and what to report.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+## Times: Long arithmetic does not compute on 2512, so start and end stamps (ms) are printed.
+<style>
+  .cvs { font-family: Arial, sans-serif; font-size: 12px; }
+  .cvs h4 { margin: 4px 0 8px 0; }
+  .cvs table { border-collapse: collapse; margin: 6px 0; }
+  .cvs td, .cvs th { border: 1px solid rgb(187,187,187); padding: 2px 6px; text-align: left; vertical-align: top; }
+  .cvs th { background: rgb(238,238,238); }
+  .cvs .ok { color: rgb(26,127,55); font-weight: bold; }
+  .cvs .ko { color: rgb(198,40,40); font-weight: bold; }
+  .cvs pre { background: rgb(246,246,246); padding: 4px; white-space: pre-wrap; }
+</style>
+
+## ---------------------------------------------------------------- parameters
+## A #set whose value is null keeps the previous value (Velocity 1.4), so each accessor form is tried.
+#set($test = "docs")
+#set($tmp = "")
+#set($tmp = $parameters.test.singleValue)
+#set($tmp = $parameters.test.singleValue())
+#if("$tmp" != "")
+  #set($test = "$tmp")
+#end
+#set($bwInt = 0)
+#set($tmp = "")
+#set($tmp = $parameters.maxRows.value)
+#set($tmp = $parameters.maxRows.value())
+#set($tmpS = "$tmp")
+#set($maxRows = 50)
+#if($tmpS.matches("[0-9]{1,5}"))
+  #set($maxRows = $bwInt.parseInt($tmpS))
+#end
+#set($tmp = "")
+#set($tmp = $parameters.excludedTypes.value)
+#set($tmp = $parameters.excludedTypes.value())
+#set($excludedTypesStr = "$tmp")
+#set($tmp = "")
+#set($tmp = $parameters.rolesText.value)
+#set($tmp = $parameters.rolesText.value())
+#set($rolesTextStr = "$tmp")
+
+#set($projectId = "")
+#set($projectId = $page.getReference().projectId())
+#set($projectIdS = "$projectId")
+#set($projectOk = false)
+#if($projectIdS.matches("[A-Za-z0-9_.-]+"))
+  #set($projectOk = true)
+#end
+#set($ds = $trackerService.getDataService())
+
+## ---------------------------------------------------------------- document selector
+## Each selected value is resolved through getModelObject(); the space and name are read with several
+## accessors (Rendering API reference, Open API object via getOldApi()). Rows are kept for the C1 report.
+#set($docRows = [])
+#set($docKeys = [])
+#set($docVals = false)
+#set($docVals = $parameters.docs.values)
+#set($docVals = $parameters.docs.values())
+#if($docVals)
+  #foreach($v in $docVals)
+    #set($row = $objectFactory.newMap())
+    #set($void = $row.put("str", "$v"))
+    #set($void = $row.put("cls", "$v.getClass().getName()"))
+    #set($vId = "")
+    #set($vId = $v.id())
+    #set($void = $row.put("id", "$vId"))
+    #set($mo = false)
+    #set($mo = $v.getModelObject())
+    #set($moCls = "")
+    #set($moUr = "")
+    #set($refSpace = "")
+    #set($refName = "")
+    #set($refProject = "")
+    #set($oldCls = "")
+    #set($oldSpace = "")
+    #set($oldName = "")
+    #set($oldUri = "")
+    #set($oldTitle = "")
+    #if($mo)
+      #set($moCls = $mo.getClass().getName())
+      #set($moUr = $mo.isUnresolvable())
+      #if("$moUr" == "false")
+        #set($ref = false)
+        #set($ref = $mo.getReference())
+        #if($ref)
+          #set($refSpace = $ref.spaceId())
+          #set($refName = $ref.name())
+          #set($refName = $ref.id())
+          #set($refProject = $ref.projectId())
+        #end
+        #set($old = false)
+        #set($old = $mo.getOldApi())
+        #if($old)
+          #set($oldCls = $old.getClass().getName())
+          #set($oldSpace = $old.getModuleFolder())
+          #set($oldName = $old.getId())
+          #set($oldUri = $old.getUri())
+          #set($oldTitle = $old.getTitle())
+        #end
+      #end
+    #end
+    #set($void = $row.put("moCls", "$moCls"))
+    #set($void = $row.put("moUr", "$moUr"))
+    #set($void = $row.put("ref", "$refProject | $refSpace | $refName"))
+    #set($void = $row.put("old", "$oldCls | $oldSpace | $oldName | $oldTitle"))
+    #set($void = $row.put("uri", "$oldUri"))
+    ## Key used by C3/C4: Open API values first, Rendering API reference otherwise.
+    #set($kSpace = "$oldSpace")
+    #set($kName = "$oldName")
+    #if($kName == "")
+      #set($kSpace = "$refSpace")
+      #set($kName = "$refName")
+    #end
+    #set($key = "")
+    #if($kName != "")
+      #set($key = "${kSpace}/${kName}")
+      #if(!$docKeys.contains($key))
+        #set($void = $docKeys.add($key))
+      #end
+    #end
+    #set($void = $row.put("key", "$key"))
+    #set($void = $docRows.add($row))
+  #end
+#end
+
+## ---------------------------------------------------------------- link role selector
+#set($roleRows = [])
+#set($roleIds = [])
+#set($roleVals = false)
+#set($roleVals = $parameters.roles.values)
+#set($roleVals = $parameters.roles.values())
+#if($roleVals)
+  #foreach($v in $roleVals)
+    #set($row = $objectFactory.newMap())
+    #set($void = $row.put("str", "$v"))
+    #set($void = $row.put("cls", "$v.getClass().getName()"))
+    #set($rId = "")
+    #set($rId = $v.id())
+    #set($rId = $v.getId())
+    #set($rName = "")
+    #set($rName = $v.label())
+    #set($rName = $v.getName())
+    #set($rName = $v.name())
+    #set($void = $row.put("id", "$rId"))
+    #set($void = $row.put("name", "$rName"))
+    #set($void = $roleRows.add($row))
+    #set($rIdS = "$rId")
+    #if($rIdS == "")
+      #set($rIdS = "$v")
+    #end
+    #if($rIdS.matches("[A-Za-z0-9_.-]+") && !$roleIds.contains($rIdS))
+      #set($void = $roleIds.add($rIdS))
+    #end
+  #end
+#end
+#set($rolesFrom = "selector")
+#if($roleIds.size() == 0)
+  #set($rolesFrom = "text parameter")
+  #foreach($p in $rolesTextStr.split(","))
+    #set($pt = $p.trim())
+    #if($pt.matches("[A-Za-z0-9_.-]+") && !$roleIds.contains($pt))
+      #set($void = $roleIds.add($pt))
+    #end
+  #end
+#end
+#set($roleSql = "")
+#foreach($r in $roleIds)
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+#set($typeSql = "")
+#foreach($p in $excludedTypesStr.split(","))
+  #set($pt = $p.trim())
+  #if($pt.matches("[A-Za-z0-9_.-]+"))
+    #if($typeSql != "")
+      #set($typeSql = "${typeSql},")
+    #end
+    #set($typeSql = "${typeSql}'${pt}'")
+  #end
+#end
+
+## SQL condition "document is one of the selected ones" for a module alias (quotes doubled).
+#macro(cvsDocCond $alias)
+  #set($cvsCond = "")
+  #foreach($k in $docKeys)
+    #set($kSp = $k.substring(0, $k.lastIndexOf("/")))
+    #set($kNm = $k.substring($k.lastIndexOf("/")))
+    #set($kNm = $kNm.substring(1))
+    #set($kSp = $kSp.replace("'", "''"))
+    #set($kNm = $kNm.replace("'", "''"))
+    #if($cvsCond != "")
+      #set($cvsCond = "${cvsCond} OR ")
+    #end
+    #set($cvsCond = "${cvsCond}(${alias}.c_modulefolder = '${kSp}' AND ${alias}.c_id = '${kNm}')")
+  #end
+  #if($cvsCond != "")
+    #set($cvsCond = " AND (${cvsCond})")
+  #end
+#end
+
+#macro(cvsKey $mod)
+  #set($cvsKeyOut = "")
+  #set($cvsUr = "unknown")
+  #if($mod)
+    #set($cvsUr = $mod.isUnresolvable())
+  #end
+  #if("$cvsUr" == "false")
+    #set($cvsF = "")
+    #set($cvsF = $mod.getModuleFolder())
+    #set($cvsN = "")
+    #set($cvsN = $mod.getId())
+    #if("$cvsN" != "")
+      #set($cvsKeyOut = "${cvsF}/${cvsN}")
+    #end
+  #end
+#end
+
+<div class="cvs">
+<h4>Document Coverage spike &mdash; test <code>$esc.html($test)</code> &mdash; project <code>$!esc.html($projectId)</code></h4>
+
+#if(!$projectOk)
+  <p class="ko">Project id could not be resolved. Place the widget on a page of a project.</p>
+
+## ================================================================ C1 document selector
+#elseif($test == "docs")
+  <p>Parameter object: <code>$!esc.html($parameters.docs.getClass().getName())</code>; values collection: <code>$!esc.html($docVals.getClass().getName())</code>; <b>$docRows.size()</b> selected document(s).</p>
+  #if($docRows.size() == 0)
+    <p>No document selected. Select 2 or 3 documents in the widget parameters and refresh, then report this table. With none selected the widget would use all documents of the project.</p>
+  #end
+  <table>
+    <tr><th>#</th><th>value as text</th><th>value class</th><th>id()</th><th>getModelObject() class</th><th>isUnresolvable()</th><th>getReference(): project | space | name</th><th>getOldApi(): class | space | name | title</th><th>getOldApi().getUri()</th><th>key used</th></tr>
+    #set($n = 0)
+    #foreach($r in $docRows)
+      #set($n = $n + 1)
+      <tr><td>$n</td><td>$esc.html($r.get("str"))</td><td>$esc.html($r.get("cls"))</td><td>$esc.html($r.get("id"))</td><td>$esc.html($r.get("moCls"))</td><td>$esc.html($r.get("moUr"))</td><td>$esc.html($r.get("ref"))</td><td>$esc.html($r.get("old"))</td><td>$esc.html($r.get("uri"))</td><td>$esc.html($r.get("key"))</td></tr>
+    #end
+  </table>
+
+## ================================================================ C2 link roles
+#elseif($test == "roles")
+  <p>Parameter object: <code>$!esc.html($parameters.roles.getClass().getName())</code>; <b>$roleRows.size()</b> selected role(s). Roles used: <code>$esc.html($roleSql)</code> (from the $rolesFrom).</p>
+  <table>
+    <tr><th>#</th><th>value as text</th><th>value class</th><th>id</th><th>name / label</th></tr>
+    #set($n = 0)
+    #foreach($r in $roleRows)
+      #set($n = $n + 1)
+      <tr><td>$n</td><td>$esc.html($r.get("str"))</td><td>$esc.html($r.get("cls"))</td><td>$esc.html($r.get("id"))</td><td>$esc.html($r.get("name"))</td></tr>
+    #end
+  </table>
+  <p>Link roles configured in the project (id, name, opposite name). Empty if not accessible:</p>
+  #set($tp = false)
+  #set($tp = $trackerService.getTrackerProject($projectId))
+  #set($roleEnum = false)
+  #if($tp)
+    #set($roleEnum = $tp.getWorkItemLinkRoleEnum())
+  #end
+  <table>
+    <tr><th>id</th><th>name</th><th>opposite name</th></tr>
+    #if($roleEnum)
+      #foreach($o in $roleEnum.getAllOptions())
+        #set($oId = "")
+        #set($oId = $o.getId())
+        #set($oName = "")
+        #set($oName = $o.getName())
+        #set($oOpp = "")
+        #set($oOpp = $o.getOppositeName())
+        <tr><td>$esc.html($oId)</td><td>$esc.html($oName)</td><td>$esc.html($oOpp)</td></tr>
+      #end
+    #end
+  </table>
+
+## ================================================================ C3 / C4 scan and coverage
+#elseif($roleIds.size() == 0)
+  <p class="ko">No link role: select roles in the "Link roles" parameter (or type them in the text parameter).</p>
+#elseif($test == "scan" || $test == "coverage")
+  ## Link sources (ws, document ms) with a selected role whose target (wt, document mt) is in another document,
+  ## both documents among the selected ones (all documents of the project when none is selected).
+  #cvsDocCond("ms")
+  #set($condS = $cvsCond)
+  #cvsDocCond("mt")
+  #set($condT = $cvsCond)
+  #set($sql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${condS}${condT}")
+  <p>Documents: <b>$docKeys.size()</b> selected (0 = all). Roles: <code>$esc.html($roleSql)</code> (from the $rolesFrom).</p>
+  <pre>$esc.html($sql)</pre>
+  #set($t0 = $date.systemTime)
+  #set($items = $ds.sqlSearch($sql))
+  #set($t1 = $date.systemTime)
+  ## pair key "target doc | role | source doc" -> [links, source items, target items]
+  #set($pairs = $objectFactory.newMap())
+  #set($pairSrc = $objectFactory.newMap())
+  #set($pairTgt = $objectFactory.newMap())
+  ## covered target items per target document (all selected roles and source documents)
+  #set($covered = $objectFactory.newMap())
+  #set($linksUsed = 0)
+  #set($unres = 0)
+  #foreach($wi in $items)
+    #set($srcMod = false)
+    #set($srcMod = $wi.getModule())
+    #cvsKey($srcMod)
+    #set($srcKey = $cvsKeyOut)
+    #set($srcId = $wi.getId())
+    #foreach($ls in $wi.getLinkedWorkItemsStructsDirect())
+      #set($role = "")
+      #set($role = $ls.getLinkRole().getId())
+      #if($roleIds.contains("$role"))
+        #set($tgt = false)
+        #set($tgt = $ls.getLinkedItem())
+        #set($tUr = "unknown")
+        #if($tgt)
+          #set($tUr = $tgt.isUnresolvable())
+        #end
+        #if("$tUr" != "false")
+          #set($unres = $unres + 1)
+        #else
+          #set($tgtMod = false)
+          #set($tgtMod = $tgt.getModule())
+          #cvsKey($tgtMod)
+          #set($tgtKey = $cvsKeyOut)
+          #set($inSel = true)
+          #if($docKeys.size() > 0 && (!$docKeys.contains($tgtKey) || !$docKeys.contains($srcKey)))
+            #set($inSel = false)
+          #end
+          #if($srcKey != "" && $tgtKey != "" && $srcKey != $tgtKey && $inSel)
+            #set($linksUsed = $linksUsed + 1)
+            #set($tgtId = $tgt.getId())
+            #set($pk = "${tgtKey} | ${role} | ${srcKey}")
+            #if(!$pairs.containsKey($pk))
+              #set($void = $pairs.put($pk, 0))
+              #set($void = $pairSrc.put($pk, []))
+              #set($void = $pairTgt.put($pk, []))
+            #end
+            #set($cnt = $pairs.get($pk) + 1)
+            #set($void = $pairs.put($pk, $cnt))
+            #if(!$pairSrc.get($pk).contains($srcId))
+              #set($void = $pairSrc.get($pk).add($srcId))
+            #end
+            #if(!$pairTgt.get($pk).contains($tgtId))
+              #set($void = $pairTgt.get($pk).add($tgtId))
+            #end
+            #if(!$covered.containsKey($tgtKey))
+              #set($void = $covered.put($tgtKey, []))
+            #end
+            #if(!$covered.get($tgtKey).contains($tgtId))
+              #set($void = $covered.get($tgtKey).add($tgtId))
+            #end
+          #end
+        #end
+      #end
+    #end
+  #end
+  #set($t2 = $date.systemTime)
+  <table>
+    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>Link-source work items returned by SQL</td><td>$!items.size()</td></tr>
+    <tr><td>Cross-document links counted (selected roles and documents)</td><td>$linksUsed</td></tr>
+    <tr><td>Links to unresolvable items (ignored)</td><td>$unres</td></tr>
+    <tr><td>Document pairs (per role)</td><td>$pairs.size()</td></tr>
+    <tr><td>SQL start / end (ms)</td><td>$t0 / $t1</td></tr>
+    <tr><td>Scan end (ms)</td><td>$t2</td></tr>
+  </table>
+  <p>One row per pair. The link is stored on the item of the <b>source</b> document and points to the item of the
+  <b>target</b> document. For coverage, the target is expected to be the upstream document (e.g. the customer specification).</p>
+  <table>
+    <tr><th>Target document | role | source document</th><th>Links</th><th>Distinct source items</th><th>Distinct target items</th><th>Example (source item &rarr; target item)</th></tr>
+    #set($n = 0)
+    #foreach($k in $pairs.keySet())
+      #set($n = $n + 1)
+      #if($n <= $maxRows)
+        <tr><td>$esc.html($k)</td><td>$pairs.get($k)</td><td>$pairSrc.get($k).size()</td><td>$pairTgt.get($k).size()</td><td>$esc.html($pairSrc.get($k).get(0)) &rarr; $esc.html($pairTgt.get($k).get(0))</td></tr>
+      #end
+    #end
+  </table>
+
+  #if($test == "coverage")
+    ## Items of each target document (excluded types not counted), covered = linked from any source document.
+    #set($typeFilterSql = "")
+    #if($typeSql != "")
+      #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
+    #end
+    <p>Coverage of each target document (work item types not counted: <code>$esc.html($typeSql)</code>).</p>
+    <table>
+      <tr><th>Target document</th><th>Work items</th><th>Covered</th><th>Coverage</th><th>Uncovered items (first $maxRows)</th><th>SQL start / end (ms)</th></tr>
+      #foreach($tk in $covered.keySet())
+        #set($kSp = $tk.substring(0, $tk.lastIndexOf("/")))
+        #set($kNm = $tk.substring($tk.lastIndexOf("/")))
+        #set($kNm = $kNm.substring(1))
+        #set($kSp = $kSp.replace("'", "''"))
+        #set($kNm = $kNm.replace("'", "''"))
+        #set($cSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${kSp}' AND m.c_id = '${kNm}'${typeFilterSql}")
+        #set($c0 = $date.systemTime)
+        #set($docItems = $ds.sqlSearch($cSql))
+        #set($c1 = $date.systemTime)
+        #set($total = $docItems.size())
+        #set($cov = 0)
+        #set($unc = "")
+        #set($uncN = 0)
+        #foreach($w in $docItems)
+          #set($wId = $w.getId())
+          #if($covered.get($tk).contains($wId))
+            #set($cov = $cov + 1)
+          #else
+            #set($uncN = $uncN + 1)
+            #if($uncN <= $maxRows)
+              #if($unc != "")
+                #set($unc = "${unc}, ")
+              #end
+              #set($unc = "${unc}${wId}")
+            #end
+          #end
+        #end
+        #set($pctS = "-")
+        #if($total > 0)
+          #set($pctV = $cov * 100 / $total)
+          #set($pctS = "${pctV}%")
+        #end
+        <tr><td>$esc.html($tk)</td><td>$total</td><td>$cov</td><td>$pctS</td><td>$uncN: $esc.html($unc)</td><td>$c0 / $c1</td></tr>
+      #end
+    </table>
+    <p>Covered items that are not counted (excluded type, or contained in no selected target) are left out of the percentage.</p>
+  #end
+#else
+  <p class="ko">Unknown test "$esc.html($test)".</p>
+#end
+</div>

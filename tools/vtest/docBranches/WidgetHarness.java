@@ -17,6 +17,9 @@ import org.apache.velocity.runtime.log.LogSystem;
  *
  * The mocks follow what the spike observed on 2512: customEnum singleValue() is a String,
  * sqlSearch returns object lists, links are stored on the copy/branch/derived item.
+ * The mock classes are shared: tools/vtest/docCoverage/CoverageHarness.java and tools/vtest/cvSpike/SpikeHarness.java
+ * compile this file with theirs. Selector mocks (DocOpt, RoleOpt, link role enumeration) follow the docCoverage spike
+ * C1/C2 on 2512.
  */
 public class WidgetHarness {
 
@@ -230,9 +233,69 @@ public class WidgetHarness {
         return out;
     }
 
+    // @document selector value (spike C1): ProxyEnumOption -> getModelObject() ProxyDocument -> getOldApi() Module.
+    // getReference().spaceId() is empty on 2512.
+    public static class DocRef {
+        final Module m;
+        DocRef(Module m) { this.m = m; }
+        public String projectId() { return "VforIA"; }
+        public String spaceId() { return ""; }
+        public String name() { return m.getId(); }
+    }
+
+    public static class Doc {
+        final Module m;
+        Doc(Module m) { this.m = m; }
+        public boolean isUnresolvable() { return m.unresolvable; }
+        public DocRef getReference() { return new DocRef(m); }
+        public Module getOldApi() { return m; }
+    }
+
+    public static class DocOpt {
+        final Module m;
+        public DocOpt(Module m) { this.m = m; }
+        public String id() { return m.folder + " / " + m.name; }
+        public Doc getModelObject() { return new Doc(m); }
+        public String toString() { return "ProxyEnumOption id:" + id(); }
+    }
+
+    // workitem-link-role selector value (spike C2): id() = role id.
+    public static class RoleOpt {
+        final String id;
+        public RoleOpt(String id) { this.id = id; }
+        public String id() { return id; }
+        public String toString() { return "ProxyEnumOption id:" + id; }
+    }
+
+    // Project link role enumeration: id, name, opposite name (spike C2).
+    public static class RoleEnumOpt {
+        final String id, name, opposite;
+        public RoleEnumOpt(String id, String name, String opposite) { this.id = id; this.name = name; this.opposite = opposite; }
+        public String getId() { return id; }
+        public String getName() { return name; }
+        public String getOppositeName() { return opposite; }
+    }
+
+    static final List<RoleEnumOpt> LINK_ROLES = new ArrayList<RoleEnumOpt>(Arrays.asList(
+        new RoleEnumOpt("parent", "has parent", "is parent of"),
+        new RoleEnumOpt("satisfies", "satisfies", "is satisfied by"),
+        new RoleEnumOpt("verifies", "verifies", "is verified by"),
+        new RoleEnumOpt("duplicates", "duplicates", "is duplicated by"),
+        new RoleEnumOpt("derived_from", "is derived from", "is derived by"),
+        new RoleEnumOpt("branched_from", "is branched from", "has branch")));
+
+    public static class RoleEnum {
+        public List<RoleEnumOpt> getAllOptions() { return LINK_ROLES; }
+    }
+
+    public static class TrackerProject {
+        public RoleEnum getWorkItemLinkRoleEnum() { return new RoleEnum(); }
+    }
+
     public static class TrackerService {
         private final DataService ds = new DataService();
         public DataService getDataService() { return ds; }
+        public TrackerProject getTrackerProject(String projectId) { return new TrackerProject(); }
     }
 
     public static class ObjectFactory {
@@ -333,9 +396,9 @@ public class WidgetHarness {
         String widgetDir = args[0];
         String outDir = args[1];
         Map<String, Param> params = new HashMap<String, Param>();
-        params.put("copyRoles", new Param("duplicates", null));
-        params.put("branchRoles", new Param("branched_from", null));
-        params.put("derivedRoles", new Param("derived_from", null));
+        params.put("copyLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("duplicates")))));
+        params.put("branchLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("branched_from")))));
+        params.put("derivedLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("derived_from")))));
         params.put("excludedTypes", new Param("heading", null));
         params.put("spaces", new Param("", null));
         params.put("showMode", new Param(args.length > 2 ? args[2] : "related", null));
@@ -347,8 +410,9 @@ public class WidgetHarness {
         params.put("height", new Param(Integer.valueOf(560), null));
         String browser = render(widgetDir, params, false, outDir + "/velocity-browser.log");
         write(outDir + "/browser-fragment.html", browser);
-        check(browser.contains("data-id=\"Ghost_Author_Doc\"") && browser.contains("data-author=\"(unknown user)\""),
-            "document with a deleted author is listed with author (unknown user)");
+        check(browser.contains("data-id=\"Ghost_Author_Doc\"") && !browser.contains("unknown user") && !browser.contains("data-author"),
+            "document with a deleted author is listed (the author field was removed)");
+        check(browser.contains("data-kc=\"5\""), "link roles read from the selectors (copy relations found)");
         check(!browser.contains("Missing_Source"), "unresolvable source documents are ignored");
         check(!browser.contains("VIA-999"), "links to unresolvable work items are ignored");
         check(browser.contains("data-o=\"Requirements/SRS_Test\" data-c=\"Requirements/SRS_Test_Branch_Test_C\""),
@@ -356,6 +420,14 @@ public class WidgetHarness {
         int sqlBrowser = SQL_COUNT;
         String pdf = render(widgetDir, params, true, outDir + "/velocity-pdf.log");
         write(outDir + "/pdf-fragment.html", pdf);
+        // No copy role selected: no copy relation; no role at all: message.
+        params.put("copyLinkRoles", new Param(null, new ArrayList<Object>()));
+        String noCopy = render(widgetDir, params, false, outDir + "/velocity-nocopy.log");
+        check(!noCopy.contains("data-kc=\"5\"") && noCopy.contains("data-kb=\"2\""), "empty copy role selector: no copy relation, branches kept");
+        params.put("branchLinkRoles", new Param(null, new ArrayList<Object>()));
+        params.put("derivedLinkRoles", new Param(null, null));
+        String noRole = render(widgetDir, params, false, outDir + "/velocity-norole.log");
+        check(noRole.contains("select at least one link role"), "no link role selected: message");
         System.out.println("Rendered: browser " + browser.length() + " chars, pdf " + pdf.length() + " chars, SQL queries per render " + sqlBrowser);
     }
 }

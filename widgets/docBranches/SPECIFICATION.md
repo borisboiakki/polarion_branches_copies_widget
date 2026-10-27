@@ -40,11 +40,11 @@ in their standard configuration, so these are the defaults. They can still be ch
 | ID | Requirement | Priority |
 |---|---|---|
 | F1 | List the project's LiveDocs as graph nodes. Default node fields: **document ID, title, space** | Must |
-| F1b | Additional node fields selectable by the user: type, status, author, created, updated, work item count. Default selection set in the widget parameters. The viewer can toggle them in the widget UI without editing the parameters | Should |
+| F1b | Additional node fields selectable by the user: type, status, created, updated, work item count (author removed in 0.3.0, PO: not useful). Default selection set in the widget parameters. The viewer can toggle them in the widget UI without editing the parameters | Should |
 | F2 | Draw **one line per related document pair**, directed **source → copy/branch/derived**, labelled with the kind(s) of the relation (e.g. `derived`, `branch`, `copy`, or `branch + derived`) | Must |
 | F3 | Distinguish the kinds Copy / Branch / Derived with line style **and** colour, plus a legend | Must |
 | F4 | Deduce edges by aggregating work item links (roles from §3) between items of two documents | Must |
-| F5 | Link roles per kind are widget parameters with the §3 defaults | Must |
+| F5 | Link roles per kind are widget parameters with the §3 defaults: `workitem-link-role` multi-selectors since 0.3.0 (no typing) | Must |
 | F6 | Threshold parameter: minimum linked items (absolute and/or %) before an edge is drawn | Should |
 | F7 | Use document-level metadata (§3) when present and flag disagreement with link-based inference | Should |
 | F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target. **Heading items are excluded** from counts by default (parameter: excluded types, default `heading`) | Should |
@@ -152,12 +152,15 @@ context (F15), non-LiveDoc documents.
    g. (fixed in 0.1.1) A document whose author user was deleted made the widget fail with
       `uri: subterra:data-service:objects:/default/${User}t0025088` (found by the PO on 2512). References to
       unresolvable objects (author, branched/derived source, link target) are now checked with `isUnresolvable()`.
-      Still to confirm on the instance with the document of that user.
+      Still to confirm on the instance with the document of that user. (Moot since 0.3.0: the author field was removed.)
    h. **Verified on 2512 (PO, 0.2.0).** Multi-value parameter "Relation kinds shown by default" is read correctly (same question as e; falls back to all).
    i. **Verified on 2512 (PO, 0.2.0): the Excel export works.** `#loadWidgetJs("resources/xlsx.js")` (Widget SDK directive, not yet used on 2512) loads the Excel library:
       the Excel button must download an `.xlsx`. If it downloads a `.csv` and the status line says "Excel library not
       loaded", the directive did not work. Also check that the zip entry `docBranches/resources/xlsx.js` (29 chars) is
       accepted on upload.
+   j. **Verified on 2512 (PO, 0.3.0).** The link role selectors show their defaults (`duplicates`, `branched_from`, `derived_from`) when the widget is
+      added: `$factory.enumeration(...).values([...])` as in guide §2.1, not yet used on 2512. If the defaults are missing,
+      select the roles by hand and report it.
 
 ## 11. Decision log
 
@@ -193,3 +196,6 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Linked item counts on the line labels can be hidden: parameter "Linked item counts on the lines by default" (shown/hidden) + toolbar toggle "Item counts"; applies to all kinds and to the PDF view; tooltips, details, table and Excel keep the counts. Widget 0.2.0 | PO |
 | 2026-10-27 | PO test of 0.2.0 on 2512: upload with `resources/xlsx.js` accepted, Excel export works (`#loadWidgetJs` verified), relation kind filter and parameter work, item count toggle and parameter work (PDF too). Open checks h and i closed | PO |
 | 2026-10-27 | Repository restructured for a second widget (docCoverage): sources in `widgets/docBranches/`, client core in `shared/js/core.js`, Velocity snippets in `shared/vm/`, Excel library in `shared/resources/`. No functional change (render output, SVG, CSV and Excel identical on the mock set); widget 0.2.1. Release tags are now `docBranches-vN.N.N` | PO |
+| 2026-10-27 | Shared core changes for docCoverage, still in 0.2.1 (not released yet): line labels are kept clear of the target document box; `documents.vm` can restrict the documents and keeps their work item lists (unused by docBranches) | |
+| 2026-10-27 | Widget 0.3.0: link roles per kind chosen with `workitem-link-role` multi-selectors (shared macro `bwRoleIds`, as docCoverage) instead of comma-separated text; new parameter ids `copyLinkRoles`, `branchLinkRoles`, `derivedLinkRoles` (no backward compatibility, PO). The **author** document field is removed from both widgets (PO, user feedback) | PO |
+| 2026-10-27 | PO test of 0.3.0 on 2512: role selectors with their defaults, graph as before, no author field. Ready for release | PO |
