@@ -20,7 +20,6 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
 |---|---|---|
 | Documents | none = all documents of the project | The LiveDocs to analyse (document selector) |
 | Link roles (1 to 5) | none | The link roles that count as coverage, e.g. `satisfies`, `verifies`. More than 5: the first 5 are used |
-| Link roles as text | empty | Comma-separated role ids, used only if no role is selected above |
 | Work item types not counted | `heading` | Not counted in the coverage, and links to them are ignored |
 | Spaces to include | empty (all) | Comma-separated space names (default space: `_default`) |
 | Documents shown by default | Only documents with relations | Or *All selected documents*. Viewers can switch it |

@@ -57,11 +57,10 @@ public class CoverageHarness {
         WidgetHarness.link(12, "parent", 11);
     }
 
-    static Map<String, WidgetHarness.Param> params(List<Object> docs, List<Object> roles, String rolesText) {
+    static Map<String, WidgetHarness.Param> params(List<Object> docs, List<Object> roles) {
         Map<String, WidgetHarness.Param> p = new HashMap<String, WidgetHarness.Param>();
         p.put("docs", new WidgetHarness.Param(null, docs));
         p.put("roles", new WidgetHarness.Param(null, roles));
-        p.put("rolesText", new WidgetHarness.Param(rolesText, null));
         p.put("excludedTypes", new WidgetHarness.Param("heading", null));
         p.put("spaces", new WidgetHarness.Param("", null));
         p.put("showMode", new WidgetHarness.Param("related", null));
@@ -80,7 +79,7 @@ public class CoverageHarness {
         List<Object> docs = list(new WidgetHarness.DocOpt(spec), new WidgetHarness.DocOpt(a), new WidgetHarness.DocOpt(b), new WidgetHarness.DocOpt(c));
         List<Object> roles = list(new WidgetHarness.RoleOpt("satisfies"), new WidgetHarness.RoleOpt("verifies"));
 
-        String br = WidgetHarness.render(dir, params(docs, roles, ""), false, out + "/velocity-browser.log");
+        String br = WidgetHarness.render(dir, params(docs, roles), false, out + "/velocity-browser.log");
         WidgetHarness.write(out + "/browser-fragment.html", br);
         WidgetHarness.check(br.contains("data-roles=\"satisfies|satisfies;verifies|verifies\""), "roles and their names are passed to the page");
         WidgetHarness.check(br.contains("data-k=\"Specs/CustomerSpec\"") && !br.contains("data-k=\"_default/Other\""), "only the selected documents are listed");
@@ -91,25 +90,25 @@ public class CoverageHarness {
         WidgetHarness.check(br.contains("data-items=\"6\" data-up=\"1\" data-cov=\"4\" data-unc-n=\"2\" data-unc=\"VIA-5 VIA-6\""), "CustomerSpec coverage 4/6, uncovered VIA-5 VIA-6");
         WidgetHarness.check(br.contains("data-items=\"4\" data-up=\"1\" data-cov=\"2\""), "SysReq_A coverage 2/4");
 
-        String pdf = WidgetHarness.render(dir, params(docs, roles, ""), true, out + "/velocity-pdf.log");
+        String pdf = WidgetHarness.render(dir, params(docs, roles), true, out + "/velocity-pdf.log");
         WidgetHarness.write(out + "/pdf-fragment.html", pdf);
         WidgetHarness.check(pdf.contains("Coverage: 67% (4/6)") && !pdf.contains("<script"), "PDF: static graph with coverage, no script");
         WidgetHarness.check(pdf.contains("VIA-5, VIA-6"), "PDF: uncovered items listed");
 
-        // No document selected = all documents (Other appears); roles from the text parameter.
-        String all = WidgetHarness.render(dir, params(list(), list(), "satisfies"), false, out + "/velocity-all.log");
-        WidgetHarness.check(all.contains("data-c=\"_default/Other\""), "no document selected: all documents, roles from text");
+        // No document selected = all documents (Other appears).
+        String all = WidgetHarness.render(dir, params(list(), list(new WidgetHarness.RoleOpt("satisfies"))), false, out + "/velocity-all.log");
+        WidgetHarness.check(all.contains("data-c=\"_default/Other\""), "no document selected: all documents");
         // More than 5 roles: first 5 used, warning.
         List<Object> six = list(new WidgetHarness.RoleOpt("satisfies"), new WidgetHarness.RoleOpt("verifies"), new WidgetHarness.RoleOpt("parent"),
             new WidgetHarness.RoleOpt("duplicates"), new WidgetHarness.RoleOpt("derived_from"), new WidgetHarness.RoleOpt("branched_from"));
-        String many = WidgetHarness.render(dir, params(docs, six, ""), false, out + "/velocity-six.log");
+        String many = WidgetHarness.render(dir, params(docs, six), false, out + "/velocity-six.log");
         WidgetHarness.check(many.contains("Only the first 5 link roles are used (1 ignored).") && !many.contains("branched_from|"), "more than 5 roles: warning, first 5 used");
         // An unreadable selected document and no role at all.
         WidgetHarness.Module gone = new WidgetHarness.Module("_default", "Gone", "Gone");
         gone.unresolvable = true;
-        String lost = WidgetHarness.render(dir, params(list(new WidgetHarness.DocOpt(spec), new WidgetHarness.DocOpt(gone), new WidgetHarness.DocOpt(a)), roles, ""), false, out + "/velocity-lost.log");
+        String lost = WidgetHarness.render(dir, params(list(new WidgetHarness.DocOpt(spec), new WidgetHarness.DocOpt(gone), new WidgetHarness.DocOpt(a)), roles), false, out + "/velocity-lost.log");
         WidgetHarness.check(lost.contains("1 selected document(s) could not be read."), "unreadable selected document reported");
-        String none = WidgetHarness.render(dir, params(docs, list(), ""), false, out + "/velocity-none.log");
+        String none = WidgetHarness.render(dir, params(docs, list()), false, out + "/velocity-none.log");
         WidgetHarness.check(none.contains("select at least one link role"), "no role: message");
         System.out.println("Rendered: browser " + br.length() + " chars, pdf " + pdf.length() + " chars");
     }

@@ -116,15 +116,7 @@
   #set($graphHeight = 600)
 #end
 
-## docCoverage parameters
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.rolesText.value)
-#set($tmp = $parameters.rolesText.value())
-#set($rolesTextStr = "")
-#if("$tmp" != $bwUnset)
-  #set($rolesTextStr = "$tmp")
-#end
-## Limits: uncovered items kept per document in the page model (full count always shown), linked item samples per pair,
+## docCoverage limits: uncovered items kept per document in the page model (full count always shown), linked item samples per pair,
 ## link roles used.
 #set($uncCap = 500)
 #set($sampleCap = 30)
@@ -226,7 +218,7 @@
   #end
 #end
 
-## Link roles: selector values (id() = role id, spike C2), else the text parameter. At most maxRoles.
+## Link roles: selector values (id() = role id, spike C2; verified with 2 roles by the PO on 2512). At most maxRoles.
 #set($roleAll = [])
 #set($roleVals = false)
 #set($roleVals = $parameters.roles.values)
@@ -240,9 +232,6 @@
       #set($void = $roleAll.add($ridS))
     #end
   #end
-#end
-#if($roleAll.size() == 0)
-  #bwIdList($rolesTextStr $roleAll)
 #end
 #set($roleIds = [])
 #foreach($r in $roleAll)

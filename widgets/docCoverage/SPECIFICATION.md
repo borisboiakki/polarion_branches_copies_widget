@@ -41,7 +41,7 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 |---|---|---|
 | F1 | **Document selection** in the widget parameters: a multi-select document selector (`@document`). Nothing selected = all documents of the project (optionally limited by "Spaces to include") | Must |
 | F1b | **In-widget document selector**: the viewer can hide/show documents among those analysed, without edit mode | Should |
-| F2 | **Link roles**: multi-select of the project's link roles (`workitem-link-role`), **1 to 5**. More than 5: the first 5 are used and a warning is shown. Text parameter as fallback if the selector cannot be read `[?]` C2 | Must |
+| F2 | **Link roles**: multi-select of the project's link roles (`workitem-link-role`), **1 to 5**. More than 5: the first 5 are used and a warning is shown. (A text fallback was dropped: the selector works on 2512, PO) | Must |
 | F3 | One **line per document pair** (upstream → downstream) when ≥ 1 link of a selected role exists between their items, labelled with each role and its **link count** (e.g. `satisfies 42 + verifies 3`) | Must |
 | F4 | One line style and colour per role (5 styles), legend; viewer toggles per role (as the relation kinds of docBranches) and the "Item counts" toggle | Must |
 | F5 | **Counters** per pair: links per role; **downstream items with links** (count and % of the downstream document); **upstream items covered** by this downstream document (count and %) | Must |
@@ -68,7 +68,7 @@ object, Velocity 1.4-safe templates, no customer data in the repository.
 Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`; static view for PDF/print):
 
 1. **Parameters**: documents (`$factory.enumeration("Documents", "@document")`, multi), roles
-   (`$factory.enumeration("Link roles", "workitem-link-role")`, multi), roles as text (fallback), excluded types, spaces,
+   (`$factory.enumeration("Link roles", "workitem-link-role")`, multi), excluded types, spaces,
    documents shown, item counts, extra fields, height. Common ones come from `shared/vm/params.vm`.
 2. **Documents**: `shared/vm/documents.vm`, restricted to the selected document keys (space/name). Verified by C1: each
    value of `$parameters.docs.values()` is a `ProxyEnumOption`; `getModelObject()` is a `ProxyDocument` (check
@@ -110,13 +110,14 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 
 Only verifiable on the instance (the harness uses mocks):
 
-a. Upload of `docCoverage.zip` (entry `docCoverage/resources/xlsx.js`, 29 characters) and the Excel export.
-b. The document and role selectors as in C1/C2, with 2+ documents and 2 roles; the "Link roles as text" fallback.
-c. Coverage numbers on the spike set (customer spec 5/6 = 83 %, uncovered item listed) in the graph, table, details,
-   Excel and PDF export.
-d. Arrows downstream → upstream, upstream on the left; role names on the lines.
-e. No document selected (= all documents of the project): rendering time on the large project.
-f. Viewer permissions (as docBranches §10.2 a).
+a. ✅ (PO, 2026-10-27) Upload of `docCoverage.zip` (entry `docCoverage/resources/xlsx.js`, 29 characters) and the Excel export.
+b. ✅ (PO) The document and role selectors with 4 documents and 2 roles (`verifies`, `satisfies`): one checkbox and
+   line style per role, a chain of 3 documents (test spec → system spec → customer spec). The text fallback was
+   removed before release (not needed).
+c. ✅ (PO) Coverage on the spike set: customer spec 5/6 = 83 %, uncovered item listed.
+d. ✅ (PO screenshot) Arrows downstream → upstream, upstream on the left, role names and link counts on the lines.
+e. ✅ (PO) Fast rendering with many documents.
+f. Viewer permissions (as docBranches §10.2 a) — still open.
 
 ## 10. Decision log
 
@@ -131,3 +132,4 @@ f. Viewer permissions (as docBranches §10.2 a).
 | 2026-10-27 | Raw spike results (PDF/PNG with company branding) removed from the branch and its history; only findings are kept | PO |
 | 2026-10-27 | Arrows downstream → upstream (link direction), upstream on the left; uncovered list capped at 500 per document (full count shown); no performance concern for the large project | PO |
 | 2026-10-27 | Widget 0.1.0 implemented: shared core + `graph.js` (coverage recomputed in the browser from the shown roles and documents, document picker, document details with uncovered items, table, Excel, SVG), static PDF view with coverage tables; harness `tools/vtest/docCoverage/` | `tools/test-widget.sh docCoverage` |
+| 2026-10-27 | PO test of 0.1.0 on 2512: upload, Excel, selectors with 2 roles, coverage 83 %, arrows and labels, speed OK. The "Link roles as text" parameter is removed (selector works); still 0.1.0 (not released) | PO |

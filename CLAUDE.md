@@ -11,7 +11,7 @@ one build and one test setup:
 - **docCoverage** (`widgets/docCoverage/`, 0.1.0): for selected documents and 1–5 link roles, which document
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
-  (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done, to be validated on 2512).
+  (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done and validated on 2512).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
 
 ## Required reading before coding
@@ -93,6 +93,8 @@ Verified through web search (2026-10-27):
   - `workitem-link-role` multi-select: `values()` → `ProxyEnumOption`, `id()` = role id. Project link roles with name and
     opposite name: `$trackerService.getTrackerProject(id).getWorkItemLinkRoleEnum().getAllOptions()`.
   - `satisfies` links are stored on the downstream item (source) and target the customer specification item.
+- **Verified by the PO on 2512 with docCoverage 0.1.0**: upload (`docCoverage/resources/xlsx.js`), Excel export, document and
+  role selectors (4 documents, 2 roles), coverage numbers, arrows/labels, fast rendering with many documents.
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.

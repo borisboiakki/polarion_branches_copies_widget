@@ -1,6 +1,5 @@
 $parameters.put("docs", $factory.enumeration("Documents (none = all documents of the project)", "@document").allowNoValue(true).allowMultipleValues(true).build())
 $parameters.put("roles", $factory.enumeration("Link roles (1 to 5)", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).build())
-$parameters.put("rolesText", $factory.string("Link roles as text, used if no role is selected above (comma separated)").value("").build())
 $parameters.put("excludedTypes", $factory.string("Work item types not counted (comma separated)").value("heading").build())
 $parameters.put("spaces", $factory.string("Spaces to include (comma separated, empty = all)").value("").build())
 $parameters.put("showMode", $factory.customEnum("Documents shown by default").addEnumItem("related", "Only documents with relations").addEnumItem("all", "All selected documents").allowNoValue(false).allowMultipleValues(false).singleValue("related").build())
