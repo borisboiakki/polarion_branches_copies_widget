@@ -27,8 +27,7 @@ Starting document (the original, "A"): **`SRS_Test`**.
 | G | `Test_G_UnrelatedDoc` | Unrelated document | none |
 
 The documents `Index` and `Sp` in the same space are not part of the test set and should show no relation.
-The space name is still to be confirmed: run widget test **V2** first, or read it from a document URL
-(`.../#/project/VforIA/wiki/<SPACE>/<DOCUMENT>`).
+All test documents are in the space **`Requirements`** (confirmed by the PO; mapping above confirmed too).
 
 ---
 
@@ -125,11 +124,11 @@ Use your REST token (Postman, curl or similar). The base URL is `https://MYHOST/
 The space of the default folder is `_default`. URL-encode document names that contain spaces (`%20`).
 
 **R1 — full document resource for `SRS_Test_Reuse_TestB`, `SRS_Test_Branch_Test_C`, `SRS_Test_TestD_Derived` and
-`SRS_Test_F_nooverwrite`** (replace `SPACE` with the space name, see §0)
+`SRS_Test_F_nooverwrite`** (replace `DOCNAME` with each document name)
 
 ```
 curl -s -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
-  "https://MYHOST/polarion/rest/v1/projects/VforIA/spaces/SPACE/documents/DOCNAME?fields%5Bdocuments%5D=@all"
+  "https://MYHOST/polarion/rest/v1/projects/VforIA/spaces/Requirements/documents/DOCNAME?fields%5Bdocuments%5D=@all"
 ```
 Looking for relationships or attributes such as `branchedFrom`, `derivedFrom`, `derivedFromLinkRole`, `variant`.
 Please paste the JSON responses. Remove anything confidential first; only the structure and IDs matter.
@@ -171,7 +170,7 @@ Parameters: *Link roles* (default `duplicates,branched_from,derived_from`), *Max
 | **V6 JavaScript** | Do inline scripts run? Can SVG be serialised and turned into a PNG (canvas, blob URLs, CSP)? | OK/FAIL lines; try the two download links |
 | **V7 PDF** | Export the page to **PDF** (and print preview): flags, static SVG, HTML fallback | Attach the PDF or a screenshot |
 
-Suggested order: **V2** first (it gives the space name), then V3a/V3b, V4, V5a–c, V6, V7.
+Suggested order: V2, then V3a/V3b, V4, V5a–c, V6, V7.
 
 For V4, the expected pairs on `VforIA` are the A2 table above, with counts (e.g. `SRS_Test_Reuse_TestB | duplicates |
 SRS_Test`, `SRS_Test_Copy_of_B_TestE | duplicates | SRS_Test_Reuse_TestB`, `SRS_Test_Branch_Test_C | branched_from |
@@ -193,7 +192,6 @@ If any test shows a Velocity error, copy the message from the widget, or from th
 ## Results template (copy into your answer)
 
 ```
-Space of the test documents:
 A2 Q1/Q2 documents + item counts per role (duplicates, branched_from, derived_from):
 A2 Q3 / Q4 documents:
 A2 Q5 DISTINCT / GROUP BY accepted?:
