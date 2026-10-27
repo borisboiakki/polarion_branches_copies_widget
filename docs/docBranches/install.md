@@ -22,7 +22,7 @@ Widget id `docBranches`, version in `widgets/docBranches/VERSION` (N.N.N; shown 
 | Copy link roles | `duplicates` | Link roles that mark a copy / LiveDoc reuse (selector of the project's link roles, several allowed) |
 | Branch link roles | `branched_from` | Link roles of overwritten items in a branch (selector) |
 | Derived link roles | `derived_from` | Link roles of items reused with derivation (selector) |
-| Work item types not counted | `heading` | Items of these types are ignored in links and counts |
+| Work item types not counted | Heading | Selector of the project's work item types (none = all types counted). Items of these types are ignored in links and counts |
 | Spaces to include | empty (all) | Comma-separated space names, e.g. `Requirements, Design` |
 | Documents shown by default | Only documents with relations | Or *All documents*. Viewers can switch it in the widget |
 | Indirect relations by default | Hidden | Relations inherited through an intermediate copy (see below) |

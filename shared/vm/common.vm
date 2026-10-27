@@ -1,18 +1,9 @@
 ## Shared snippet common.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED common.vm".
 ## Lists, project, output mode and the bwKey macro. Needs params.vm.
-## Only identifiers are allowed in role and type lists; they go into SQL.
-#macro(bwIdList $bwIn $bwOut)
-  #foreach($bwPart in $bwIn.split(","))
-    #set($bwT = $bwPart.trim())
-    #if($bwT.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwT))
-      #set($void = $bwOut.add($bwT))
-    #end
-  #end
-#end
-
-## Link role ids from the values() of a workitem-link-role multi-selector (verified on 2512, docCoverage spike C2:
-## each value is a ProxyEnumOption, id() = role id). Identifiers only, as they go into SQL.
-#macro(bwRoleIds $bwVals $bwOut)
+## Option ids from the values() of an enumeration multi-selector: link roles (workitem-link-role, verified on 2512,
+## docCoverage spike C2: each value is a ProxyEnumOption, id() = role id) and work item types (workitem-type).
+## Identifiers only, as they go into SQL.
+#macro(bwOptionIds $bwVals $bwOut)
   #if($bwVals)
     #foreach($bwV in $bwVals)
       #set($bwRid = "$bwV")
@@ -26,7 +17,7 @@
 #end
 
 #set($excludedTypes = [])
-#bwIdList($excludedTypesStr $excludedTypes)
+#bwOptionIds($excludedTypeVals $excludedTypes)
 
 ## Space names may contain blanks; they are compared in Velocity only, never put into SQL.
 #set($spaceFilter = [])

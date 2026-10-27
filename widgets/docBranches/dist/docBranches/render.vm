@@ -3,7 +3,7 @@
 ## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
 ## Velocity 1.4 and writes widgets/docBranches/dist/docBranches.zip.
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
-#set($bwVersion = "0.3.0")
+#set($bwVersion = "0.3.1")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -36,19 +36,16 @@
 
 ## ======================================================================= parameters
 ## Shared snippet params.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED params.vm".
-## Parameters common to the document widgets: excludedTypes, spaces, showMode, lineCounts, extraFields, height.
+## Parameters common to the document widgets: excludedTypes (values only), spaces, showMode, lineCounts, extraFields, height.
 ## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
 ## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
 ## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
 #set($bwUnset = "__unset__")
 
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.excludedTypes.value)
-#set($tmp = $parameters.excludedTypes.value())
-#set($excludedTypesStr = "heading")
-#if("$tmp" != $bwUnset)
-  #set($excludedTypesStr = "$tmp")
-#end
+## excludedTypes: workitem-type multi-selector, read in common.vm with bwOptionIds (nothing selected = all types counted).
+#set($excludedTypeVals = false)
+#set($excludedTypeVals = $parameters.excludedTypes.values)
+#set($excludedTypeVals = $parameters.excludedTypes.values())
 
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.spaces.value)
@@ -110,7 +107,7 @@
 #end
 
 ## docBranches parameters
-## Link roles per kind: workitem-link-role multi-selectors, read with bwRoleIds (common.vm).
+## Link roles per kind: workitem-link-role multi-selectors, read with bwOptionIds (common.vm).
 #set($copyRoleVals = false)
 #set($copyRoleVals = $parameters.copyLinkRoles.values)
 #set($copyRoleVals = $parameters.copyLinkRoles.values())
@@ -172,19 +169,10 @@
 ## ======================================================================= lists and kinds
 ## Shared snippet common.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED common.vm".
 ## Lists, project, output mode and the bwKey macro. Needs params.vm.
-## Only identifiers are allowed in role and type lists; they go into SQL.
-#macro(bwIdList $bwIn $bwOut)
-  #foreach($bwPart in $bwIn.split(","))
-    #set($bwT = $bwPart.trim())
-    #if($bwT.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwT))
-      #set($void = $bwOut.add($bwT))
-    #end
-  #end
-#end
-
-## Link role ids from the values() of a workitem-link-role multi-selector (verified on 2512, docCoverage spike C2:
-## each value is a ProxyEnumOption, id() = role id). Identifiers only, as they go into SQL.
-#macro(bwRoleIds $bwVals $bwOut)
+## Option ids from the values() of an enumeration multi-selector: link roles (workitem-link-role, verified on 2512,
+## docCoverage spike C2: each value is a ProxyEnumOption, id() = role id) and work item types (workitem-type).
+## Identifiers only, as they go into SQL.
+#macro(bwOptionIds $bwVals $bwOut)
   #if($bwVals)
     #foreach($bwV in $bwVals)
       #set($bwRid = "$bwV")
@@ -198,7 +186,7 @@
 #end
 
 #set($excludedTypes = [])
-#bwIdList($excludedTypesStr $excludedTypes)
+#bwOptionIds($excludedTypeVals $excludedTypes)
 
 ## Space names may contain blanks; they are compared in Velocity only, never put into SQL.
 #set($spaceFilter = [])
@@ -251,11 +239,11 @@
 #end
 
 #set($copyRoles = [])
-#bwRoleIds($copyRoleVals $copyRoles)
+#bwOptionIds($copyRoleVals $copyRoles)
 #set($branchRoles = [])
-#bwRoleIds($branchRoleVals $branchRoles)
+#bwOptionIds($branchRoleVals $branchRoles)
 #set($derivedRoles = [])
-#bwRoleIds($derivedRoleVals $derivedRoles)
+#bwOptionIds($derivedRoleVals $derivedRoles)
 
 ## role -> kind (first kind wins if a role is listed twice)
 #set($roleKind = $objectFactory.newMap())

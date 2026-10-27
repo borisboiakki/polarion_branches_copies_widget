@@ -399,7 +399,7 @@ public class WidgetHarness {
         params.put("copyLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("duplicates")))));
         params.put("branchLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("branched_from")))));
         params.put("derivedLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("derived_from")))));
-        params.put("excludedTypes", new Param("heading", null));
+        params.put("excludedTypes", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("heading")))));
         params.put("spaces", new Param("", null));
         params.put("showMode", new Param(args.length > 2 ? args[2] : "related", null));
         params.put("showIndirect", new Param("hide", null));

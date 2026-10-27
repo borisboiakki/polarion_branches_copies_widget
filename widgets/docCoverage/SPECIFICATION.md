@@ -33,7 +33,7 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 - **Upstream document** = document of the link **targets** (e.g. the customer specification).
   **Downstream document** = document of the link **sources** (e.g. the system requirements that "satisfy").
   Verified by C3 for `satisfies`: the link is stored on the downstream item and targets the customer specification item.
-- **Counted items**: work items of a document, without the excluded types (default `heading`).
+- **Counted items**: work items of a document, without the excluded types (`workitem-type` selector, default Heading).
 
 ## 4. Functional requirements
 
@@ -118,6 +118,7 @@ c. ✅ (PO) Coverage on the spike set: customer spec 5/6 = 83 %, uncovered item 
 d. ✅ (PO screenshot) Arrows downstream → upstream, upstream on the left, role names and link counts on the lines.
 e. ✅ (PO) Fast rendering with many documents.
 f. Viewer permissions (as docBranches §10.2 a) — still open.
+g. 0.1.1: excluded types selector (`workitem-type`) lists the project's types, Heading preselected, coverage unchanged — to check.
 
 ## 10. Decision log
 
@@ -135,3 +136,4 @@ f. Viewer permissions (as docBranches §10.2 a) — still open.
 | 2026-10-27 | PO test of 0.1.0 on 2512: upload, Excel, selectors with 2 roles, coverage 83 %, arrows and labels, speed OK. The "Link roles as text" parameter is removed (selector works); still 0.1.0 (not released) | PO |
 | 2026-10-27 | Author field removed (user feedback); role selector read with the shared macro `bwRoleIds`. Still 0.1.0 (not released) | PO |
 | 2026-10-27 | PO test of 0.1.0 (without author) on 2512: OK. Ready for release | PO |
+| 2026-10-27 | Widget 0.1.1: the excluded work item types are chosen with a `workitem-type` multi-selector (default Heading, none selected = all types counted) instead of comma-separated text; shared macro `bwRoleIds` renamed `bwOptionIds`. Patch release (PO). To check on 2512: selector lists the types with Heading preselected; counts unchanged with Heading | PO |

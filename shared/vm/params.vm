@@ -1,17 +1,14 @@
 ## Shared snippet params.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED params.vm".
-## Parameters common to the document widgets: excludedTypes, spaces, showMode, lineCounts, extraFields, height.
+## Parameters common to the document widgets: excludedTypes (values only), spaces, showMode, lineCounts, extraFields, height.
 ## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
 ## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
 ## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
 #set($bwUnset = "__unset__")
 
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.excludedTypes.value)
-#set($tmp = $parameters.excludedTypes.value())
-#set($excludedTypesStr = "heading")
-#if("$tmp" != $bwUnset)
-  #set($excludedTypesStr = "$tmp")
-#end
+## excludedTypes: workitem-type multi-selector, read in common.vm with bwOptionIds (nothing selected = all types counted).
+#set($excludedTypeVals = false)
+#set($excludedTypeVals = $parameters.excludedTypes.values)
+#set($excludedTypeVals = $parameters.excludedTypes.values())
 
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.spaces.value)

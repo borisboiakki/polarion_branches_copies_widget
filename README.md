@@ -20,7 +20,7 @@ open for both widgets: behaviour for viewers who cannot read some documents (see
 - Interactive SVG graph (layered layout, zoom, highlight, tooltips, details with the linked work items).
 - Table view, SVG download, Excel workbook download (CSV fallback).
 - Static graph + table in PDF export and print (no JavaScript).
-- Link roles and documents chosen with Polarion selectors in the widget parameters (no typing).
+- Link roles, documents and excluded work item types chosen with Polarion selectors in the widget parameters (no typing).
 - Viewer toggles (relation kinds or roles, item counts, extra document fields), defaults set as widget parameters.
 - Velocity 1.4-safe templates, SQL scoped to one project, `isUnresolvable()` guard on every referenced object.
 

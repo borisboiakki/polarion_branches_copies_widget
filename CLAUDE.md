@@ -44,7 +44,9 @@ Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks
 - Data: SQL scoped to one project (≈100 LiveDocs / 20k work items). Never loop over all work items in Velocity.
 - Interactive graph = client-side SVG. PDF/print = static server-side SVG + table, no JS.
 - Default link roles: copy `duplicates`, branch `branched_from`, derived `derived_from`. All of them are parameters,
-  chosen with `workitem-link-role` multi-selectors (read with the shared macro `bwRoleIds`), never typed.
+  chosen with `workitem-link-role` multi-selectors (read with the shared macro `bwOptionIds`), never typed. Excluded work item
+  types (default `heading`) use a `workitem-type` multi-selector read the same way (docBranches 0.3.1 / docCoverage 0.1.1,
+  not yet verified on 2512).
 - Work the technical risks in SPEC §9 (spike) before building features on top of them.
 
 ## Research notes (verified vs. unverified)
