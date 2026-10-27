@@ -1,6 +1,6 @@
 # Specification — Polarion Branches Widget
 
-**Status:** DRAFT v0.3 — refined with the product owner on 2026-10-27. Items marked `[?]` are still open
+**Status:** v0.4 — implementation v0.1.0 started (`widget/`) — refined with the product owner on 2026-10-27. Items marked `[?]` are still open
 or need verification on a real Polarion instance.
 
 ## 1. Goal
@@ -141,6 +141,15 @@ context (F15), non-LiveDoc documents.
    widget resources (HTTP 200)? If yes, the JS could move to a separate file. V6: OK/FAIL lines and whether
    "Download PNG" works (decides if the widget's PNG export works as built). Implementation continues meanwhile
    (decision 2026-10-27); the widget inlines its JS, so V5c does not block it.
+2. **OPEN CHECKS for widget v0.1.0 on 2512** (only verifiable on the instance; the Velocity 1.4 harness uses mocks):
+   a. Viewer permissions (N1): documents are read via `IDataService.sqlSearch` (Open API). Check with a user who
+      cannot read some documents; switch to the Rendering API if they appear.
+   b. Item counts per document filter on `module.c_modulefolder` = `getModuleFolder()`; check that counts are not 0
+      for documents in the default space.
+   c. Document link URL `#/project/<id>/wiki/<space>/<document>` opens the document (default space included).
+   d. `getType()/getStatus().getName()`, `getAuthor().getName()` and `$date.format` give readable values.
+   e. Multi-value parameter "Extra document fields" is read correctly (`values()` type not yet observed on 2512).
+   f. PNG export works in the browser (linked to open check 1 / spike V6).
 
 ## 11. Decision log
 
@@ -168,3 +177,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Indirect relations from inherited links are hidden by default (transitive reduction), with a viewer toggle to show them | PO |
 | 2026-10-27 | Spike Part B (V1–V7) on `EOLE_AI_MCP_TESTS`: data approach (b) validated and fast; `#include`/`#parse` of resources fail → JS/CSS inlined; inline JS + SVG export work in the browser; static SVG renders in PDF. Transitive reduction made kind-agnostic. Pending: V5c/V6 browser screenshots | `docs/V*_*.pdf` |
 | 2026-10-27 | Start widget implementation (v0.1) before V5c/V6 browser results; tracked as open check §10.1 | PO |
+| 2026-10-27 | Widget v0.1.0 implemented (`widget/src`, id `docBranches`): Velocity data collection + inlined JS graph, static PDF view. Tested with Velocity 1.4 on mocks and in Chromium; open checks §10.2 | `tools/test-widget.sh` |

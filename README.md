@@ -3,8 +3,10 @@
 A Siemens Polarion **LiveReport widget** that shows the documents of a project and how they relate to
 each other — which documents are **branches** of which, and which are **copies** (reuse) of which.
 
-> Status: **specification v0.2.** Approach decided (Velocity widget, Polarion 2512, compatible with 2606). Technical spike in progress (`docs/spike-tests.md`). See [`SPECIFICATION.md`](SPECIFICATION.md).
-> No implementation yet.
+> Status: **v0.1.0 — first implementation, to be validated on Polarion 2512.** Spike complete
+> (`docs/spike-tests.md`). Install: [`docs/install.md`](docs/install.md). Requirements: [`SPECIFICATION.md`](SPECIFICATION.md).
+
+![Widget preview rendered from the VforIA test set (mock data)](docs/preview-graph.png)
 
 ## Why
 
@@ -21,17 +23,25 @@ Relations are **deduced from work item links** between documents' work items (pl
 3. Aggregate item-level links into document-to-document relations (e.g. "≥ N items of B are linked to A").
 4. Classify each relation (copy / branch / derived) and render a graph or tree.
 
-## Planned deliverables
+## Build and test
 
-- Velocity widget with configurable parameters (scope, link roles: `duplicates` / `branched_from` / `derived_from`, filters).
-- Interactive graph + tabular fallback; static rendering for PDF/print.
-- Install and configuration guide.
+```
+python3 tools/build-widget.py   # inline the JS, check with Velocity 1.4, write widget/dist/docBranches.zip
+tools/test-widget.sh            # build + render with Velocity 1.4 on mock data + Chromium screenshots
+tools/vcheck.sh                 # parse every .vm file with Velocity 1.4
+```
+
+Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the browser check).
 
 ## Repository contents
 
 | File | Purpose |
 |---|---|
-| `SPECIFICATION.md` | Draft requirements and open questions |
+| `SPECIFICATION.md` | Requirements, decisions and open checks |
+| `widget/src/` | Widget sources: `render.vm`, `parameters.vm`, `branches-graph.js` (inlined at build) |
+| `widget/dist/docBranches.zip` | Upload package (generated, committed for convenience) |
+| `docs/install.md` | Install and configuration guide |
+| `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vtest/` | Build, Velocity 1.4 harness with mock Polarion objects, browser check |
 | `docs/spike-tests.md` | SQL and widget tests to run on a Polarion 2512 instance |
 | `spike/bwSpike/`, `spike/bwSpike.zip` | Diagnostic test widget (upload package) |
 | `CLAUDE.md` | Instructions for Claude Code working in this repo |
