@@ -259,8 +259,8 @@ The PO reports that everything was smooth and fast.
 | V3a / V3b | ✅ `DISTINCT` and `GROUP BY … HAVING COUNT(DISTINCT …)` accepted by `sqlSearch`. Both return the same 21 documents (≈24 / 21 ms) |
 | V4 | ✅ **Data approach validated.** SQL returns 1631 link-source items (≈22 ms). The Velocity scan of their links gives 2597 cross-document links and 31 (document, role, document) pairs in ≈84 ms. Inherited links appear as expected, e.g. `B EOLE Capella Model` → `A EOLE Capella Model` (360) **and** → `EOLE Capella Model` (360). New case: a branch inherits its source's copy links too (`A EOLE Capella Model_branched_over`: `branched_from` → `A EOLE Capella Model` 342 **and** `duplicates` → `EOLE Capella Model` 342), so transitive reduction must ignore the kind. `docs/V4_*.pdf` |
 | V5a / V5b | ❌ `#include("resources/spike.txt")` / `#parse("resources/spike.vm")`: "Unable to find resource". Velocity cannot load files from the widget's `resources/` folder. `docs/V5A.png`, `docs/V5B.png` |
-| V5c | ⏳ Not conclusive: the PDF export does not run JavaScript ("running…"). **Needs a browser screenshot** |
-| V6 | ⚠️ The PDF shows "JS NOT executed" (expected: no JS in PDF). But `docs/V6_export_bw-spike.svg` was downloaded from the browser, so **inline JS runs and SVG export works**. PNG export not confirmed. **Needs a browser screenshot** of the OK/FAIL lines |
+| V5c | ⏳ **OPEN CHECK (tracked in SPEC §10.1)** Not conclusive: the PDF export does not run JavaScript ("running…"). **Needs a browser screenshot** |
+| V6 | ⚠️ **OPEN CHECK (tracked in SPEC §10.1)** The PDF shows "JS NOT executed" (expected: no JS in PDF). But `docs/V6_export_bw-spike.svg` was downloaded from the browser, so **inline JS runs and SVG export works**. PNG export not confirmed. **Needs a browser screenshot** of the OK/FAIL lines |
 | V7 | ✅ Static inline SVG (boxes, dashed line, arrow, label) and the HTML fallback both render in the PDF export. `docs/V7_*.pdf` |
 
 ## Results template (copy into your answer)

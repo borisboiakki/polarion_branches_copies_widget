@@ -137,7 +137,10 @@ context (F15), non-LiveDoc documents.
 
 ## 10. Open questions
 
-1. V5c / V6: browser screenshots (not PDF) to confirm the resource URL test and PNG export.
+1. **OPEN CHECK (PO, pending)**: spike V5c and V6 browser screenshots (not PDF). V5c: does any `/repo/...` URL serve
+   widget resources (HTTP 200)? If yes, the JS could move to a separate file. V6: OK/FAIL lines and whether
+   "Download PNG" works (decides if the widget's PNG export works as built). Implementation continues meanwhile
+   (decision 2026-10-27); the widget inlines its JS, so V5c does not block it.
 
 ## 11. Decision log
 
@@ -164,3 +167,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Spike A3 R2: REST confirms roles/direction; copy of a copy keeps the inherited `duplicates` link to the original (E→A besides E→B). Part A complete | `docs/R2_test_results.txt` |
 | 2026-10-27 | Indirect relations from inherited links are hidden by default (transitive reduction), with a viewer toggle to show them | PO |
 | 2026-10-27 | Spike Part B (V1–V7) on `EOLE_AI_MCP_TESTS`: data approach (b) validated and fast; `#include`/`#parse` of resources fail → JS/CSS inlined; inline JS + SVG export work in the browser; static SVG renders in PDF. Transitive reduction made kind-agnostic. Pending: V5c/V6 browser screenshots | `docs/V*_*.pdf` |
+| 2026-10-27 | Start widget implementation (v0.1) before V5c/V6 browser results; tracked as open check §10.1 | PO |
