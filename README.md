@@ -56,7 +56,7 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 | `widget/dist/docBranches.zip` | Upload package (generated, committed for convenience) |
 | `docs/install.md` | Install and configuration guide |
 | `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vtest/` | Build, Velocity 1.4 harness with mock Polarion objects, browser check |
-| `tests/v0.1.x/` | Spike of release 0.1.x, kept for reference: test plan, the results sent from Polarion, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
+| `tests/v0.1.x/` | Spike of release 0.1.x, kept for reference: test plan with the findings, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
 | `CLAUDE.md` | Instructions for Claude Code working in this repo |
 | `Polarion_Development_Guide.md` | Polarion development best practices (baseline: Polarion 2512) |
 
