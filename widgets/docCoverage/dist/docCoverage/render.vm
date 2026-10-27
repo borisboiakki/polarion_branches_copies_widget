@@ -1,0 +1,2048 @@
+## Document Coverage - render.vm
+## Source: widgets/docCoverage/src/render.vm. tools/build-widget.py inlines the shared snippets (shared/vm) at the
+## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
+## Velocity 1.4 and writes widgets/docCoverage/dist/docCoverage.zip.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+## Terms: upstream document = document of the link targets (e.g. customer specification), downstream document =
+## document of the link sources. Verified for "satisfies" on 2512 (spike C3). Edge "up>down": o = upstream, c = downstream.
+#set($bwVersion = "0.1.0")
+## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
+## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
+<style>
+  .bw-root, .cw-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
+  .bw-toolbar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
+  .bw-ctl { font-size: 12px; padding: 2px 4px; }
+  .bw-search { width: 170px; }
+  .bw-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; }
+  .bw-fields { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  .bw-btns { display: inline-flex; gap: 4px; }
+  .bw-btn { font-size: 12px; padding: 2px 8px; cursor: pointer; border: 1px solid rgb(170,178,195); background: rgb(248,249,252); border-radius: 3px; }
+  .bw-btn:hover { background: rgb(232,237,247); }
+  .bw-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 2px 0 4px 0; }
+  .bw-leg { display: inline-flex; align-items: center; gap: 4px; }
+  .bw-muted { color: rgb(110,118,135); }
+  .bw-status { color: rgb(110,118,135); margin-bottom: 4px; }
+  .bw-view { overflow: auto; border: 1px solid rgb(215,220,230); background: rgb(255,255,255); }
+  .bw-svg { display: block; }
+  .bw-node, .bw-edge, .bw-edge-label { cursor: pointer; }
+  .bw-tip { position: absolute; z-index: 20; background: rgb(255,255,250); border: 1px solid rgb(170,170,170); padding: 4px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); pointer-events: none; max-width: 420px; }
+  .bw-tip-head { font-weight: 600; }
+  .bw-details { border: 1px solid rgb(215,220,230); background: rgb(250,251,253); padding: 6px 8px; margin-bottom: 6px; }
+  .bw-details-head { font-weight: 600; margin-bottom: 4px; }
+  .bw-items { margin: 4px 0 0 18px; padding: 0; max-height: 180px; overflow: auto; }
+  .bw-table { border-collapse: collapse; margin: 4px 0; }
+  .bw-table td, .bw-table th { border: 1px solid rgb(200,205,215); padding: 3px 6px; text-align: left; vertical-align: top; }
+  .bw-table th { background: rgb(238,241,246); }
+  .bw-error, .bw-warn { color: rgb(198,40,40); }
+</style>
+<style>
+  .cw-pick { position: relative; display: inline-block; }
+  .cw-pick-panel { position: absolute; z-index: 30; top: 24px; left: 0; min-width: 260px; max-height: 320px; overflow: auto; background: rgb(255,255,255); border: 1px solid rgb(170,178,195); box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 6px 8px; }
+  .cw-pick-panel .bw-check { margin: 2px 0; }
+</style>
+
+## ======================================================================= parameters
+## Shared snippet params.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED params.vm".
+## Parameters common to the document widgets: excludedTypes, spaces, showMode, lineCounts, extraFields, height.
+## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
+## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
+## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
+#set($bwUnset = "__unset__")
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.excludedTypes.value)
+#set($tmp = $parameters.excludedTypes.value())
+#set($excludedTypesStr = "heading")
+#if("$tmp" != $bwUnset)
+  #set($excludedTypesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.spaces.value)
+#set($tmp = $parameters.spaces.value())
+#set($spacesStr = "")
+#if("$tmp" != $bwUnset)
+  #set($spacesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.showMode.singleValue)
+#set($tmp = $parameters.showMode.singleValue())
+#set($showMode = "related")
+#if("$tmp" == "all")
+  #set($showMode = "all")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.lineCounts.singleValue)
+#set($tmp = $parameters.lineCounts.singleValue())
+#set($showCounts = true)
+#if("$tmp" == "hide")
+  #set($showCounts = false)
+#end
+
+#set($extraList = [])
+#set($tmp = false)
+#set($tmp = $parameters.extraFields.values)
+#set($tmp = $parameters.extraFields.values())
+#if($tmp)
+  #foreach($v in $tmp)
+    #set($fid = "$v")
+    #set($fid = $v.id())
+    #set($fidS = "$fid")
+    #if($fidS.matches("type|status|author|created|updated|items") && !$extraList.contains($fidS))
+      #set($void = $extraList.add($fidS))
+    #end
+  #end
+#end
+#set($extrasStr = "")
+#foreach($f in $extraList)
+  #if($extrasStr != "")
+    #set($extrasStr = "${extrasStr},")
+  #end
+  #set($extrasStr = "${extrasStr}${f}")
+#end
+
+#set($bwInt = 0)
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.height.value)
+#set($tmp = $parameters.height.value())
+#set($tmpS = "$tmp")
+#set($graphHeight = 600)
+#if($tmpS.matches("[0-9]{1,5}"))
+  #set($graphHeight = $bwInt.parseInt($tmpS))
+#end
+#if($graphHeight < 200)
+  #set($graphHeight = 600)
+#end
+
+## docCoverage parameters
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.rolesText.value)
+#set($tmp = $parameters.rolesText.value())
+#set($rolesTextStr = "")
+#if("$tmp" != $bwUnset)
+  #set($rolesTextStr = "$tmp")
+#end
+## Limits: uncovered items kept per document in the page model (full count always shown), linked item samples per pair,
+## link roles used.
+#set($uncCap = 500)
+#set($sampleCap = 30)
+#set($maxRoles = 5)
+
+## ======================================================================= lists
+## Shared snippet common.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED common.vm".
+## Lists, project, output mode and the bwKey macro. Needs params.vm.
+## Only identifiers are allowed in role and type lists; they go into SQL.
+#macro(bwIdList $bwIn $bwOut)
+  #foreach($bwPart in $bwIn.split(","))
+    #set($bwT = $bwPart.trim())
+    #if($bwT.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwT))
+      #set($void = $bwOut.add($bwT))
+    #end
+  #end
+#end
+
+#set($excludedTypes = [])
+#bwIdList($excludedTypesStr $excludedTypes)
+
+## Space names may contain blanks; they are compared in Velocity only, never put into SQL.
+#set($spaceFilter = [])
+#foreach($bwPart in $spacesStr.split(","))
+  #set($bwT = $bwPart.trim())
+  #if($bwT != "")
+    #set($void = $spaceFilter.add($bwT))
+  #end
+#end
+
+#set($typeSql = "")
+#foreach($t in $excludedTypes)
+  #if($typeSql != "")
+    #set($typeSql = "${typeSql},")
+  #end
+  #set($typeSql = "${typeSql}'${t}'")
+#end
+
+#set($projectIdRaw = "")
+#set($projectIdRaw = $page.getReference().projectId())
+#set($projectId = "$projectIdRaw")
+#set($projectOk = false)
+#if($projectId.matches("[A-Za-z0-9_.-]+"))
+  #set($projectOk = true)
+#end
+
+#set($isStatic = false)
+#if($widgetContext.target().isPdf() || $widgetContext.target().isPrint())
+  #set($isStatic = true)
+#end
+
+## Document key used everywhere: "space/name"
+## Referenced objects (document of a link, "branched from" source) can be unresolvable (deleted, no access).
+## Any access other than isUnresolvable() then throws, so they are only used when isUnresolvable() is false.
+#macro(bwKey $bwMod)
+  #set($bwKeyOut = "")
+  #set($bwUr = "unknown")
+  #if($bwMod)
+    #set($bwUr = $bwMod.isUnresolvable())
+  #end
+  #if("$bwUr" == "false")
+    #set($bwF = "")
+    #set($bwF = $bwMod.getModuleFolder())
+    #set($bwN = "")
+    #set($bwN = $bwMod.getId())
+    #if("$bwN" != "")
+      #set($bwKeyOut = "${bwF}/${bwN}")
+    #end
+  #end
+#end
+
+## Selected documents -> keys "space/name". Verified on 2512 (spike C1): each value is a ProxyEnumOption,
+## getModelObject() a ProxyDocument, getOldApi() the Open API Module (getReference().spaceId() is empty).
+#set($docOnly = [])
+#set($docSelLost = 0)
+#set($docVals = false)
+#set($docVals = $parameters.docs.values)
+#set($docVals = $parameters.docs.values())
+#if($docVals)
+  #foreach($v in $docVals)
+    #set($mo = false)
+    #set($mo = $v.getModelObject())
+    #set($moUr = "unknown")
+    #if($mo)
+      #set($moUr = $mo.isUnresolvable())
+    #end
+    #set($old = false)
+    #if("$moUr" == "false")
+      #set($old = $mo.getOldApi())
+    #end
+    #bwKey($old)
+    #if($bwKeyOut != "")
+      #if(!$docOnly.contains($bwKeyOut))
+        #set($void = $docOnly.add($bwKeyOut))
+      #end
+    #else
+      #set($docSelLost = $docSelLost + 1)
+    #end
+  #end
+#end
+
+## Link roles: selector values (id() = role id, spike C2), else the text parameter. At most maxRoles.
+#set($roleAll = [])
+#set($roleVals = false)
+#set($roleVals = $parameters.roles.values)
+#set($roleVals = $parameters.roles.values())
+#if($roleVals)
+  #foreach($v in $roleVals)
+    #set($rid = "$v")
+    #set($rid = $v.id())
+    #set($ridS = "$rid")
+    #if($ridS.matches("[A-Za-z0-9_.-]+") && !$roleAll.contains($ridS))
+      #set($void = $roleAll.add($ridS))
+    #end
+  #end
+#end
+#if($roleAll.size() == 0)
+  #bwIdList($rolesTextStr $roleAll)
+#end
+#set($roleIds = [])
+#foreach($r in $roleAll)
+  #if($roleIds.size() < $maxRoles)
+    #set($void = $roleIds.add($r))
+  #end
+#end
+#set($rolesDropped = $roleAll.size() - $roleIds.size())
+## Role names from the project's link role enumeration (spike C2); the id when not found.
+#set($roleName = $objectFactory.newMap())
+#foreach($r in $roleIds)
+  #set($void = $roleName.put($r, $r))
+#end
+#if($projectOk && $roleIds.size() > 0)
+  #set($tp = false)
+  #set($tp = $trackerService.getTrackerProject($projectId))
+  #set($roleEnum = false)
+  #if($tp)
+    #set($roleEnum = $tp.getWorkItemLinkRoleEnum())
+  #end
+  #if($roleEnum)
+    #foreach($o in $roleEnum.getAllOptions())
+      #set($oId = "")
+      #set($oId = $o.getId())
+      #set($oIdS = "$oId")
+      #if($roleName.containsKey($oIdS))
+        #set($oName = "")
+        #set($oName = $o.getName())
+        #if("$oName" != "")
+          #set($void = $roleName.put($oIdS, "$oName"))
+        #end
+      #end
+    #end
+  #end
+#end
+#set($roleSql = "")
+#foreach($r in $roleIds)
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+## Line styles of the roles, in selection order (same palette as graph.js).
+#set($roleColors = ["rgb(51,103,214)", "rgb(198,40,40)", "rgb(26,127,55)", "rgb(142,68,173)", "rgb(211,84,0)"])
+#set($roleDashes = ["", "9,5", "2,4", "6,3", "12,4,2,4"])
+
+#if(!$projectOk)
+  <div class="bw-warn">Document Coverage: place this widget on a page of a project.</div>
+#elseif($roleIds.size() == 0)
+  <div class="bw-warn">Document Coverage: select at least one link role in the widget parameters.</div>
+#else
+
+## ======================================================================= documents
+## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
+## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
+## status, author, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## (space/name) to keep; empty or unset = all documents.
+#set($ds = $trackerService.getDataService())
+#if(!$docOnly)
+  #set($docOnly = [])
+#end
+#set($docList = [])
+#set($docByKey = $objectFactory.newMap())
+#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
+#set($typeFilterSql = "")
+#if($typeSql != "")
+  #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
+#end
+#foreach($m in $ds.sqlSearch($docSql))
+  #bwKey($m)
+  #set($dKey = $bwKeyOut)
+  #set($dSpace = "")
+  #set($dSpace = $m.getModuleFolder())
+  #set($keep = true)
+  #if($dKey == "" || $docByKey.containsKey($dKey))
+    #set($keep = false)
+  #end
+  #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
+    #set($keep = false)
+  #end
+  #if($keep && $docOnly.size() > 0 && !$docOnly.contains($dKey))
+    #set($keep = false)
+  #end
+  #if($keep)
+    #set($d = $objectFactory.newMap())
+    #set($dName = $m.getId())
+    #set($dTitle = "")
+    #set($dTitle = $m.getTitle())
+    #if("$dTitle" == "")
+      #set($dTitle = "$dName")
+    #end
+    #set($dType = "")
+    #set($dTypeObj = false)
+    #set($dTypeObj = $m.getType())
+    #if($dTypeObj)
+      #set($dType = $dTypeObj.getId())
+      #set($dType = $dTypeObj.getName())
+    #end
+    #set($dStatus = "")
+    #set($dStatusObj = false)
+    #set($dStatusObj = $m.getStatus())
+    #if($dStatusObj)
+      #set($dStatus = $dStatusObj.getId())
+      #set($dStatus = $dStatusObj.getName())
+    #end
+    ## The author can be a deleted user: unresolvable objects throw on any access, see bwKey.
+    #set($dAuthor = "")
+    #set($dAuthorObj = false)
+    #set($dAuthorObj = $m.getAuthor())
+    #set($dAuthorUr = "unknown")
+    #if($dAuthorObj)
+      #set($dAuthorUr = $dAuthorObj.isUnresolvable())
+    #end
+    #if("$dAuthorUr" == "false")
+      #set($dAuthor = $dAuthorObj.getId())
+      #set($dAuthor = $dAuthorObj.getName())
+    #elseif($dAuthorObj)
+      #set($dAuthor = "(unknown user)")
+    #end
+    #set($dCreated = "")
+    #set($dDate = false)
+    #set($dDate = $m.getCreated())
+    #if($dDate)
+      #set($dCreated = "$dDate")
+      #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
+    #end
+    #set($dUpdated = "")
+    #set($dDate = false)
+    #set($dDate = $m.getUpdated())
+    #if($dDate)
+      #set($dUpdated = "$dDate")
+      #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
+    #end
+    ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
+    #set($spaceStr = "$dSpace")
+    #set($nameStr = "$dName")
+    #set($spaceSql = $spaceStr.replace("'", "''"))
+    #set($nameSql = $nameStr.replace("'", "''"))
+    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
+    #set($dItems = -1)
+    #set($dItemObjs = [])
+    #set($dItemObjs = $ds.sqlSearch($cntSql))
+    #set($dItems = $dItemObjs.size())
+    #set($void = $d.put("key", $dKey))
+    #set($void = $d.put("id", "$dName"))
+    #set($void = $d.put("title", "$dTitle"))
+    #set($void = $d.put("space", "$dSpace"))
+    #set($void = $d.put("type", "$dType"))
+    #set($void = $d.put("status", "$dStatus"))
+    #set($void = $d.put("author", "$dAuthor"))
+    #set($void = $d.put("created", "$dCreated"))
+    #set($void = $d.put("updated", "$dUpdated"))
+    #set($void = $d.put("items", $dItems))
+    #set($void = $d.put("itemObjs", $dItemObjs))
+    #set($void = $d.put("module", $m))
+    #set($void = $docList.add($d))
+    #set($void = $docByKey.put($dKey, $d))
+  #end
+#end
+
+## ======================================================================= links
+## Link-source items of the selected documents with a selected role whose target is in another selected document.
+## The documents are filtered in SQL (space and name) and again in Velocity.
+#set($condS = "")
+#set($condT = "")
+#foreach($d in $docList)
+  #set($kSp = $d.get("space").replace("'", "''"))
+  #set($kNm = $d.get("id").replace("'", "''"))
+  #if($condS != "")
+    #set($condS = "${condS} OR ")
+    #set($condT = "${condT} OR ")
+  #end
+  #set($condS = "${condS}(ms.c_modulefolder = '${kSp}' AND ms.c_id = '${kNm}')")
+  #set($condT = "${condT}(mt.c_modulefolder = '${kSp}' AND mt.c_id = '${kNm}')")
+#end
+#set($srcTypeSql = "")
+#if($typeSql != "")
+  #set($srcTypeSql = " AND ws.c_type NOT IN (${typeSql})")
+#end
+#set($edges = $objectFactory.newMap())
+#set($edgeKeys = [])
+## upstream key -> map of covered item ids (all roles, all downstream documents)
+#set($coveredAll = $objectFactory.newMap())
+#macro(cwEdge $cwUp $cwDown)
+  #set($cwPk = "${cwUp}>${cwDown}")
+  #if(!$edges.containsKey($cwPk))
+    #set($cwE = $objectFactory.newMap())
+    #set($void = $cwE.put("o", $cwUp))
+    #set($void = $cwE.put("c", $cwDown))
+    #set($void = $cwE.put("links", $objectFactory.newMap()))
+    #set($void = $cwE.put("up", $objectFactory.newMap()))
+    #set($void = $cwE.put("down", $objectFactory.newMap()))
+    #set($void = $cwE.put("upAll", $objectFactory.newMap()))
+    #set($void = $cwE.put("downAll", $objectFactory.newMap()))
+    #set($void = $cwE.put("samples", []))
+    #foreach($cwR in $roleIds)
+      #set($void = $cwE.get("links").put($cwR, 0))
+      #set($void = $cwE.get("up").put($cwR, $objectFactory.newMap()))
+      #set($void = $cwE.get("down").put($cwR, $objectFactory.newMap()))
+    #end
+    #set($void = $edges.put($cwPk, $cwE))
+    #set($void = $edgeKeys.add($cwPk))
+  #end
+  #set($cwE = $edges.get($cwPk))
+#end
+#if($docList.size() > 1)
+  #set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${srcTypeSql} AND (${condS}) AND (${condT})")
+  #foreach($wi in $ds.sqlSearch($linkSql))
+    #set($srcMod = false)
+    #set($srcMod = $wi.getModule())
+    #bwKey($srcMod)
+    #set($srcKey = $bwKeyOut)
+    #if($srcKey != "" && $docByKey.containsKey($srcKey))
+      #set($srcId = "$wi.getId()")
+      #foreach($ls in $wi.getLinkedWorkItemsStructsDirect())
+        #set($role = "")
+        #set($role = $ls.getLinkRole().getId())
+        #set($roleS = "$role")
+        #if($roleName.containsKey($roleS))
+          #set($tgt = false)
+          #set($tgt = $ls.getLinkedItem())
+          #set($tUr = "unknown")
+          #if($tgt)
+            #set($tUr = $tgt.isUnresolvable())
+          #end
+          #if("$tUr" == "false")
+            #set($tType = "")
+            #set($tTypeObj = false)
+            #set($tTypeObj = $tgt.getType())
+            #if($tTypeObj)
+              #set($tType = $tTypeObj.getId())
+            #end
+            #if(!$excludedTypes.contains("$tType"))
+              #set($tgtMod = false)
+              #set($tgtMod = $tgt.getModule())
+              #bwKey($tgtMod)
+              #set($tgtKey = $bwKeyOut)
+              #if($tgtKey != "" && $tgtKey != $srcKey && $docByKey.containsKey($tgtKey))
+                #set($tgtId = "$tgt.getId()")
+                #cwEdge($tgtKey $srcKey)
+                #set($nl = $cwE.get("links").get($roleS) + 1)
+                #set($void = $cwE.get("links").put($roleS, $nl))
+                #set($void = $cwE.get("up").get($roleS).put($tgtId, true))
+                #set($void = $cwE.get("down").get($roleS).put($srcId, true))
+                #set($void = $cwE.get("upAll").put($tgtId, true))
+                #set($void = $cwE.get("downAll").put($srcId, true))
+                #if($cwE.get("samples").size() < $sampleCap)
+                  #set($void = $cwE.get("samples").add("${srcId}|${tgtId}|${roleS}"))
+                #end
+                #if(!$coveredAll.containsKey($tgtKey))
+                  #set($void = $coveredAll.put($tgtKey, $objectFactory.newMap()))
+                #end
+                #set($void = $coveredAll.get($tgtKey).put($tgtId, true))
+              #end
+            #end
+          #end
+        #end
+      #end
+    #end
+  #end
+#end
+
+## ======================================================================= coverage
+## Per upstream document: counted items covered by any shown link, uncovered items (first uncCap).
+#foreach($uk in $coveredAll.keySet())
+  #set($d = $docByKey.get($uk))
+  #set($covMap = $coveredAll.get($uk))
+  #set($cov = 0)
+  #set($uncN = 0)
+  #set($unc = [])
+  #foreach($w in $d.get("itemObjs"))
+    #set($wId = "$w.getId()")
+    #if($covMap.containsKey($wId))
+      #set($cov = $cov + 1)
+    #else
+      #set($uncN = $uncN + 1)
+      #if($unc.size() < $uncCap)
+        #set($void = $unc.add($wId))
+      #end
+    #end
+  #end
+  #set($void = $d.put("upstream", true))
+  #set($void = $d.put("covered", $cov))
+  #set($void = $d.put("uncN", $uncN))
+  #set($void = $d.put("unc", $unc))
+#end
+#set($linkedKeys = $objectFactory.newMap())
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($void = $linkedKeys.put($e.get("o"), true))
+  #set($void = $linkedKeys.put($e.get("c"), true))
+#end
+
+## Text helpers for the output
+#macro(cwRolesLabel $cwEd $cwWithCounts)
+  #set($cwLabel = "")
+  #foreach($cwR in $roleIds)
+    #set($cwN = $cwEd.get("links").get($cwR))
+    #if($cwN > 0)
+      #if($cwLabel != "")
+        #set($cwLabel = "${cwLabel} + ")
+      #end
+      #set($cwNm = $roleName.get($cwR))
+      #if($cwWithCounts)
+        #set($cwLabel = "${cwLabel}${cwNm} ${cwN}")
+      #else
+        #set($cwLabel = "${cwLabel}${cwNm}")
+      #end
+    #end
+  #end
+#end
+#macro(cwPct $cwPart $cwWhole)
+  #set($cwPctOut = "-")
+  #if($cwWhole > 0)
+    ## Rounded to the nearest integer, as in the browser view (integer arithmetic only).
+    #set($cwPv = ($cwPart * 200 + $cwWhole) / (2 * $cwWhole))
+    #set($cwPctOut = "${cwPv}% (${cwPart}/${cwWhole})")
+  #end
+#end
+
+## ======================================================================= output
+#if($isStatic)
+## ----------------------------------------------------------------- static view (PDF / print)
+## No JavaScript. Elements limited to rect, line, polygon and text (rendered in PDF, docBranches spike V7).
+## Levels: longest path upstream -> downstream (upstream on the left)
+#set($lvl = $objectFactory.newMap())
+#foreach($d in $docList)
+  #if($linkedKeys.containsKey($d.get("key")))
+    #set($void = $lvl.put($d.get("key"), 0))
+  #end
+#end
+#foreach($pass in [1..15])
+  #foreach($k in $edgeKeys)
+    #set($e = $edges.get($k))
+    #set($lo = $lvl.get($e.get("o")))
+    #set($lc = $lvl.get($e.get("c")))
+    #if($lc <= $lo && $lo < 30)
+      #set($nl = $lo + 1)
+      #set($void = $lvl.put($e.get("c"), $nl))
+    #end
+  #end
+#end
+#set($maxLevel = 0)
+#foreach($k in $lvl.keySet())
+  #if($lvl.get($k) > $maxLevel)
+    #set($maxLevel = $lvl.get($k))
+  #end
+#end
+#set($cols = [])
+#set($placed = $objectFactory.newMap())
+#foreach($L in [0..$maxLevel])
+  #set($col = [])
+  #if($L > 0)
+    #set($pl = $L - 1)
+    #foreach($p in $cols.get($pl))
+      #foreach($k in $edgeKeys)
+        #set($e = $edges.get($k))
+        #if($e.get("o") == $p.get("key") && !$placed.containsKey($e.get("c")) && $lvl.get($e.get("c")) == $L)
+          #set($void = $col.add($docByKey.get($e.get("c"))))
+          #set($void = $placed.put($e.get("c"), true))
+        #end
+      #end
+    #end
+  #end
+  #foreach($d in $docList)
+    #if($linkedKeys.containsKey($d.get("key")) && !$placed.containsKey($d.get("key")) && $lvl.get($d.get("key")) == $L)
+      #set($void = $col.add($d))
+      #set($void = $placed.put($d.get("key"), true))
+    #end
+  #end
+  #set($void = $cols.add($col))
+#end
+## Geometry (integers only)
+#set($nW = 220)
+#set($cGap = 170)
+#set($rGap = 16)
+#set($mg = 16)
+#set($nLines = 4 + $extraList.size())
+#set($nH = 16 + 14 * $nLines)
+#set($px = $objectFactory.newMap())
+#set($py = $objectFactory.newMap())
+#set($maxRows = 0)
+#set($ci = 0)
+#foreach($col in $cols)
+  #set($ri = 0)
+  #foreach($d in $col)
+    #set($x = $mg + $ci * ($nW + $cGap))
+    #set($y = $mg + $ri * ($nH + $rGap))
+    #set($void = $px.put($d.get("key"), $x))
+    #set($void = $py.put($d.get("key"), $y))
+    #set($ri = $ri + 1)
+  #end
+  #if($ri > $maxRows)
+    #set($maxRows = $ri)
+  #end
+  #set($ci = $ci + 1)
+#end
+#set($cw = 2 * $mg + ($maxLevel + 1) * $nW + $maxLevel * $cGap)
+#set($ch = 2 * $mg + $maxRows * ($nH + $rGap))
+#set($outW = $cw)
+#set($outH = $ch)
+#if($cw > 700)
+  #set($outW = 700)
+  #set($outH = $ch * 700 / $cw)
+#end
+<div class="cw-root">
+<div><b>Document Coverage</b> &mdash; project $esc.html($projectId) &mdash; $edgeKeys.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
+#set($legend = "")
+#set($ri = 0)
+#foreach($r in $roleIds)
+  #if($legend != "")
+    #set($legend = "${legend}, ")
+  #end
+  #set($rn = $roleName.get($r))
+  #set($rc = "solid blue")
+  #if($ri == 1)
+    #set($rc = "dashed red")
+  #elseif($ri == 2)
+    #set($rc = "dotted green")
+  #elseif($ri == 3)
+    #set($rc = "dashed purple")
+  #elseif($ri == 4)
+    #set($rc = "dash-dot orange")
+  #end
+  #set($legend = "${legend}${rn} ${rc}")
+  #set($ri = $ri + 1)
+#end
+<div class="bw-muted">Arrow: downstream &rarr; upstream (link direction), upstream documents on the left. Line style: $esc.html($legend).</div>
+#if($rolesDropped > 0)
+<div class="bw-warn">Only the first $maxRoles link roles are used ($rolesDropped ignored).</div>
+#end
+#if($edgeKeys.size() == 0)
+<p>No link of the selected roles between the selected documents.</p>
+#else
+<svg xmlns="http://www.w3.org/2000/svg" width="$outW" height="$outH" viewBox="0 0 $cw $ch">
+<rect x="0" y="0" width="$cw" height="$ch" fill="rgb(255,255,255)"/>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($eo = $e.get("o"))
+  #set($ec = $e.get("c"))
+  #set($half = $nH / 2)
+  #set($x1 = $px.get($eo) + $nW)
+  #set($y1 = $py.get($eo) + $half)
+  #set($x2 = $px.get($ec))
+  #set($y2 = $py.get($ec) + $half)
+  #set($xm = $x1 + $cGap / 2)
+  ## Line style of the first selected role present on the edge
+  #set($color = "")
+  #set($dash = "")
+  #set($ri = 0)
+  #foreach($r in $roleIds)
+    #if($color == "" && $e.get("links").get($r) > 0)
+      #set($color = $roleColors.get($ri))
+      #set($dash = $roleDashes.get($ri))
+    #end
+    #set($ri = $ri + 1)
+  #end
+  #cwRolesLabel($e $showCounts)
+  #set($ax = $x1 + 9)
+  #set($ay1 = $y1 - 5)
+  #set($ay2 = $y1 + 5)
+  ## Label at the downstream end (one per line there; several lines can share the upstream end)
+  #set($lx = $xm + 3)
+  #set($ly = $y2 - 4)
+<line x1="$ax" y1="$y1" x2="$xm" y2="$y1" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y1" x2="$xm" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y2" x2="$x2" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<polygon points="$ax,$ay1 $x1,$y1 $ax,$ay2" fill="$color"/>
+<text x="$lx" y="$ly" font-family="Arial" font-size="9" fill="$color">$esc.html($cwLabel)</text>
+#end
+#foreach($col in $cols)
+  #foreach($d in $col)
+    #set($x = $px.get($d.get("key")))
+    #set($y = $py.get($d.get("key")))
+    #set($tx = $x + 7)
+<rect x="$x" y="$y" width="$nW" height="$nH" rx="5" fill="rgb(246,248,252)" stroke="rgb(120,132,155)" stroke-width="1"/>
+    #set($lines = [])
+    #set($void = $lines.add($d.get("id")))
+    #set($void = $lines.add($d.get("title")))
+    #set($void = $lines.add($d.get("space")))
+    #if($d.get("upstream"))
+      #cwPct($d.get("covered") $d.get("items"))
+      #set($void = $lines.add("Coverage: ${cwPctOut}"))
+    #else
+      #set($void = $lines.add("Coverage: -"))
+    #end
+    #foreach($f in $extraList)
+      #set($fv = "$d.get($f)")
+      #if($f == "items" && $fv == "-1")
+        #set($fv = "")
+      #end
+      #set($fl = $f)
+      #if($f == "type")
+        #set($fl = "Type")
+      #elseif($f == "status")
+        #set($fl = "Status")
+      #elseif($f == "author")
+        #set($fl = "Author")
+      #elseif($f == "created")
+        #set($fl = "Created")
+      #elseif($f == "updated")
+        #set($fl = "Updated")
+      #elseif($f == "items")
+        #set($fl = "Work items")
+      #end
+      #set($void = $lines.add("${fl}: ${fv}"))
+    #end
+    #set($li = 0)
+    #foreach($t in $lines)
+      #set($ts = "$t")
+      #if($ts.length() > 36)
+        #set($ts2 = $ts.substring(0, 35))
+        #set($ts = "${ts2}...")
+      #end
+      #set($ty = $y + 19 + $li * 14)
+      #set($fw = "normal")
+      #if($li == 0)
+        #set($fw = "bold")
+      #end
+<text x="$tx" y="$ty" font-family="Arial" font-size="11" font-weight="$fw" fill="rgb(25,35,55)">$esc.html($ts)</text>
+      #set($li = $li + 1)
+    #end
+  #end
+#end
+</svg>
+#end
+<table class="bw-table">
+<tr><th>Downstream</th><th>Roles (links)</th><th>Upstream</th><th>Downstream items with links</th><th>Upstream items covered</th></tr>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($o = $docByKey.get($e.get("o")))
+  #set($c = $docByKey.get($e.get("c")))
+  #cwRolesLabel($e true)
+  #cwPct($e.get("downAll").size() $c.get("items"))
+  #set($downTxt = $cwPctOut)
+  #cwPct($e.get("upAll").size() $o.get("items"))
+  #set($upTxt = $cwPctOut)
+<tr><td>$esc.html($c.get("space")) / $esc.html($c.get("id"))</td><td>$esc.html($cwLabel)</td><td>$esc.html($o.get("space")) / $esc.html($o.get("id"))</td><td>$esc.html($downTxt)</td><td>$esc.html($upTxt)</td></tr>
+#end
+</table>
+<table class="bw-table">
+<tr><th>Upstream document</th><th>Work items</th><th>Coverage</th><th>Uncovered items</th></tr>
+#foreach($d in $docList)
+  #if($d.get("upstream"))
+    #cwPct($d.get("covered") $d.get("items"))
+    #set($uncTxt = "")
+    #set($ui = 0)
+    #foreach($u in $d.get("unc"))
+      #if($ui < 100)
+        #if($uncTxt != "")
+          #set($uncTxt = "${uncTxt}, ")
+        #end
+        #set($uncTxt = "${uncTxt}${u}")
+      #end
+      #set($ui = $ui + 1)
+    #end
+    #set($uncN = $d.get("uncN"))
+    #if($uncN > 100)
+      #set($uncTxt = "${uncTxt} ... ($uncN in total)")
+    #end
+<tr><td>$esc.html($d.get("space")) / $esc.html($d.get("id"))</td><td>$d.get("items")</td><td>$esc.html($cwPctOut)</td><td>$esc.html($uncTxt)</td></tr>
+  #end
+#end
+</table>
+#if($showMode == "all")
+  #set($unrelated = "")
+  #foreach($d in $docList)
+    #if(!$linkedKeys.containsKey($d.get("key")))
+      #if($unrelated != "")
+        #set($unrelated = "${unrelated}, ")
+      #end
+      #set($dSp = $d.get("space"))
+      #set($dId = $d.get("id"))
+      #set($unrelated = "${unrelated}${dSp} / ${dId}")
+    #end
+  #end
+  #if($unrelated != "")
+<p class="bw-muted">Documents without relations: $esc.html($unrelated)</p>
+  #end
+#end
+</div>
+#else
+## ----------------------------------------------------------------- browser view (model + inlined JS)
+#set($countsFlag = "1")
+#if(!$showCounts)
+#set($countsFlag = "0")
+#end
+#set($rolesStr = "")
+#foreach($r in $roleIds)
+#if($rolesStr != "")
+#set($rolesStr = "${rolesStr};")
+#end
+#set($rn = $roleName.get($r))
+#set($rolesStr = "${rolesStr}${r}|${rn}")
+#end
+#set($warn = "")
+#if($rolesDropped > 0)
+#set($warn = "Only the first $maxRoles link roles are used ($rolesDropped ignored).")
+#end
+#if($docSelLost > 0)
+#set($warn = "${warn} $docSelLost selected document(s) could not be read.")
+#end
+<div class="cw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
+  <div class="bw-model" style="display:none">
+#foreach($d in $docList)
+#set($upFlag = "0")
+#set($covN = 0)
+#set($uncN = 0)
+#set($uncStr = "")
+#if($d.get("upstream"))
+#set($upFlag = "1")
+#set($covN = $d.get("covered"))
+#set($uncN = $d.get("uncN"))
+#foreach($u in $d.get("unc"))
+#if($uncStr != "")
+#set($uncStr = "${uncStr} ")
+#end
+#set($uncStr = "${uncStr}${u}")
+#end
+#end
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+#end
+#foreach($k in $edgeKeys)
+#set($e = $edges.get($k))
+## data-r "role:links;...", data-u / data-d "role:id id id;..." (upstream items covered / downstream items with links)
+#set($rStr = "")
+#set($uStr = "")
+#set($dStr = "")
+#foreach($r in $roleIds)
+#if($rStr != "")
+#set($rStr = "${rStr};")
+#set($uStr = "${uStr};")
+#set($dStr = "${dStr};")
+#end
+#set($nlk = $e.get("links").get($r))
+#set($rStr = "${rStr}${r}:${nlk}")
+#set($ids = "")
+#foreach($id in $e.get("up").get($r).keySet())
+#if($ids != "")
+#set($ids = "${ids} ")
+#end
+#set($ids = "${ids}${id}")
+#end
+#set($uStr = "${uStr}${r}:${ids}")
+#set($ids = "")
+#foreach($id in $e.get("down").get($r).keySet())
+#if($ids != "")
+#set($ids = "${ids} ")
+#end
+#set($ids = "${ids}${id}")
+#end
+#set($dStr = "${dStr}${r}:${ids}")
+#end
+#set($samplesStr = "")
+#foreach($s in $e.get("samples"))
+#if($samplesStr != "")
+#set($samplesStr = "${samplesStr};")
+#end
+#set($samplesStr = "${samplesStr}${s}")
+#end
+    <i class="bw-e" data-o="$esc.html($e.get('o'))" data-c="$esc.html($e.get('c'))" data-r="$esc.html($rStr)" data-u="$esc.html($uStr)" data-d="$esc.html($dStr)" data-s="$esc.html($samplesStr)"></i>
+#end
+  </div>
+</div>
+## Excel export library (xlsx-js-style, resources/xlsx.js), loaded with the Widget SDK directive.
+<div class="bw-lib" style="display:none">#loadWidgetJs("resources/xlsx.js")</div>
+<script>
+(function () {
+  'use strict';
+
+  /*
+   * Shared client core of the document widgets (docBranches, docCoverage).
+   *
+   * tools/build-widget.py places this fragment inside each widget's IIFE, before the widget's own
+   * graph.js code, so nothing is global. Velocity parses the result: no dollar sign, hash sign,
+   * backslash or non-ASCII character in this file (the build checks it). Use HASH in URLs.
+   *
+   * Edge categories ("cats") describe the kinds of relation a widget draws:
+   *   [{ id: 'branch', name: 'branch', label: 'Branches', color: 'rgb(...)', dash: '9,5' }, ...]
+   * in precedence order (the first category present on an edge gives its line style). An edge is
+   *   { o: originKey, c: targetKey, kinds: { catId: count }, meta: { catId: bool }, indirect: bool,
+   *     samples: [{ c: itemInTarget, o: itemInOrigin, k: catId }], ... widget fields }
+   */
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var HASH = String.fromCharCode(35);
+  var INDIRECT_COLOR = 'rgb(150,150,150)';
+  var EXTRA_FIELDS = [
+    ['type', 'Type'], ['status', 'Status'], ['author', 'Author'],
+    ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
+  ];
+  var NODE_W = 240;
+  var LINE_H = 15;
+  var PAD = 8;
+  var COL_GAP = 130;
+  var ROW_GAP = 22;
+  var MARGIN = 20;
+  var FONT = 'Segoe UI, Arial, sans-serif';
+  // Non-ASCII characters are built at runtime so the template stays ASCII-only.
+  var ARROW = String.fromCharCode(8594);
+  var ELLIPSIS = String.fromCharCode(8230);
+  var MINUS = String.fromCharCode(8722);
+  var DASH = String.fromCharCode(8211);
+
+  // ------------------------------------------------------------------ helpers
+
+  function el(tag, attrs, parent, text) {
+    var e = document.createElement(tag);
+    setAttrs(e, attrs);
+    if (text !== undefined) { e.textContent = text; }
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function svg(tag, attrs, parent, text) {
+    var e = document.createElementNS(SVG_NS, tag);
+    setAttrs(e, attrs);
+    if (text !== undefined) { e.textContent = text; }
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function setAttrs(e, attrs) {
+    if (!attrs) { return; }
+    for (var k in attrs) {
+      if (Object.prototype.hasOwnProperty.call(attrs, k) && attrs[k] !== null && attrs[k] !== undefined) {
+        e.setAttribute(k, attrs[k]);
+      }
+    }
+  }
+
+  function trunc(s, n) {
+    s = s || '';
+    return s.length > n ? s.substring(0, n - 1) + ELLIPSIS : s;
+  }
+
+  function toInt(v) {
+    var n = parseInt(v, 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function pct(part, whole) {
+    if (!whole || whole <= 0) { return null; }
+    return Math.round(100 * part / whole);
+  }
+
+  function basePath() {
+    var p = window.location.pathname;
+    return p.substring(0, p.lastIndexOf('/') + 1);
+  }
+
+  function docUrl(project, node) {
+    return basePath() + HASH + '/project/' + encodeURIComponent(project) + '/wiki/' +
+      encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
+  }
+
+  function itemUrl(project, id) {
+    return basePath() + HASH + '/project/' + encodeURIComponent(project) + '/workitem?id=' + encodeURIComponent(id);
+  }
+
+  function absUrl(u) {
+    return window.location.protocol + '//' + window.location.host + u;
+  }
+
+  function bez(a, b, c, d, t) {
+    var u = 1 - t;
+    return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+  }
+
+  function fieldIndex(f) {
+    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return i; } }
+    return 99;
+  }
+
+  function fieldLabel(f) {
+    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return EXTRA_FIELDS[i][1]; } }
+    return f;
+  }
+
+  function download(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name }, document.body);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.parentNode.removeChild(a); }, 1000);
+  }
+
+  // ------------------------------------------------------------------ model helpers
+
+  function readNodes(root) {
+    var nodes = [];
+    var byKey = {};
+    var nEls = root.querySelectorAll('.bw-model .bw-n');
+    for (var i = 0; i < nEls.length; i++) {
+      var d = nEls[i].dataset;
+      var n = {
+        key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
+        type: d.type || '', status: d.status || '', author: d.author || '',
+        created: d.created || '', updated: d.updated || '',
+        items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
+        el: nEls[i]
+      };
+      if (n.key && !byKey[n.key]) {
+        byKey[n.key] = n;
+        nodes.push(n);
+      }
+    }
+    return { nodes: nodes, byKey: byKey };
+  }
+
+  // "c|o|k;c|o|k" -> [{ c, o, k }]
+  function parseSamples(s) {
+    var out = [];
+    if (!s) { return out; }
+    var parts = s.split(';');
+    for (var i = 0; i < parts.length; i++) {
+      var f = parts[i].split('|');
+      if (f.length === 3) { out.push({ c: f[0], o: f[1], k: f[2] }); }
+    }
+    return out;
+  }
+
+  function catById(cats, id) {
+    for (var i = 0; i < cats.length; i++) { if (cats[i].id === id) { return cats[i]; } }
+    return null;
+  }
+
+  // First category present on the edge (precedence order); the last category as fallback.
+  function mainKind(e, cats) {
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      if (e.kinds[k] > 0 || e.meta[k]) { return cats[i]; }
+    }
+    return cats[cats.length - 1];
+  }
+
+  // noCounts: kind names only (line labels when the viewer hides the linked item counts).
+  function kindsLabel(e, cats, noCounts) {
+    var parts = [];
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      if (e.kinds[k] > 0) { parts.push(cats[i].name + (noCounts ? '' : ' ' + e.kinds[k])); }
+      else if (e.meta[k]) { parts.push(cats[i].name); }
+    }
+    return parts.join(' + ');
+  }
+
+  // "a,b" -> { a: true, b: true }; empty or unknown -> every category.
+  function relFromData(s, cats) {
+    var r = {};
+    var any = false;
+    var parts = (s || '').split(',');
+    for (var i = 0; i < parts.length; i++) {
+      if (catById(cats, parts[i])) { r[parts[i]] = true; any = true; }
+    }
+    if (!any) { cats.forEach(function (c) { r[c.id] = true; }); }
+    return r;
+  }
+
+  // Edge restricted to the selected categories (null when none of its categories is selected).
+  function restrictEdge(e, cats, rel) {
+    var kinds = {};
+    var meta = {};
+    var any = false;
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      kinds[k] = rel[k] ? e.kinds[k] : 0;
+      meta[k] = rel[k] ? !!e.meta[k] : false;
+      if (kinds[k] > 0 || meta[k]) { any = true; }
+    }
+    if (!any) { return null; }
+    var r = {};
+    for (var p in e) { if (Object.prototype.hasOwnProperty.call(e, p)) { r[p] = e[p]; } }
+    r.kinds = kinds;
+    r.meta = meta;
+    r.samples = e.samples.filter(function (sm) { return !catById(cats, sm.k) || rel[sm.k]; });
+    return r;
+  }
+
+  // ------------------------------------------------------------------ layout
+
+  function nodeHeight(state) {
+    return PAD * 2 + LINE_H * ((state.baseLines || 3) + state.extras.length);
+  }
+
+  // Layered layout: origin documents on the left (longest path over direct edges), barycentre
+  // ordering to reduce crossings, documents without a shown edge in a grid below (mode 'all').
+  // state.keep(node) can force a node without edges into the grid.
+  function layout(model, state, edges) {
+    var h = nodeHeight(state);
+    var degree = {};
+    for (var i = 0; i < edges.length; i++) {
+      degree[edges[i].o] = (degree[edges[i].o] || 0) + 1;
+      degree[edges[i].c] = (degree[edges[i].c] || 0) + 1;
+    }
+    var linked = [];
+    var isolated = [];
+    for (var j = 0; j < model.nodes.length; j++) {
+      var n = model.nodes[j];
+      if (state.hidden && state.hidden[n.key]) { continue; }
+      if (degree[n.key]) { linked.push(n); }
+      else if (state.mode === 'all') { isolated.push(n); }
+    }
+
+    // Levels: longest path over direct edges (sources on the left).
+    var lvl = {};
+    for (var a = 0; a < linked.length; a++) { lvl[linked[a].key] = 0; }
+    var direct = [];
+    for (var b = 0; b < edges.length; b++) { if (!edges[b].indirect) { direct.push(edges[b]); } }
+    for (var pass = 0; pass <= linked.length; pass++) {
+      var changed = false;
+      for (var c = 0; c < direct.length; c++) {
+        var e = direct[c];
+        if (lvl[e.c] < lvl[e.o] + 1 && lvl[e.o] + 1 < 50) { lvl[e.c] = lvl[e.o] + 1; changed = true; }
+      }
+      if (!changed) { break; }
+    }
+
+    var cols = [];
+    linked.sort(function (x, y) {
+      return (x.space + '/' + x.title).localeCompare(y.space + '/' + y.title);
+    });
+    for (var d = 0; d < linked.length; d++) {
+      var L = lvl[linked[d].key];
+      if (!cols[L]) { cols[L] = []; }
+      cols[L].push(linked[d]);
+    }
+    for (var f = 0; f < cols.length; f++) { if (!cols[f]) { cols[f] = []; } }
+
+    // Barycentre ordering to reduce crossings.
+    var parents = {};
+    var children = {};
+    for (var g = 0; g < direct.length; g++) {
+      (children[direct[g].o] = children[direct[g].o] || []).push(direct[g].c);
+      (parents[direct[g].c] = parents[direct[g].c] || []).push(direct[g].o);
+    }
+    var order = {};
+    function index() {
+      for (var q = 0; q < cols.length; q++) {
+        for (var r = 0; r < cols[q].length; r++) { order[cols[q][r].key] = r; }
+      }
+    }
+    function bary(list) {
+      if (!list || !list.length) { return null; }
+      var s = 0;
+      for (var t = 0; t < list.length; t++) { s += order[list[t]]; }
+      return s / list.length;
+    }
+    function sortCol(col, rel) {
+      var keyed = col.map(function (n2, idx) {
+        var bv = bary(rel[n2.key]);
+        return { n: n2, v: bv === null ? idx : bv, idx: idx };
+      });
+      keyed.sort(function (x, y) { return x.v - y.v || x.idx - y.idx; });
+      return keyed.map(function (k) { return k.n; });
+    }
+    index();
+    for (var sweep = 0; sweep < 4; sweep++) {
+      for (var u = 1; u < cols.length; u++) { cols[u] = sortCol(cols[u], parents); index(); }
+      for (var v = cols.length - 2; v >= 0; v--) { cols[v] = sortCol(cols[v], children); index(); }
+    }
+
+    // Edges that skip a level arc over the graph; reserve room above the first row.
+    var topPad = 0;
+    for (var sk = 0; sk < edges.length; sk++) {
+      if (lvl[edges[sk].c] - lvl[edges[sk].o] > 1) { topPad = 40; break; }
+    }
+    var pos = {};
+    var maxRows = 0;
+    for (var w = 0; w < cols.length; w++) {
+      maxRows = Math.max(maxRows, cols[w].length);
+      for (var z = 0; z < cols[w].length; z++) {
+        pos[cols[w][z].key] = { x: MARGIN + w * (NODE_W + COL_GAP), y: MARGIN + topPad + z * (h + ROW_GAP) };
+      }
+    }
+    var width = MARGIN * 2 + Math.max(1, cols.length) * NODE_W + Math.max(0, cols.length - 1) * COL_GAP;
+    var height = MARGIN * 2 + topPad + maxRows * (h + ROW_GAP);
+    var isoTop = linked.length ? height + ROW_GAP : MARGIN + 18;
+    var gridCols = Math.max(3, cols.length);
+    if (isolated.length) {
+      isolated.sort(function (x, y) {
+        return (x.space + '/' + x.title).localeCompare(y.space + '/' + y.title);
+      });
+      for (var m = 0; m < isolated.length; m++) {
+        pos[isolated[m].key] = {
+          x: MARGIN + (m % gridCols) * (NODE_W + 40),
+          y: isoTop + Math.floor(m / gridCols) * (h + ROW_GAP)
+        };
+      }
+      width = Math.max(width, MARGIN * 2 + Math.min(gridCols, isolated.length) * (NODE_W + 40));
+      height = isoTop + Math.ceil(isolated.length / gridCols) * (h + ROW_GAP) + MARGIN;
+    }
+    return {
+      pos: pos, width: width, height: Math.max(height, 80), nodeH: h,
+      linked: linked, isolated: isolated, isoTop: linked.length ? height : MARGIN, topPad: topPad
+    };
+  }
+
+  // ------------------------------------------------------------------ base widget
+  // Methods shared by the widgets; each widget constructor calls initBase(this, root) and
+  // defines cats, filePrefix, emptyText, edgeSummary(e), showDetails(e), drawTable(), exportExcel().
+
+  var Base = {};
+
+  function initBase(self, root, model) {
+    self.root = root;
+    self.model = model;
+    var ds = root.dataset;
+    self.project = ds.project || '';
+    self.height = toInt(ds.height) || 600;
+    self.state = {
+      mode: ds.mode === 'all' ? 'all' : 'related',
+      counts: ds.counts !== '0',
+      extras: (ds.extras || '').split(',').filter(function (x) { return x; }),
+      filter: '',
+      zoom: 1,
+      view: 'graph'
+    };
+  }
+
+  function extendBase(Ctor) {
+    for (var k in Base) { if (Object.prototype.hasOwnProperty.call(Base, k)) { Ctor.prototype[k] = Base[k]; } }
+  }
+
+  Base.checkbox = function (parent, label, checked, onChange) {
+    var lab = el('label', { 'class': 'bw-check' }, parent);
+    var cb = el('input', { type: 'checkbox' }, lab);
+    cb.checked = !!checked;
+    el('span', null, lab, label);
+    cb.addEventListener('change', function () { onChange(cb.checked); });
+    return lab;
+  };
+
+  Base.button = function (parent, label, title, onClick) {
+    var b = el('button', { type: 'button', 'class': 'bw-btn', title: title }, parent, label);
+    b.addEventListener('click', onClick);
+    return b;
+  };
+
+  // Toolbar group with one checkbox per category (state.rel).
+  Base.kindChecks = function (bar, title) {
+    var self = this;
+    var box = el('span', { 'class': 'bw-fields' }, bar);
+    el('span', { 'class': 'bw-muted' }, box, title);
+    this.cats.forEach(function (cat) {
+      self.checkbox(box, cat.label, self.state.rel[cat.id], function (on) {
+        self.state.rel[cat.id] = on; self.render(true);
+      });
+    });
+    return box;
+  };
+
+  Base.countsCheck = function (bar) {
+    var self = this;
+    var cnt = this.checkbox(bar, 'Item counts', this.state.counts, function (on) {
+      self.state.counts = on; self.render(false);
+    });
+    cnt.title = 'Show the number of linked work items on the lines';
+    return cnt;
+  };
+
+  Base.fieldChecks = function (bar) {
+    var self = this;
+    var fields = el('span', { 'class': 'bw-fields' }, bar);
+    el('span', { 'class': 'bw-muted' }, fields, 'Fields:');
+    EXTRA_FIELDS.forEach(function (f) {
+      self.checkbox(fields, f[1], self.state.extras.indexOf(f[0]) >= 0, function (on) {
+        var ex = self.state.extras.filter(function (x) { return x !== f[0]; });
+        if (on) { ex.push(f[0]); }
+        ex.sort(function (x, y) { return fieldIndex(x) - fieldIndex(y); });
+        self.state.extras = ex;
+        self.render(false);
+      });
+    });
+    return fields;
+  };
+
+  Base.searchBox = function (bar) {
+    var self = this;
+    var search = el('input', { 'class': 'bw-ctl bw-search', type: 'search', placeholder: 'Highlight documents' + ELLIPSIS }, bar);
+    search.addEventListener('input', function () { self.state.filter = search.value.trim().toLowerCase(); self.render(false); });
+    return search;
+  };
+
+  Base.viewButtons = function (bar) {
+    var self = this;
+    var btns = el('span', { 'class': 'bw-btns' }, bar);
+    this.button(btns, 'Fit', 'Fit the graph to the view', function () { self.fit(); });
+    this.button(btns, MINUS, 'Zoom out', function () { self.setZoom(self.state.zoom / 1.25); });
+    this.button(btns, '+', 'Zoom in', function () { self.setZoom(self.state.zoom * 1.25); });
+    this.viewBtn = this.button(btns, 'Table', 'Switch between graph and table', function () {
+      self.state.view = self.state.view === 'graph' ? 'table' : 'graph';
+      self.render(false);
+    });
+    this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
+    this.button(btns, 'Excel', 'Download the shown documents and relations as an Excel workbook', function () { self.exportExcel(); });
+    this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
+    return btns;
+  };
+
+  // Areas below the toolbar: legend, status, details, graph view, table, tooltip.
+  Base.buildAreas = function () {
+    var root = this.root;
+    this.legend(el('div', { 'class': 'bw-legend' }, root));
+    this.status = el('div', { 'class': 'bw-status' }, root);
+    this.details = el('div', { 'class': 'bw-details' }, root);
+    this.details.style.display = 'none';
+    this.view = el('div', { 'class': 'bw-view' }, root);
+    this.view.style.height = this.height + 'px';
+    this.svgEl = svg('svg', { xmlns: SVG_NS, 'class': 'bw-svg' }, this.view);
+    this.table = el('div', { 'class': 'bw-table-wrap' }, root);
+    this.tip = el('div', { 'class': 'bw-tip' }, root);
+    this.tip.style.display = 'none';
+  };
+
+  Base.legendKinds = function (box) {
+    this.cats.forEach(function (cat) {
+      var item = el('span', { 'class': 'bw-leg' }, box);
+      var s = svg('svg', { width: 34, height: 10 }, item);
+      svg('line', { x1: 1, y1: 5, x2: 33, y2: 5, stroke: cat.color, 'stroke-width': 2.5, 'stroke-dasharray': cat.dash || null }, s);
+      el('span', null, item, cat.name);
+    });
+  };
+
+  // Redraws graph and table after a state change; statusText(edges) gives the status line.
+  Base.layoutAndDraw = function (edges, refit) {
+    var st = this.state;
+    this.lay = layout(this.model, st, edges);
+    this.edges = edges;
+    this.viewBtn.textContent = st.view === 'graph' ? 'Table' : 'Graph';
+    this.view.style.display = st.view === 'graph' ? '' : 'none';
+    this.table.style.display = st.view === 'table' ? '' : 'none';
+    this.drawGraph();
+    this.drawTable();
+    if (refit) { this.fit(); } else { this.applyZoom(); }
+  };
+
+  // Text lines of a document box; widgets can override it (keep it in line with state.baseLines).
+  Base.nodeLines = function (n) {
+    var lines = [
+      { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
+      { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
+      { text: n.space, weight: 400, color: 'rgb(110,118,135)' }
+    ];
+    this.state.extras.forEach(function (f) {
+      var v = n[f];
+      if (f === 'items') { v = n.items >= 0 ? String(n.items) : ''; }
+      lines.push({ text: fieldLabel(f) + ': ' + (v || DASH), weight: 400, color: 'rgb(80,88,105)' });
+    });
+    return lines;
+  };
+
+  Base.drawGraph = function () {
+    var self = this;
+    var root = this.svgEl;
+    while (root.firstChild) { root.removeChild(root.firstChild); }
+    var lay = this.lay;
+    var h = lay.nodeH;
+    svg('rect', { x: 0, y: 0, width: lay.width, height: lay.height, fill: 'rgb(255,255,255)' }, root);
+    if (!lay.linked.length && !lay.isolated.length) {
+      svg('text', { x: MARGIN, y: MARGIN + 14, 'font-family': FONT, 'font-size': 13, fill: 'rgb(90,90,90)' }, root,
+        this.emptyText);
+      return;
+    }
+    if (lay.isolated.length && lay.linked.length) {
+      svg('text', { x: MARGIN, y: lay.isoTop + 14, 'font-family': FONT, 'font-size': 12, fill: 'rgb(110,110,110)' }, root,
+        'Documents without relations');
+    }
+    var gEdges = svg('g', null, root);
+    var gNodes = svg('g', null, root);
+    var gLabels = svg('g', null, root);
+    var filter = this.state.filter;
+
+    this.edges.forEach(function (e) {
+      var p = lay.pos[e.o];
+      var q = lay.pos[e.c];
+      if (!p || !q) { return; }
+      var x1 = p.x + NODE_W, y1 = p.y + h / 2, x2 = q.x, y2 = q.y + h / 2;
+      var dx = x2 > x1 ? Math.max(30, (x2 - x1) / 2) : 70;
+      var c1x = x1 + dx, c2x = x2 - dx, c1y = y1, c2y = y2;
+      if (x2 - x1 > COL_GAP + NODE_W) {
+        // Skips at least one level: arc above the graph instead of crossing documents.
+        c1x = x1 + COL_GAP;
+        c2x = x2 - COL_GAP;
+        c1y = c2y = Math.max(4, Math.min(y1, y2) - h / 2 - lay.topPad - 30);
+      }
+      var d = 'M' + x1 + ',' + y1 + ' C' + c1x + ',' + c1y + ' ' + c2x + ',' + c2y + ' ' + (x2 - 2) + ',' + y2;
+      var cat = mainKind(e, self.cats);
+      var color = e.indirect ? INDIRECT_COLOR : cat.color;
+      var g = svg('g', { 'class': 'bw-edge' }, gEdges);
+      svg('path', {
+        d: d, fill: 'none', stroke: color, 'stroke-width': e.indirect ? 1.4 : 2.2,
+        'stroke-dasharray': e.indirect ? '4,4' : (cat.dash || null),
+        opacity: e.indirect ? 0.7 : 1
+      }, g);
+      // Arrow head at the target document, or at the origin when the widget draws arrows backwards
+      // (docCoverage: origin = upstream on the left, arrow in the link direction downstream -> upstream).
+      var head = self.arrowAtOrigin ?
+        (x1 + 10) + ',' + (y1 - 5) + ' ' + x1 + ',' + y1 + ' ' + (x1 + 10) + ',' + (y1 + 5) :
+        (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5);
+      svg('polygon', { points: head, fill: color }, g);
+      var hit = svg('path', { d: d, fill: 'none', stroke: 'rgb(0,0,0)', 'stroke-opacity': 0, 'stroke-width': 12, 'class': 'bw-hit' }, g);
+      // Label near the target end (one per edge there, while several edges can share an origin).
+      var lt = 0.8;
+      var mx = bez(x1, c1x, c2x, x2, lt);
+      var my = bez(y1, c1y, c2y, y2, lt) - 3;
+      var label = kindsLabel(e, self.cats, !self.state.counts) + (e.indirect ? ' (indirect)' : '');
+      var lg = svg('g', { 'class': 'bw-edge-label' }, gLabels);
+      var bg = svg('rect', { fill: 'rgb(255,255,255)', opacity: 0.9, rx: 3 }, lg);
+      var t = svg('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-family': FONT, 'font-size': 11, fill: color }, lg, label);
+      try {
+        var bb = t.getBBox();
+        // Keep the label clear of the target document box.
+        var over = bb.x + bb.width + 6 - x2;
+        if (over > 0) { setAttrs(t, { x: mx - over }); bb = t.getBBox(); }
+        setAttrs(bg, { x: bb.x - 3, y: bb.y - 1, width: bb.width + 6, height: bb.height + 2 });
+      } catch (err) { /* not rendered yet */ }
+      [hit, lg].forEach(function (target) {
+        target.addEventListener('mousemove', function (ev) { self.showTip(ev, self.edgeSummary(e)); });
+        target.addEventListener('mouseleave', function () { self.hideTip(); });
+        target.addEventListener('click', function () { self.showDetails(e); });
+      });
+    });
+
+    var nodes = lay.linked.concat(lay.isolated);
+    nodes.forEach(function (n) {
+      var p = lay.pos[n.key];
+      var match = !filter || (n.id + ' ' + n.title + ' ' + n.space).toLowerCase().indexOf(filter) >= 0;
+      var a = svg('a', { href: docUrl(self.project, n), target: '_top', 'class': 'bw-node' }, gNodes);
+      var g = svg('g', { opacity: match ? 1 : 0.3 }, a);
+      svg('rect', {
+        x: p.x, y: p.y, width: NODE_W, height: h, rx: 6,
+        fill: 'rgb(246,248,252)', stroke: filter && match ? 'rgb(230,126,34)' : 'rgb(120,132,155)',
+        'stroke-width': filter && match ? 2.5 : 1.2
+      }, g);
+      self.nodeLines(n).forEach(function (ln, i) {
+        svg('text', {
+          x: p.x + PAD, y: p.y + PAD + 11 + i * LINE_H, 'font-family': FONT, 'font-size': 12,
+          'font-weight': ln.weight, fill: ln.color
+        }, g, trunc(ln.text, 36));
+      });
+      svg('title', null, a, n.space + ' / ' + n.id + ' ' + DASH + ' ' + n.title);
+      if (self.onNode) { self.onNode(a, n); }
+    });
+  };
+
+  Base.showTip = function (ev, lines) {
+    var tip = this.tip;
+    tip.textContent = '';
+    lines.forEach(function (l, i) { el('div', i === 0 ? { 'class': 'bw-tip-head' } : null, tip, l); });
+    var r = this.root.getBoundingClientRect();
+    tip.style.display = 'block';
+    tip.style.left = (ev.clientX - r.left + 14) + 'px';
+    tip.style.top = (ev.clientY - r.top + 14) + 'px';
+  };
+
+  Base.hideTip = function () { this.tip.style.display = 'none'; };
+
+  // Opens the details box with a header "origin -> target" and a Close button; returns the box.
+  Base.openDetails = function (o, c) {
+    var box = this.details;
+    box.textContent = '';
+    box.style.display = 'block';
+    var head = el('div', { 'class': 'bw-details-head' }, box);
+    el('a', { href: docUrl(this.project, o), target: '_top' }, head, o.id);
+    if (c) {
+      el('span', null, head, '  ' + ARROW + '  ');
+      el('a', { href: docUrl(this.project, c), target: '_top' }, head, c.id);
+    }
+    var close = this.button(head, 'Close', 'Close the details', function () { box.style.display = 'none'; });
+    close.style.marginLeft = '12px';
+    return box;
+  };
+
+  // List of work item pairs (target item -> origin item) with the category name.
+  Base.sampleList = function (box, e, title) {
+    var self = this;
+    if (!e.samples.length) { return; }
+    el('div', { 'class': 'bw-muted' }, box, title);
+    var ul = el('ul', { 'class': 'bw-items' }, box);
+    e.samples.forEach(function (s) {
+      var li = el('li', null, ul);
+      el('a', { href: itemUrl(self.project, s.c), target: '_top' }, li, s.c);
+      el('span', null, li, ' ' + ARROW + ' ');
+      el('a', { href: itemUrl(self.project, s.o), target: '_top' }, li, s.o);
+      var cat = catById(self.cats, s.k);
+      el('span', { 'class': 'bw-muted' }, li, ' (' + (cat ? cat.name : s.k) + ')');
+    });
+    if (e.total > e.samples.length) {
+      el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (e.total - e.samples.length) + ' more');
+    }
+  };
+
+  // Simple HTML table: header names and rows of cells ({ text, href } or plain text).
+  Base.htmlTable = function (headers, rows, emptyText) {
+    var wrap = this.table;
+    var t = el('table', { 'class': 'bw-table' }, wrap);
+    var hr = el('tr', null, el('thead', null, t));
+    headers.forEach(function (x) { el('th', null, hr, x); });
+    var tb = el('tbody', null, t);
+    rows.forEach(function (row) {
+      var tr = el('tr', null, tb);
+      row.forEach(function (cell) {
+        var td = el('td', null, tr);
+        if (cell && cell.href) { el('a', { href: cell.href, target: '_top' }, td, cell.text); }
+        else { td.textContent = cell === null || cell === undefined ? '' : String(cell); }
+      });
+    });
+    if (!rows.length) { el('div', { 'class': 'bw-muted' }, wrap, emptyText); }
+  };
+
+  Base.setZoom = function (z) {
+    this.state.zoom = Math.max(0.1, Math.min(3, z));
+    this.applyZoom();
+  };
+
+  Base.applyZoom = function () {
+    var lay = this.lay;
+    var z = this.state.zoom;
+    setAttrs(this.svgEl, {
+      viewBox: '0 0 ' + lay.width + ' ' + lay.height,
+      width: Math.round(lay.width * z), height: Math.round(lay.height * z)
+    });
+  };
+
+  Base.fit = function () {
+    var lay = this.lay;
+    var w = this.view.clientWidth || 800;
+    var h = this.view.clientHeight || this.height;
+    var z = Math.min(1, (w - 12) / lay.width, (h - 12) / lay.height);
+    this.setZoom(Math.max(z, 0.2));
+  };
+
+  Base.svgString = function () {
+    var clone = this.svgEl.cloneNode(true);
+    setAttrs(clone, { xmlns: SVG_NS, width: this.lay.width, height: this.lay.height });
+    return new XMLSerializer().serializeToString(clone);
+  };
+
+  Base.fileName = function (ext) {
+    return this.filePrefix + (this.project || 'project') + '.' + ext;
+  };
+
+  Base.exportSvg = function () {
+    download(new Blob([this.svgString()], { type: 'image/svg+xml' }), this.fileName('svg'));
+  };
+
+  Base.shownDocs = function () {
+    return this.lay.linked.concat(this.lay.isolated).slice().sort(function (a, b) {
+      return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
+    });
+  };
+
+  Base.sortedEdges = function () {
+    var by = this.model.byKey;
+    return this.edges.slice().sort(function (a, b) {
+      var oa = by[a.o], ob = by[b.o], ca = by[a.c], cb = by[b.c];
+      return (oa.space + '/' + oa.id).localeCompare(ob.space + '/' + ob.id) ||
+        (ca.space + '/' + ca.id).localeCompare(cb.space + '/' + cb.id);
+    });
+  };
+
+  // ------------------------------------------------------------------ Excel export
+  // Uses the XLSX library (xlsx-js-style) loaded from the widget resources with loadWidgetJs.
+  // sheets: [{ name, rows (first row = header), widths, links: [{ r, c, url }] }].
+  // Falls back to a CSV of the first sheet when the library is not available.
+
+  function sheetFromRows(X, rows, widths, links) {
+    var ws = X.utils.aoa_to_sheet(rows);
+    var head = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '3367D6' } }, alignment: { vertical: 'center' } };
+    for (var c = 0; c < rows[0].length; c++) {
+      var ref = X.utils.encode_cell({ r: 0, c: c });
+      if (ws[ref]) { ws[ref].s = head; }
+    }
+    (links || []).forEach(function (lk) {
+      var cell = ws[X.utils.encode_cell({ r: lk.r, c: lk.c })];
+      if (cell) { cell.l = { Target: lk.url }; cell.s = { font: { color: { rgb: '1A4DB3' }, underline: true } }; }
+    });
+    ws['!cols'] = widths.map(function (w) { return { wch: w }; });
+    if (rows.length > 1) {
+      ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: rows[0].length - 1 } }) };
+    }
+    return ws;
+  }
+
+  function csvCell(v) {
+    var t = v === null || v === undefined ? '' : String(v);
+    return /[",;]|[^ -~]/.test(t) ? '"' + t.split('"').join('""') + '"' : t;
+  }
+
+  Base.exportWorkbook = function (sheets) {
+    var X = window.XLSX;
+    if (!X || !X.utils || !X.write) { this.exportCsv(sheets[0].rows, sheets[0].what); return; }
+    var wb = X.utils.book_new();
+    sheets.forEach(function (sh) {
+      X.utils.book_append_sheet(wb, sheetFromRows(X, sh.rows, sh.widths, sh.links), sh.name);
+    });
+    var data = X.write(wb, { bookType: 'xlsx', type: 'array' });
+    download(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), this.fileName('xlsx'));
+  };
+
+  Base.exportCsv = function (rows, what) {
+    var nl = String.fromCharCode(13, 10);
+    var lines = rows.map(function (row) { return row.map(csvCell).join(','); });
+    download(new Blob([String.fromCharCode(65279) + lines.join(nl) + nl], { type: 'text/csv' }), this.fileName('csv'));
+    this.status.textContent += ' ' + DASH + ' Excel library not loaded: ' + (what || 'data') + ' exported as CSV.';
+  };
+
+  // ------------------------------------------------------------------ start
+
+  function startWidgets(rootClass, Ctor, name) {
+    var roots = document.querySelectorAll('.' + rootClass);
+    for (var i = 0; i < roots.length; i++) {
+      if (roots[i].getAttribute('data-bw-ready') === '1') { continue; }
+      roots[i].setAttribute('data-bw-ready', '1');
+      try {
+        new Ctor(roots[i]);
+      } catch (err) {
+        roots[i].appendChild(el('div', { 'class': 'bw-error' }, null, name + ' widget error: ' + err));
+      }
+    }
+  }
+
+  /*
+   * Document Coverage - client-side graph (widget-specific part).
+   *
+   * tools/build-widget.py inlines shared/js/core.js and this file into render.vm, inside one IIFE.
+   * Same restrictions as core.js: no dollar sign, hash sign, backslash or non-ASCII character.
+   *
+   * Edges: o = upstream document (link targets, left), c = downstream document (link sources).
+   * Arrows follow the link direction, downstream -> upstream (arrowAtOrigin).
+   * Coverage is recomputed from the shown lines: hiding a role or a document updates it.
+   */
+
+  var ROLE_STYLES = [
+    { color: 'rgb(51,103,214)', dash: '' },
+    { color: 'rgb(198,40,40)', dash: '9,5' },
+    { color: 'rgb(26,127,55)', dash: '2,4' },
+    { color: 'rgb(142,68,173)', dash: '6,3' },
+    { color: 'rgb(211,84,0)', dash: '12,4,2,4' }
+  ];
+
+  // data-roles "id|name;id|name" -> categories in selection order.
+  function readCats(s) {
+    var cats = [];
+    (s || '').split(';').forEach(function (part) {
+      var f = part.split('|');
+      if (!f[0] || cats.length >= ROLE_STYLES.length) { return; }
+      var st = ROLE_STYLES[cats.length];
+      var name = f[1] || f[0];
+      cats.push({ id: f[0], name: name, label: name, color: st.color, dash: st.dash });
+    });
+    return cats;
+  }
+
+  function words(s) {
+    return (s || '').split(' ').filter(function (x) { return x; });
+  }
+
+  // "role:a b;role2:c" -> { role: ['a', 'b'], role2: ['c'] }
+  function roleLists(s) {
+    var out = {};
+    (s || '').split(';').forEach(function (part) {
+      var i = part.indexOf(':');
+      if (i > 0) { out[part.substring(0, i)] = words(part.substring(i + 1)); }
+    });
+    return out;
+  }
+
+  function readModel(root, cats) {
+    var model = readNodes(root);
+    model.nodes.forEach(function (n) {
+      var d = n.el.dataset;
+      n.up = d.up === '1';
+      n.uncBase = words(d.unc);
+      n.uncBaseN = toInt(d.uncN);
+    });
+    var byKey = model.byKey;
+    var edges = [];
+    var eEls = root.querySelectorAll('.bw-model .bw-e');
+    for (var j = 0; j < eEls.length; j++) {
+      var a = eEls[j].dataset;
+      if (!byKey[a.o] || !byKey[a.c] || a.o === a.c) { continue; }
+      var kinds = {};
+      (a.r || '').split(';').forEach(function (part) {
+        var i = part.indexOf(':');
+        if (i > 0) { kinds[part.substring(0, i)] = toInt(part.substring(i + 1)); }
+      });
+      cats.forEach(function (c) { if (!kinds[c.id]) { kinds[c.id] = 0; } });
+      edges.push({
+        o: a.o, c: a.c, kinds: kinds, meta: {}, indirect: false,
+        up: roleLists(a.u), down: roleLists(a.d),
+        samples: parseSamples(a.s)
+      });
+    }
+    // Every upstream item covered by any line (all roles, all documents), per upstream document.
+    model.allCovered = {};
+    edges.forEach(function (e) {
+      var set = model.allCovered[e.o] = model.allCovered[e.o] || {};
+      cats.forEach(function (c) { (e.up[c.id] || []).forEach(function (id) { set[id] = true; }); });
+    });
+    model.edges = edges;
+    return model;
+  }
+
+  function union(lists) {
+    var set = {};
+    lists.forEach(function (l) { (l || []).forEach(function (id) { set[id] = true; }); });
+    return set;
+  }
+
+  function size(set) { return Object.keys(set).length; }
+
+  function Widget(root) {
+    this.cats = readCats(root.dataset.roles);
+    initBase(this, root, readModel(root, this.cats));
+    this.filePrefix = 'document-coverage-';
+    this.emptyText = 'No link of the shown roles between the shown documents.';
+    this.arrowAtOrigin = true;
+    this.warn = root.dataset.warn || '';
+    this.state.rel = relFromData('', this.cats);
+    this.state.hidden = {};
+    this.state.baseLines = 4;
+    this.build();
+    this.render(true);
+  }
+  extendBase(Widget);
+
+  Widget.prototype.build = function () {
+    var self = this;
+    var bar = el('div', { 'class': 'bw-toolbar' }, this.root);
+
+    var mode = el('select', { 'class': 'bw-ctl', title: 'Documents shown' }, bar);
+    el('option', { value: 'related' }, mode, 'Only documents with relations');
+    el('option', { value: 'all' }, mode, 'All selected documents');
+    mode.value = this.state.mode;
+    mode.addEventListener('change', function () { self.state.mode = mode.value; self.render(true); });
+
+    this.docPicker(bar);
+    this.kindChecks(bar, 'Roles:');
+    this.countsCheck(bar).title = 'Show the number of links on the lines';
+    this.fieldChecks(bar);
+    this.searchBox(bar);
+    this.viewButtons(bar);
+    this.buildAreas();
+  };
+
+  // In-widget document selector: a button that opens a list of checkboxes.
+  Widget.prototype.docPicker = function (bar) {
+    var self = this;
+    var wrap = el('span', { 'class': 'cw-pick' }, bar);
+    var btn = this.button(wrap, 'Documents', 'Choose the documents shown', function () {
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+    var panel = el('div', { 'class': 'cw-pick-panel' }, wrap);
+    panel.style.display = 'none';
+    var all = this.checkbox(panel, '(all)', true, function (on) {
+      self.model.nodes.forEach(function (n) { if (on) { delete self.state.hidden[n.key]; } else { self.state.hidden[n.key] = true; } });
+      boxes.forEach(function (b) { b.checked = on; });
+      update();
+    });
+    all.style.fontWeight = '600';
+    var boxes = [];
+    this.model.nodes.slice().sort(function (a, b) {
+      return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
+    }).forEach(function (n) {
+      var lab = self.checkbox(panel, n.space + ' / ' + n.id, true, function (on) {
+        if (on) { delete self.state.hidden[n.key]; } else { self.state.hidden[n.key] = true; }
+        update();
+      });
+      lab.style.display = 'flex';
+      boxes.push(lab.querySelector('input'));
+    });
+    function update() {
+      var shown = self.model.nodes.length - size(self.state.hidden);
+      btn.textContent = 'Documents (' + shown + '/' + self.model.nodes.length + ')';
+      self.render(true);
+    }
+    btn.textContent = 'Documents (' + this.model.nodes.length + '/' + this.model.nodes.length + ')';
+  };
+
+  Widget.prototype.legend = function (box) {
+    this.legendKinds(box);
+    el('span', { 'class': 'bw-muted' }, box, 'Arrow: downstream ' + ARROW + ' upstream (link direction), upstream on the left. ' +
+      'Click a document for its coverage, a line for details.');
+  };
+
+  // Edges restricted to the shown roles and documents; coverage of the upstream documents from them.
+  Widget.prototype.compute = function () {
+    var st = this.state;
+    var cats = this.cats;
+    var edges = [];
+    this.model.edges.forEach(function (e) {
+      if (st.hidden[e.o] || st.hidden[e.c]) { return; }
+      var r = restrictEdge(e, cats, st.rel);
+      if (!r) { return; }
+      var shownRoles = cats.filter(function (c) { return st.rel[c.id]; });
+      r.upSet = union(shownRoles.map(function (c) { return e.up[c.id]; }));
+      r.downSet = union(shownRoles.map(function (c) { return e.down[c.id]; }));
+      r.links = 0;
+      shownRoles.forEach(function (c) { r.links += r.kinds[c.id]; });
+      r.total = size(r.downSet);
+      edges.push(r);
+    });
+    var cov = {};
+    edges.forEach(function (e) {
+      var set = cov[e.o] = cov[e.o] || {};
+      Object.keys(e.upSet).forEach(function (id) { set[id] = true; });
+    });
+    this.cov = cov;
+    return edges;
+  };
+
+  // Coverage of an upstream document with the current filters: { covered, total, uncovered (list), uncoveredN }.
+  Widget.prototype.coverage = function (n) {
+    if (!n.up) { return null; }
+    var set = this.cov[n.key] || {};
+    var covered = size(set);
+    // Uncovered = never covered (from the server, first 500) + covered only by hidden lines.
+    var lost = Object.keys(this.model.allCovered[n.key] || {}).filter(function (id) { return !set[id]; }).sort();
+    return {
+      covered: covered, total: n.items,
+      uncovered: lost.concat(n.uncBase), uncoveredN: n.uncBaseN + lost.length
+    };
+  };
+
+  function covText(c) {
+    if (!c) { return DASH; }
+    var p = pct(c.covered, c.total);
+    return p === null ? DASH : p + '% (' + c.covered + '/' + c.total + ')';
+  }
+
+  Widget.prototype.nodeLines = function (n) {
+    var lines = Base.nodeLines.call(this, n);
+    var c = this.coverage(n);
+    lines.splice(3, 0, { text: 'Coverage: ' + covText(c), weight: 600, color: c ? 'rgb(26,90,60)' : 'rgb(140,146,160)' });
+    return lines;
+  };
+
+  // A click on a document shows its coverage (the document link stays in the details).
+  Widget.prototype.onNode = function (a, n) {
+    var self = this;
+    a.addEventListener('click', function (ev) { ev.preventDefault(); self.showDocDetails(n); });
+  };
+
+  Widget.prototype.render = function (refit) {
+    var edges = this.compute();
+    this.layoutAndDraw(edges, refit);
+    var shown = this.lay.linked.length + this.lay.isolated.length;
+    this.status.textContent = shown + ' of ' + this.model.nodes.length + ' documents, ' + edges.length + ' relations' +
+      (this.warn ? ' ' + DASH + ' ' + this.warn : '');
+    // Open details follow the filters: document details are recomputed, relation details closed.
+    if (this.details.style.display !== 'none') {
+      if (this.detailDoc && !this.state.hidden[this.detailDoc.key]) { this.showDocDetails(this.detailDoc); }
+      else { this.details.style.display = 'none'; }
+    }
+  };
+
+  Widget.prototype.edgeSummary = function (e) {
+    var o = this.model.byKey[e.o];
+    var c = this.model.byKey[e.c];
+    var lines = [c.id + '  ' + ARROW + '  ' + o.id, kindsLabel(e, this.cats) + ' (' + e.links + ' links)'];
+    var pd = pct(size(e.downSet), c.items);
+    var pu = pct(size(e.upSet), o.items);
+    lines.push(size(e.downSet) + ' items of ' + c.id + ' with links' + (pd !== null ? ' (' + pd + '%)' : ''));
+    lines.push(size(e.upSet) + ' items of ' + o.id + ' covered' + (pu !== null ? ' (' + pu + '%)' : ''));
+    return lines;
+  };
+
+  Widget.prototype.showDetails = function (e) {
+    this.detailDoc = null;
+    var o = this.model.byKey[e.o];
+    var c = this.model.byKey[e.c];
+    var box = this.openDetails(c, o);
+    this.edgeSummary(e).slice(1).forEach(function (l) { el('div', null, box, l); });
+    this.sampleList(box, e, 'Linked work items (downstream ' + ARROW + ' upstream):');
+  };
+
+  Widget.prototype.showDocDetails = function (n) {
+    var self = this;
+    this.detailDoc = n;
+    var box = this.openDetails(n, null);
+    el('div', null, box, n.title + ' ' + DASH + ' ' + n.space);
+    var c = this.coverage(n);
+    if (!c) {
+      el('div', { 'class': 'bw-muted' }, box, 'No shown link points to this document (not upstream).');
+    } else {
+      el('div', null, box, 'Coverage: ' + covText(c) + ', ' + c.uncoveredN + ' uncovered items');
+      if (c.uncovered.length) {
+        el('div', { 'class': 'bw-muted' }, box, 'Uncovered items:');
+        var ul = el('ul', { 'class': 'bw-items' }, box);
+        c.uncovered.forEach(function (id) {
+          el('a', { href: itemUrl(self.project, id), target: '_top' }, el('li', null, ul), id);
+        });
+        if (c.uncoveredN > c.uncovered.length) {
+          el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (c.uncoveredN - c.uncovered.length) + ' more');
+        }
+      }
+    }
+    var down = this.edges.filter(function (e) { return e.o === n.key; });
+    if (down.length) {
+      el('div', { 'class': 'bw-muted' }, box, 'Covered by: ' + down.map(function (e) {
+        return self.model.byKey[e.c].id + ' (' + size(e.upSet) + ')';
+      }).join(', '));
+    }
+  };
+
+  // Downstream -> upstream relations, then the coverage of the upstream documents.
+  Widget.prototype.drawTable = function () {
+    var self = this;
+    this.table.textContent = '';
+    if (this.state.view !== 'table') { return; }
+    var rows = this.sortedEdges().map(function (e) {
+      var o = self.model.byKey[e.o];
+      var c = self.model.byKey[e.c];
+      return [
+        { text: c.space + ' / ' + c.id, href: docUrl(self.project, c) },
+        kindsLabel(e, self.cats),
+        { text: o.space + ' / ' + o.id, href: docUrl(self.project, o) },
+        covText({ covered: size(e.downSet), total: c.items }),
+        covText({ covered: size(e.upSet), total: o.items })
+      ];
+    });
+    this.htmlTable(['Downstream', 'Roles (links)', 'Upstream', 'Downstream items with links', 'Upstream items covered'], rows, 'No relation found.');
+    var cov = this.shownDocs().filter(function (n) { return n.up; }).map(function (n) {
+      var c = self.coverage(n);
+      return [{ text: n.space + ' / ' + n.id, href: docUrl(self.project, n) }, String(n.items), covText(c), String(c.uncoveredN)];
+    });
+    if (cov.length) {
+      this.htmlTable(['Upstream document', 'Work items', 'Coverage', 'Uncovered items'], cov, '');
+    }
+  };
+
+  // ------------------------------------------------------------------ Excel export (current filters)
+
+  Widget.prototype.exportExcel = function () {
+    var self = this;
+    var by = this.model.byKey;
+    var cats = this.cats;
+    var edges = this.sortedEdges();
+    var rel = [['Downstream space', 'Downstream document', 'Downstream title', 'Roles',
+      'Upstream space', 'Upstream document', 'Upstream title']
+      .concat(cats.map(function (c) { return c.name + ' links'; }))
+      .concat(['Links', 'Downstream items with links', 'Downstream work items', 'Downstream with links (%)',
+        'Upstream items covered', 'Upstream work items', 'Upstream covered (%)'])];
+    var relLinks = [];
+    edges.forEach(function (e, i) {
+      var o = by[e.o];
+      var c = by[e.c];
+      var pd = pct(size(e.downSet), c.items);
+      var pu = pct(size(e.upSet), o.items);
+      rel.push([c.space, c.id, c.title, kindsLabel(e, cats), o.space, o.id, o.title]
+        .concat(cats.map(function (k) { return e.kinds[k.id]; }))
+        .concat([e.links, size(e.downSet), c.items < 0 ? '' : c.items, pd === null ? '' : pd,
+          size(e.upSet), o.items < 0 ? '' : o.items, pu === null ? '' : pu]));
+      relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, c)) });
+      relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, o)) });
+    });
+    var docs = [['Space', 'Document', 'Title', 'Type', 'Status', 'Author', 'Created', 'Updated', 'Work items',
+      'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items']];
+    var shown = this.shownDocs();
+    shown.forEach(function (n) {
+      var c = self.coverage(n);
+      var p = c ? pct(c.covered, c.total) : null;
+      docs.push([n.space, n.id, n.title, n.type, n.status, n.author, n.created, n.updated, n.items < 0 ? '' : n.items,
+        n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '']);
+    });
+    var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
+    var unc = [['Upstream document', 'Uncovered item']];
+    var uncLinks = [];
+    shown.forEach(function (n) {
+      var c = self.coverage(n);
+      if (!c) { return; }
+      c.uncovered.forEach(function (id) {
+        unc.push([n.space + ' / ' + n.id, id]);
+        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(self.project, id)) });
+      });
+    });
+    var items = [['Downstream document', 'Upstream document', 'Downstream item', 'Upstream item', 'Role']];
+    var itemLinks = [];
+    edges.forEach(function (e) {
+      var o = by[e.o];
+      var c = by[e.c];
+      e.samples.forEach(function (sm) {
+        var cat = catById(cats, sm.k);
+        items.push([c.space + ' / ' + c.id, o.space + ' / ' + o.id, sm.c, sm.o, cat ? cat.name : sm.k]);
+        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(self.project, sm.c)) });
+        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(self.project, sm.o)) });
+      });
+    });
+    this.exportWorkbook([
+      { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
+        widths: [14, 28, 34, 24, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 28, 40, 14, 14, 20, 18, 18, 11, 9, 11, 11, 11] },
+      { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
+      { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
+    ]);
+  };
+
+  startWidgets('cw-root', Widget, 'Coverage');
+})();
+</script>
+#end
+#end

@@ -290,8 +290,12 @@
 ## ======================================================================= documents
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
-## status, author, created, updated, items, module). Needs common.vm.
+## status, author, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## (space/name) to keep; empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
+#if(!$docOnly)
+  #set($docOnly = [])
+#end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
 #set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
@@ -309,6 +313,9 @@
     #set($keep = false)
   #end
   #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
+    #set($keep = false)
+  #end
+  #if($keep && $docOnly.size() > 0 && !$docOnly.contains($dKey))
     #set($keep = false)
   #end
   #if($keep)
@@ -368,7 +375,9 @@
     #set($nameSql = $nameStr.replace("'", "''"))
     #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
     #set($dItems = -1)
-    #set($dItems = $ds.sqlSearch($cntSql).size())
+    #set($dItemObjs = [])
+    #set($dItemObjs = $ds.sqlSearch($cntSql))
+    #set($dItems = $dItemObjs.size())
     #set($void = $d.put("key", $dKey))
     #set($void = $d.put("id", "$dName"))
     #set($void = $d.put("title", "$dTitle"))
@@ -379,6 +388,7 @@
     #set($void = $d.put("created", "$dCreated"))
     #set($void = $d.put("updated", "$dUpdated"))
     #set($void = $d.put("items", $dItems))
+    #set($void = $d.put("itemObjs", $dItemObjs))
     #set($void = $d.put("module", $m))
     #set($void = $docList.add($d))
     #set($void = $docByKey.put($dKey, $d))
@@ -1379,9 +1389,14 @@
         'stroke-dasharray': e.indirect ? '4,4' : (cat.dash || null),
         opacity: e.indirect ? 0.7 : 1
       }, g);
-      svg('polygon', { points: (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5), fill: color }, g);
+      // Arrow head at the target document, or at the origin when the widget draws arrows backwards
+      // (docCoverage: origin = upstream on the left, arrow in the link direction downstream -> upstream).
+      var head = self.arrowAtOrigin ?
+        (x1 + 10) + ',' + (y1 - 5) + ' ' + x1 + ',' + y1 + ' ' + (x1 + 10) + ',' + (y1 + 5) :
+        (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5);
+      svg('polygon', { points: head, fill: color }, g);
       var hit = svg('path', { d: d, fill: 'none', stroke: 'rgb(0,0,0)', 'stroke-opacity': 0, 'stroke-width': 12, 'class': 'bw-hit' }, g);
-      // Label near the arrow head so that each label sits next to its target document.
+      // Label near the target end (one per edge there, while several edges can share an origin).
       var lt = 0.8;
       var mx = bez(x1, c1x, c2x, x2, lt);
       var my = bez(y1, c1y, c2y, y2, lt) - 3;
@@ -1391,6 +1406,9 @@
       var t = svg('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-family': FONT, 'font-size': 11, fill: color }, lg, label);
       try {
         var bb = t.getBBox();
+        // Keep the label clear of the target document box.
+        var over = bb.x + bb.width + 6 - x2;
+        if (over > 0) { setAttrs(t, { x: mx - over }); bb = t.getBBox(); }
         setAttrs(bg, { x: bb.x - 3, y: bb.y - 1, width: bb.width + 6, height: bb.height + 2 });
       } catch (err) { /* not rendered yet */ }
       [hit, lg].forEach(function (target) {

@@ -1,7 +1,8 @@
 # Specification — Document Coverage widget (docCoverage)
 
-**Status:** v0.2, 2026-10-27, written with the product owner (PO). Spike C1–C4 done on 2512
-(`tests/docCoverage-v0.1.x/spike-tests.md`, §8); implementation of 0.1.0 can start. Items marked `[?]` are open or need verification on a Polarion instance.
+**Status:** v0.3, 2026-10-27, written with the product owner (PO). Spike C1–C4 done on 2512
+(`tests/docCoverage-v0.1.x/spike-tests.md`, §8). Widget **0.1.0 implemented** (`widgets/docCoverage/src`), tested with
+Velocity 1.4 on mocks and in Chromium; open checks on the instance in §9. Items marked `[?]` are open or need verification on a Polarion instance.
 
 ## 1. Goal
 
@@ -89,11 +90,10 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 
 ## 7. Open questions
 
-1. Arrow direction: upstream → downstream (as docBranches: original → copy), upstream documents on the left. C3 shows
-   the upstream document is the link target, so this is the default. Alternative: arrow in the link direction
-   (downstream → upstream, "satisfies"). `[?]` PO
+1. ~~Arrow direction~~ **Decided**: arrows in the link direction, **downstream → upstream** (the usual traceability
+   notation); upstream documents stay on the left (PO, 2026-10-27).
 2. ~~Role labels~~ **Decided**: role name (PO, 2026-10-27).
-3. Cap of the uncovered items list in the page model (default 500 per document) `[?]` PO
+3. ~~Cap of the uncovered items list~~ **Decided**: 500 per document in the page model, full count always shown (PO).
 4. Should a document that is both upstream and downstream (middle of a chain) show its coverage %? Default: yes, for
    the links where it is the target.
 
@@ -103,10 +103,22 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 |---|---|---|
 | C1 | How are the selected documents of an `@document` multi-select read (`values()`, `getModelObject()`, space/name)? | ✅ `ProxyEnumOption` → `getModelObject()` `ProxyDocument` → `getOldApi()` `Module` (folder `_default`, id). `getReference().spaceId()` empty |
 | C2 | How are the selected link roles read (id, name), and which roles does the project have (id, name, opposite name)? | ✅ `id()` = role id; project roles readable with name and opposite name |
-| C3 | Link direction of the coverage roles, link scan between the selected documents, timing on the large project | ✅ `satisfies` stored on the downstream item, target = customer spec; SQL with source + target document filter works; 3–4 ms SQL, ≤ 1 ms scan (small set). Large project / all documents not measured `[?]` |
+| C3 | Link direction of the coverage roles, link scan between the selected documents, timing on the large project | ✅ `satisfies` stored on the downstream item, target = customer spec; SQL with source + target document filter works; 3–4 ms SQL, ≤ 1 ms scan (small set). Large project not measured; PO: no performance concern |
 | C4 | Counted items per upstream document, coverage % and uncovered items, timing | ✅ 6 counted items (heading excluded), 5 covered = 83 %, 1 uncovered listed; ≤ 1 ms |
 
-## 9. Decision log
+## 9. Open checks for 0.1.0 on 2512
+
+Only verifiable on the instance (the harness uses mocks):
+
+a. Upload of `docCoverage.zip` (entry `docCoverage/resources/xlsx.js`, 29 characters) and the Excel export.
+b. The document and role selectors as in C1/C2, with 2+ documents and 2 roles; the "Link roles as text" fallback.
+c. Coverage numbers on the spike set (customer spec 5/6 = 83 %, uncovered item listed) in the graph, table, details,
+   Excel and PDF export.
+d. Arrows downstream → upstream, upstream on the left; role names on the lines.
+e. No document selected (= all documents of the project): rendering time on the large project.
+f. Viewer permissions (as docBranches §10.2 a).
+
+## 10. Decision log
 
 | Date | Decision | Source |
 |---|---|---|
@@ -117,3 +129,5 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 | 2026-10-27 | Spike C1–C4 on 2512 (project with a customer specification and two system specifications, role `satisfies`): selectors readable, document key from `getOldApi()`, coverage links stored on the downstream item, coverage computed as expected, fast on the small set | PO tests |
 | 2026-10-27 | Line labels show the role **name** | PO |
 | 2026-10-27 | Raw spike results (PDF/PNG with company branding) removed from the branch and its history; only findings are kept | PO |
+| 2026-10-27 | Arrows downstream → upstream (link direction), upstream on the left; uncovered list capped at 500 per document (full count shown); no performance concern for the large project | PO |
+| 2026-10-27 | Widget 0.1.0 implemented: shared core + `graph.js` (coverage recomputed in the browser from the shown roles and documents, document picker, document details with uncovered items, table, Excel, SVG), static PDF view with coverage tables; harness `tools/vtest/docCoverage/` | `tools/test-widget.sh docCoverage` |

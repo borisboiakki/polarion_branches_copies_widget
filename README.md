@@ -6,9 +6,11 @@ between them, deduced from work item links. They share one client core, one buil
 | Widget | What it shows | Status | Docs |
 |---|---|---|---|
 | **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | 0.2.x, in use on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
-| **docCoverage** — Document Coverage | For selected documents and link roles, which document covers which, with link counts, coverage % and uncovered items | specified, spike pending | [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
+| **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | 0.1.0, to be validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
 
 ![docBranches preview rendered from the VforIA test set (mock data)](docs/docBranches/preview-graph.png)
+
+![docCoverage preview rendered from the mock coverage set](docs/docCoverage/preview-graph.png)
 
 ## Common features
 

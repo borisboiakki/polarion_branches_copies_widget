@@ -3,43 +3,10 @@ import java.util.*;
 /**
  * Smoke test of the docCoverage spike widget (tests/docCoverage-v0.1.x/spike-widget/cvSpike) with Velocity 1.4,
  * reusing the mock Polarion objects of tools/vtest/docBranches/WidgetHarness.java (VforIA test set).
- * The document selector values mimic a Rendering API option: getModelObject() -> document with getReference()
- * and getOldApi(). These shapes are assumptions until C1/C2 run on 2512.
+ * The selector mocks (WidgetHarness.DocOpt, RoleOpt) follow what C1/C2 showed on 2512.
  * Usage: java SpikeHarness <spikeWidgetDir> <outDir>
  */
 public class SpikeHarness {
-
-    public static class DocRef {
-        final WidgetHarness.Module m;
-        DocRef(WidgetHarness.Module m) { this.m = m; }
-        public String projectId() { return "VforIA"; }
-        public String spaceId() { return m.getModuleFolder(); }
-        public String name() { return m.getId(); }
-    }
-
-    public static class Doc {
-        final WidgetHarness.Module m;
-        Doc(WidgetHarness.Module m) { this.m = m; }
-        public boolean isUnresolvable() { return false; }
-        public DocRef getReference() { return new DocRef(m); }
-        public WidgetHarness.Module getOldApi() { return m; }
-    }
-
-    public static class DocOpt {
-        final WidgetHarness.Module m;
-        DocOpt(WidgetHarness.Module m) { this.m = m; }
-        public String id() { return m.getModuleFolder() + "/" + m.getId(); }
-        public Doc getModelObject() { return new Doc(m); }
-        public String toString() { return id(); }
-    }
-
-    public static class RoleOpt {
-        final String id;
-        RoleOpt(String id) { this.id = id; }
-        public String id() { return id; }
-        public String name() { return id.replace('_', ' '); }
-        public String toString() { return id; }
-    }
 
     static WidgetHarness.Module mod(String name) {
         for (WidgetHarness.Module m : WidgetHarness.MODULES) { if (m.getId().equals(name)) { return m; } }
@@ -51,12 +18,12 @@ public class SpikeHarness {
         String dir = args[0];
         String out = args[1];
         List<Object> docs = new ArrayList<Object>();
-        docs.add(new DocOpt(mod("SRS_Test")));
-        docs.add(new DocOpt(mod("SRS_Test_Reuse_TestB")));
-        docs.add(new DocOpt(mod("SRS_Test_TestD_Derived")));
+        docs.add(new WidgetHarness.DocOpt(mod("SRS_Test")));
+        docs.add(new WidgetHarness.DocOpt(mod("SRS_Test_Reuse_TestB")));
+        docs.add(new WidgetHarness.DocOpt(mod("SRS_Test_TestD_Derived")));
         List<Object> roles = new ArrayList<Object>();
-        roles.add(new RoleOpt("duplicates"));
-        roles.add(new RoleOpt("derived_from"));
+        roles.add(new WidgetHarness.RoleOpt("duplicates"));
+        roles.add(new WidgetHarness.RoleOpt("derived_from"));
         String[] tests = { "docs", "roles", "scan", "coverage" };
         for (String t : tests) {
             Map<String, WidgetHarness.Param> p = new HashMap<String, WidgetHarness.Param>();

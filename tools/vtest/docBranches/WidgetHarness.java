@@ -17,6 +17,9 @@ import org.apache.velocity.runtime.log.LogSystem;
  *
  * The mocks follow what the spike observed on 2512: customEnum singleValue() is a String,
  * sqlSearch returns object lists, links are stored on the copy/branch/derived item.
+ * The mock classes are shared: tools/vtest/docCoverage/CoverageHarness.java and tools/vtest/cvSpike/SpikeHarness.java
+ * compile this file with theirs. Selector mocks (DocOpt, RoleOpt, link role enumeration) follow the docCoverage spike
+ * C1/C2 on 2512.
  */
 public class WidgetHarness {
 
@@ -230,9 +233,69 @@ public class WidgetHarness {
         return out;
     }
 
+    // @document selector value (spike C1): ProxyEnumOption -> getModelObject() ProxyDocument -> getOldApi() Module.
+    // getReference().spaceId() is empty on 2512.
+    public static class DocRef {
+        final Module m;
+        DocRef(Module m) { this.m = m; }
+        public String projectId() { return "VforIA"; }
+        public String spaceId() { return ""; }
+        public String name() { return m.getId(); }
+    }
+
+    public static class Doc {
+        final Module m;
+        Doc(Module m) { this.m = m; }
+        public boolean isUnresolvable() { return m.unresolvable; }
+        public DocRef getReference() { return new DocRef(m); }
+        public Module getOldApi() { return m; }
+    }
+
+    public static class DocOpt {
+        final Module m;
+        public DocOpt(Module m) { this.m = m; }
+        public String id() { return m.folder + " / " + m.name; }
+        public Doc getModelObject() { return new Doc(m); }
+        public String toString() { return "ProxyEnumOption id:" + id(); }
+    }
+
+    // workitem-link-role selector value (spike C2): id() = role id.
+    public static class RoleOpt {
+        final String id;
+        public RoleOpt(String id) { this.id = id; }
+        public String id() { return id; }
+        public String toString() { return "ProxyEnumOption id:" + id; }
+    }
+
+    // Project link role enumeration: id, name, opposite name (spike C2).
+    public static class RoleEnumOpt {
+        final String id, name, opposite;
+        public RoleEnumOpt(String id, String name, String opposite) { this.id = id; this.name = name; this.opposite = opposite; }
+        public String getId() { return id; }
+        public String getName() { return name; }
+        public String getOppositeName() { return opposite; }
+    }
+
+    static final List<RoleEnumOpt> LINK_ROLES = new ArrayList<RoleEnumOpt>(Arrays.asList(
+        new RoleEnumOpt("parent", "has parent", "is parent of"),
+        new RoleEnumOpt("satisfies", "satisfies", "is satisfied by"),
+        new RoleEnumOpt("verifies", "verifies", "is verified by"),
+        new RoleEnumOpt("duplicates", "duplicates", "is duplicated by"),
+        new RoleEnumOpt("derived_from", "is derived from", "is derived by"),
+        new RoleEnumOpt("branched_from", "is branched from", "has branch")));
+
+    public static class RoleEnum {
+        public List<RoleEnumOpt> getAllOptions() { return LINK_ROLES; }
+    }
+
+    public static class TrackerProject {
+        public RoleEnum getWorkItemLinkRoleEnum() { return new RoleEnum(); }
+    }
+
     public static class TrackerService {
         private final DataService ds = new DataService();
         public DataService getDataService() { return ds; }
+        public TrackerProject getTrackerProject(String projectId) { return new TrackerProject(); }
     }
 
     public static class ObjectFactory {

@@ -2,7 +2,8 @@
 # Build each widget, render it with Velocity 1.4 against mock Polarion objects, then load the browser
 # and PDF output in Chromium (Playwright), take screenshots and test the interactions.
 # Usage: tools/test-widget.sh [widget|all] [outDir]      (defaults: all, /tmp/bw-widget-test)
-# Per widget: tools/vtest/<widget>/WidgetHarness.java (mocks + render) and tools/vtest/<widget>/browser-check.js.
+# Per widget: tools/vtest/<widget>/*Harness.java (render on mocks; main class = that file) and tools/vtest/<widget>/browser-check.js.
+# The mock Polarion objects live in tools/vtest/docBranches/WidgetHarness.java and are compiled with every harness.
 # Output of each widget goes to <outDir>/<widget>/.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,8 +21,11 @@ for w in "${widgets[@]}"; do
   out="$base/$w"
   mkdir -p "$out/cls"
   python3 "$root/tools/build-widget.py" --widget "$w"
-  javac -nowarn -cp "$cp" -d "$out/cls" "$root/tools/vtest/$w/"*.java 2>&1 | grep -v '^Picked up\|^Note:' || true
-  java -cp "$out/cls:$cp" WidgetHarness "$root/widgets/$w/dist/$w" "$out" related 2>&1 | grep -v '^Picked up'
+  srcs=("$root/tools/vtest/docBranches/WidgetHarness.java")
+  for f in "$root/tools/vtest/$w/"*.java; do [ "$f" = "${srcs[0]}" ] || srcs+=("$f"); done
+  main="$(cd "$root/tools/vtest/$w" && ls *Harness.java | head -1)"
+  javac -nowarn -cp "$cp" -d "$out/cls" "${srcs[@]}" 2>&1 | grep -v '^Picked up\|^Note:' || true
+  java -cp "$out/cls:$cp" "${main%.java}" "$root/widgets/$w/dist/$w" "$out" related 2>&1 | grep -v '^Picked up'
   for f in browser pdf; do
     { printf '<!doctype html><html><head><meta charset="utf-8"><title>%s</title></head><body style="margin:16px;width:1180px">' "$f"
       cat "$out/$f-fragment.html"; echo '</body></html>'; } > "$out/$f.html"

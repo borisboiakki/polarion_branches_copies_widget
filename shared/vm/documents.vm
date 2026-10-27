@@ -1,7 +1,11 @@
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
-## status, author, created, updated, items, module). Needs common.vm.
+## status, author, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## (space/name) to keep; empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
+#if(!$docOnly)
+  #set($docOnly = [])
+#end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
 #set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
@@ -19,6 +23,9 @@
     #set($keep = false)
   #end
   #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
+    #set($keep = false)
+  #end
+  #if($keep && $docOnly.size() > 0 && !$docOnly.contains($dKey))
     #set($keep = false)
   #end
   #if($keep)
@@ -78,7 +85,9 @@
     #set($nameSql = $nameStr.replace("'", "''"))
     #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
     #set($dItems = -1)
-    #set($dItems = $ds.sqlSearch($cntSql).size())
+    #set($dItemObjs = [])
+    #set($dItemObjs = $ds.sqlSearch($cntSql))
+    #set($dItems = $dItemObjs.size())
     #set($void = $d.put("key", $dKey))
     #set($void = $d.put("id", "$dName"))
     #set($void = $d.put("title", "$dTitle"))
@@ -89,6 +98,7 @@
     #set($void = $d.put("created", "$dCreated"))
     #set($void = $d.put("updated", "$dUpdated"))
     #set($void = $d.put("items", $dItems))
+    #set($void = $d.put("itemObjs", $dItemObjs))
     #set($void = $d.put("module", $m))
     #set($void = $docList.add($d))
     #set($void = $docByKey.put($dKey, $d))

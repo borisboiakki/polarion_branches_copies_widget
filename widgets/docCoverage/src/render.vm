@@ -1,0 +1,648 @@
+## Document Coverage - render.vm
+## Source: widgets/docCoverage/src/render.vm. tools/build-widget.py inlines the shared snippets (shared/vm) at the
+## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
+## Velocity 1.4 and writes widgets/docCoverage/dist/docCoverage.zip.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+## Terms: upstream document = document of the link targets (e.g. customer specification), downstream document =
+## document of the link sources. Verified for "satisfies" on 2512 (spike C3). Edge "up>down": o = upstream, c = downstream.
+#set($bwVersion = "0.1.0")
+## BW_SHARED style.vm
+<style>
+  .cw-pick { position: relative; display: inline-block; }
+  .cw-pick-panel { position: absolute; z-index: 30; top: 24px; left: 0; min-width: 260px; max-height: 320px; overflow: auto; background: rgb(255,255,255); border: 1px solid rgb(170,178,195); box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 6px 8px; }
+  .cw-pick-panel .bw-check { margin: 2px 0; }
+</style>
+
+## ======================================================================= parameters
+## BW_SHARED params.vm
+
+## docCoverage parameters
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.rolesText.value)
+#set($tmp = $parameters.rolesText.value())
+#set($rolesTextStr = "")
+#if("$tmp" != $bwUnset)
+  #set($rolesTextStr = "$tmp")
+#end
+## Limits: uncovered items kept per document in the page model (full count always shown), linked item samples per pair,
+## link roles used.
+#set($uncCap = 500)
+#set($sampleCap = 30)
+#set($maxRoles = 5)
+
+## ======================================================================= lists
+## BW_SHARED common.vm
+
+## Selected documents -> keys "space/name". Verified on 2512 (spike C1): each value is a ProxyEnumOption,
+## getModelObject() a ProxyDocument, getOldApi() the Open API Module (getReference().spaceId() is empty).
+#set($docOnly = [])
+#set($docSelLost = 0)
+#set($docVals = false)
+#set($docVals = $parameters.docs.values)
+#set($docVals = $parameters.docs.values())
+#if($docVals)
+  #foreach($v in $docVals)
+    #set($mo = false)
+    #set($mo = $v.getModelObject())
+    #set($moUr = "unknown")
+    #if($mo)
+      #set($moUr = $mo.isUnresolvable())
+    #end
+    #set($old = false)
+    #if("$moUr" == "false")
+      #set($old = $mo.getOldApi())
+    #end
+    #bwKey($old)
+    #if($bwKeyOut != "")
+      #if(!$docOnly.contains($bwKeyOut))
+        #set($void = $docOnly.add($bwKeyOut))
+      #end
+    #else
+      #set($docSelLost = $docSelLost + 1)
+    #end
+  #end
+#end
+
+## Link roles: selector values (id() = role id, spike C2), else the text parameter. At most maxRoles.
+#set($roleAll = [])
+#set($roleVals = false)
+#set($roleVals = $parameters.roles.values)
+#set($roleVals = $parameters.roles.values())
+#if($roleVals)
+  #foreach($v in $roleVals)
+    #set($rid = "$v")
+    #set($rid = $v.id())
+    #set($ridS = "$rid")
+    #if($ridS.matches("[A-Za-z0-9_.-]+") && !$roleAll.contains($ridS))
+      #set($void = $roleAll.add($ridS))
+    #end
+  #end
+#end
+#if($roleAll.size() == 0)
+  #bwIdList($rolesTextStr $roleAll)
+#end
+#set($roleIds = [])
+#foreach($r in $roleAll)
+  #if($roleIds.size() < $maxRoles)
+    #set($void = $roleIds.add($r))
+  #end
+#end
+#set($rolesDropped = $roleAll.size() - $roleIds.size())
+## Role names from the project's link role enumeration (spike C2); the id when not found.
+#set($roleName = $objectFactory.newMap())
+#foreach($r in $roleIds)
+  #set($void = $roleName.put($r, $r))
+#end
+#if($projectOk && $roleIds.size() > 0)
+  #set($tp = false)
+  #set($tp = $trackerService.getTrackerProject($projectId))
+  #set($roleEnum = false)
+  #if($tp)
+    #set($roleEnum = $tp.getWorkItemLinkRoleEnum())
+  #end
+  #if($roleEnum)
+    #foreach($o in $roleEnum.getAllOptions())
+      #set($oId = "")
+      #set($oId = $o.getId())
+      #set($oIdS = "$oId")
+      #if($roleName.containsKey($oIdS))
+        #set($oName = "")
+        #set($oName = $o.getName())
+        #if("$oName" != "")
+          #set($void = $roleName.put($oIdS, "$oName"))
+        #end
+      #end
+    #end
+  #end
+#end
+#set($roleSql = "")
+#foreach($r in $roleIds)
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+## Line styles of the roles, in selection order (same palette as graph.js).
+#set($roleColors = ["rgb(51,103,214)", "rgb(198,40,40)", "rgb(26,127,55)", "rgb(142,68,173)", "rgb(211,84,0)"])
+#set($roleDashes = ["", "9,5", "2,4", "6,3", "12,4,2,4"])
+
+#if(!$projectOk)
+  <div class="bw-warn">Document Coverage: place this widget on a page of a project.</div>
+#elseif($roleIds.size() == 0)
+  <div class="bw-warn">Document Coverage: select at least one link role in the widget parameters.</div>
+#else
+
+## ======================================================================= documents
+## BW_SHARED documents.vm
+
+## ======================================================================= links
+## Link-source items of the selected documents with a selected role whose target is in another selected document.
+## The documents are filtered in SQL (space and name) and again in Velocity.
+#set($condS = "")
+#set($condT = "")
+#foreach($d in $docList)
+  #set($kSp = $d.get("space").replace("'", "''"))
+  #set($kNm = $d.get("id").replace("'", "''"))
+  #if($condS != "")
+    #set($condS = "${condS} OR ")
+    #set($condT = "${condT} OR ")
+  #end
+  #set($condS = "${condS}(ms.c_modulefolder = '${kSp}' AND ms.c_id = '${kNm}')")
+  #set($condT = "${condT}(mt.c_modulefolder = '${kSp}' AND mt.c_id = '${kNm}')")
+#end
+#set($srcTypeSql = "")
+#if($typeSql != "")
+  #set($srcTypeSql = " AND ws.c_type NOT IN (${typeSql})")
+#end
+#set($edges = $objectFactory.newMap())
+#set($edgeKeys = [])
+## upstream key -> map of covered item ids (all roles, all downstream documents)
+#set($coveredAll = $objectFactory.newMap())
+#macro(cwEdge $cwUp $cwDown)
+  #set($cwPk = "${cwUp}>${cwDown}")
+  #if(!$edges.containsKey($cwPk))
+    #set($cwE = $objectFactory.newMap())
+    #set($void = $cwE.put("o", $cwUp))
+    #set($void = $cwE.put("c", $cwDown))
+    #set($void = $cwE.put("links", $objectFactory.newMap()))
+    #set($void = $cwE.put("up", $objectFactory.newMap()))
+    #set($void = $cwE.put("down", $objectFactory.newMap()))
+    #set($void = $cwE.put("upAll", $objectFactory.newMap()))
+    #set($void = $cwE.put("downAll", $objectFactory.newMap()))
+    #set($void = $cwE.put("samples", []))
+    #foreach($cwR in $roleIds)
+      #set($void = $cwE.get("links").put($cwR, 0))
+      #set($void = $cwE.get("up").put($cwR, $objectFactory.newMap()))
+      #set($void = $cwE.get("down").put($cwR, $objectFactory.newMap()))
+    #end
+    #set($void = $edges.put($cwPk, $cwE))
+    #set($void = $edgeKeys.add($cwPk))
+  #end
+  #set($cwE = $edges.get($cwPk))
+#end
+#if($docList.size() > 1)
+  #set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${srcTypeSql} AND (${condS}) AND (${condT})")
+  #foreach($wi in $ds.sqlSearch($linkSql))
+    #set($srcMod = false)
+    #set($srcMod = $wi.getModule())
+    #bwKey($srcMod)
+    #set($srcKey = $bwKeyOut)
+    #if($srcKey != "" && $docByKey.containsKey($srcKey))
+      #set($srcId = "$wi.getId()")
+      #foreach($ls in $wi.getLinkedWorkItemsStructsDirect())
+        #set($role = "")
+        #set($role = $ls.getLinkRole().getId())
+        #set($roleS = "$role")
+        #if($roleName.containsKey($roleS))
+          #set($tgt = false)
+          #set($tgt = $ls.getLinkedItem())
+          #set($tUr = "unknown")
+          #if($tgt)
+            #set($tUr = $tgt.isUnresolvable())
+          #end
+          #if("$tUr" == "false")
+            #set($tType = "")
+            #set($tTypeObj = false)
+            #set($tTypeObj = $tgt.getType())
+            #if($tTypeObj)
+              #set($tType = $tTypeObj.getId())
+            #end
+            #if(!$excludedTypes.contains("$tType"))
+              #set($tgtMod = false)
+              #set($tgtMod = $tgt.getModule())
+              #bwKey($tgtMod)
+              #set($tgtKey = $bwKeyOut)
+              #if($tgtKey != "" && $tgtKey != $srcKey && $docByKey.containsKey($tgtKey))
+                #set($tgtId = "$tgt.getId()")
+                #cwEdge($tgtKey $srcKey)
+                #set($nl = $cwE.get("links").get($roleS) + 1)
+                #set($void = $cwE.get("links").put($roleS, $nl))
+                #set($void = $cwE.get("up").get($roleS).put($tgtId, true))
+                #set($void = $cwE.get("down").get($roleS).put($srcId, true))
+                #set($void = $cwE.get("upAll").put($tgtId, true))
+                #set($void = $cwE.get("downAll").put($srcId, true))
+                #if($cwE.get("samples").size() < $sampleCap)
+                  #set($void = $cwE.get("samples").add("${srcId}|${tgtId}|${roleS}"))
+                #end
+                #if(!$coveredAll.containsKey($tgtKey))
+                  #set($void = $coveredAll.put($tgtKey, $objectFactory.newMap()))
+                #end
+                #set($void = $coveredAll.get($tgtKey).put($tgtId, true))
+              #end
+            #end
+          #end
+        #end
+      #end
+    #end
+  #end
+#end
+
+## ======================================================================= coverage
+## Per upstream document: counted items covered by any shown link, uncovered items (first uncCap).
+#foreach($uk in $coveredAll.keySet())
+  #set($d = $docByKey.get($uk))
+  #set($covMap = $coveredAll.get($uk))
+  #set($cov = 0)
+  #set($uncN = 0)
+  #set($unc = [])
+  #foreach($w in $d.get("itemObjs"))
+    #set($wId = "$w.getId()")
+    #if($covMap.containsKey($wId))
+      #set($cov = $cov + 1)
+    #else
+      #set($uncN = $uncN + 1)
+      #if($unc.size() < $uncCap)
+        #set($void = $unc.add($wId))
+      #end
+    #end
+  #end
+  #set($void = $d.put("upstream", true))
+  #set($void = $d.put("covered", $cov))
+  #set($void = $d.put("uncN", $uncN))
+  #set($void = $d.put("unc", $unc))
+#end
+#set($linkedKeys = $objectFactory.newMap())
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($void = $linkedKeys.put($e.get("o"), true))
+  #set($void = $linkedKeys.put($e.get("c"), true))
+#end
+
+## Text helpers for the output
+#macro(cwRolesLabel $cwEd $cwWithCounts)
+  #set($cwLabel = "")
+  #foreach($cwR in $roleIds)
+    #set($cwN = $cwEd.get("links").get($cwR))
+    #if($cwN > 0)
+      #if($cwLabel != "")
+        #set($cwLabel = "${cwLabel} + ")
+      #end
+      #set($cwNm = $roleName.get($cwR))
+      #if($cwWithCounts)
+        #set($cwLabel = "${cwLabel}${cwNm} ${cwN}")
+      #else
+        #set($cwLabel = "${cwLabel}${cwNm}")
+      #end
+    #end
+  #end
+#end
+#macro(cwPct $cwPart $cwWhole)
+  #set($cwPctOut = "-")
+  #if($cwWhole > 0)
+    ## Rounded to the nearest integer, as in the browser view (integer arithmetic only).
+    #set($cwPv = ($cwPart * 200 + $cwWhole) / (2 * $cwWhole))
+    #set($cwPctOut = "${cwPv}% (${cwPart}/${cwWhole})")
+  #end
+#end
+
+## ======================================================================= output
+#if($isStatic)
+## ----------------------------------------------------------------- static view (PDF / print)
+## No JavaScript. Elements limited to rect, line, polygon and text (rendered in PDF, docBranches spike V7).
+## Levels: longest path upstream -> downstream (upstream on the left)
+#set($lvl = $objectFactory.newMap())
+#foreach($d in $docList)
+  #if($linkedKeys.containsKey($d.get("key")))
+    #set($void = $lvl.put($d.get("key"), 0))
+  #end
+#end
+#foreach($pass in [1..15])
+  #foreach($k in $edgeKeys)
+    #set($e = $edges.get($k))
+    #set($lo = $lvl.get($e.get("o")))
+    #set($lc = $lvl.get($e.get("c")))
+    #if($lc <= $lo && $lo < 30)
+      #set($nl = $lo + 1)
+      #set($void = $lvl.put($e.get("c"), $nl))
+    #end
+  #end
+#end
+#set($maxLevel = 0)
+#foreach($k in $lvl.keySet())
+  #if($lvl.get($k) > $maxLevel)
+    #set($maxLevel = $lvl.get($k))
+  #end
+#end
+#set($cols = [])
+#set($placed = $objectFactory.newMap())
+#foreach($L in [0..$maxLevel])
+  #set($col = [])
+  #if($L > 0)
+    #set($pl = $L - 1)
+    #foreach($p in $cols.get($pl))
+      #foreach($k in $edgeKeys)
+        #set($e = $edges.get($k))
+        #if($e.get("o") == $p.get("key") && !$placed.containsKey($e.get("c")) && $lvl.get($e.get("c")) == $L)
+          #set($void = $col.add($docByKey.get($e.get("c"))))
+          #set($void = $placed.put($e.get("c"), true))
+        #end
+      #end
+    #end
+  #end
+  #foreach($d in $docList)
+    #if($linkedKeys.containsKey($d.get("key")) && !$placed.containsKey($d.get("key")) && $lvl.get($d.get("key")) == $L)
+      #set($void = $col.add($d))
+      #set($void = $placed.put($d.get("key"), true))
+    #end
+  #end
+  #set($void = $cols.add($col))
+#end
+## Geometry (integers only)
+#set($nW = 220)
+#set($cGap = 170)
+#set($rGap = 16)
+#set($mg = 16)
+#set($nLines = 4 + $extraList.size())
+#set($nH = 16 + 14 * $nLines)
+#set($px = $objectFactory.newMap())
+#set($py = $objectFactory.newMap())
+#set($maxRows = 0)
+#set($ci = 0)
+#foreach($col in $cols)
+  #set($ri = 0)
+  #foreach($d in $col)
+    #set($x = $mg + $ci * ($nW + $cGap))
+    #set($y = $mg + $ri * ($nH + $rGap))
+    #set($void = $px.put($d.get("key"), $x))
+    #set($void = $py.put($d.get("key"), $y))
+    #set($ri = $ri + 1)
+  #end
+  #if($ri > $maxRows)
+    #set($maxRows = $ri)
+  #end
+  #set($ci = $ci + 1)
+#end
+#set($cw = 2 * $mg + ($maxLevel + 1) * $nW + $maxLevel * $cGap)
+#set($ch = 2 * $mg + $maxRows * ($nH + $rGap))
+#set($outW = $cw)
+#set($outH = $ch)
+#if($cw > 700)
+  #set($outW = 700)
+  #set($outH = $ch * 700 / $cw)
+#end
+<div class="cw-root">
+<div><b>Document Coverage</b> &mdash; project $esc.html($projectId) &mdash; $edgeKeys.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
+#set($legend = "")
+#set($ri = 0)
+#foreach($r in $roleIds)
+  #if($legend != "")
+    #set($legend = "${legend}, ")
+  #end
+  #set($rn = $roleName.get($r))
+  #set($rc = "solid blue")
+  #if($ri == 1)
+    #set($rc = "dashed red")
+  #elseif($ri == 2)
+    #set($rc = "dotted green")
+  #elseif($ri == 3)
+    #set($rc = "dashed purple")
+  #elseif($ri == 4)
+    #set($rc = "dash-dot orange")
+  #end
+  #set($legend = "${legend}${rn} ${rc}")
+  #set($ri = $ri + 1)
+#end
+<div class="bw-muted">Arrow: downstream &rarr; upstream (link direction), upstream documents on the left. Line style: $esc.html($legend).</div>
+#if($rolesDropped > 0)
+<div class="bw-warn">Only the first $maxRoles link roles are used ($rolesDropped ignored).</div>
+#end
+#if($edgeKeys.size() == 0)
+<p>No link of the selected roles between the selected documents.</p>
+#else
+<svg xmlns="http://www.w3.org/2000/svg" width="$outW" height="$outH" viewBox="0 0 $cw $ch">
+<rect x="0" y="0" width="$cw" height="$ch" fill="rgb(255,255,255)"/>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($eo = $e.get("o"))
+  #set($ec = $e.get("c"))
+  #set($half = $nH / 2)
+  #set($x1 = $px.get($eo) + $nW)
+  #set($y1 = $py.get($eo) + $half)
+  #set($x2 = $px.get($ec))
+  #set($y2 = $py.get($ec) + $half)
+  #set($xm = $x1 + $cGap / 2)
+  ## Line style of the first selected role present on the edge
+  #set($color = "")
+  #set($dash = "")
+  #set($ri = 0)
+  #foreach($r in $roleIds)
+    #if($color == "" && $e.get("links").get($r) > 0)
+      #set($color = $roleColors.get($ri))
+      #set($dash = $roleDashes.get($ri))
+    #end
+    #set($ri = $ri + 1)
+  #end
+  #cwRolesLabel($e $showCounts)
+  #set($ax = $x1 + 9)
+  #set($ay1 = $y1 - 5)
+  #set($ay2 = $y1 + 5)
+  ## Label at the downstream end (one per line there; several lines can share the upstream end)
+  #set($lx = $xm + 3)
+  #set($ly = $y2 - 4)
+<line x1="$ax" y1="$y1" x2="$xm" y2="$y1" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y1" x2="$xm" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y2" x2="$x2" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<polygon points="$ax,$ay1 $x1,$y1 $ax,$ay2" fill="$color"/>
+<text x="$lx" y="$ly" font-family="Arial" font-size="9" fill="$color">$esc.html($cwLabel)</text>
+#end
+#foreach($col in $cols)
+  #foreach($d in $col)
+    #set($x = $px.get($d.get("key")))
+    #set($y = $py.get($d.get("key")))
+    #set($tx = $x + 7)
+<rect x="$x" y="$y" width="$nW" height="$nH" rx="5" fill="rgb(246,248,252)" stroke="rgb(120,132,155)" stroke-width="1"/>
+    #set($lines = [])
+    #set($void = $lines.add($d.get("id")))
+    #set($void = $lines.add($d.get("title")))
+    #set($void = $lines.add($d.get("space")))
+    #if($d.get("upstream"))
+      #cwPct($d.get("covered") $d.get("items"))
+      #set($void = $lines.add("Coverage: ${cwPctOut}"))
+    #else
+      #set($void = $lines.add("Coverage: -"))
+    #end
+    #foreach($f in $extraList)
+      #set($fv = "$d.get($f)")
+      #if($f == "items" && $fv == "-1")
+        #set($fv = "")
+      #end
+      #set($fl = $f)
+      #if($f == "type")
+        #set($fl = "Type")
+      #elseif($f == "status")
+        #set($fl = "Status")
+      #elseif($f == "author")
+        #set($fl = "Author")
+      #elseif($f == "created")
+        #set($fl = "Created")
+      #elseif($f == "updated")
+        #set($fl = "Updated")
+      #elseif($f == "items")
+        #set($fl = "Work items")
+      #end
+      #set($void = $lines.add("${fl}: ${fv}"))
+    #end
+    #set($li = 0)
+    #foreach($t in $lines)
+      #set($ts = "$t")
+      #if($ts.length() > 36)
+        #set($ts2 = $ts.substring(0, 35))
+        #set($ts = "${ts2}...")
+      #end
+      #set($ty = $y + 19 + $li * 14)
+      #set($fw = "normal")
+      #if($li == 0)
+        #set($fw = "bold")
+      #end
+<text x="$tx" y="$ty" font-family="Arial" font-size="11" font-weight="$fw" fill="rgb(25,35,55)">$esc.html($ts)</text>
+      #set($li = $li + 1)
+    #end
+  #end
+#end
+</svg>
+#end
+<table class="bw-table">
+<tr><th>Downstream</th><th>Roles (links)</th><th>Upstream</th><th>Downstream items with links</th><th>Upstream items covered</th></tr>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($o = $docByKey.get($e.get("o")))
+  #set($c = $docByKey.get($e.get("c")))
+  #cwRolesLabel($e true)
+  #cwPct($e.get("downAll").size() $c.get("items"))
+  #set($downTxt = $cwPctOut)
+  #cwPct($e.get("upAll").size() $o.get("items"))
+  #set($upTxt = $cwPctOut)
+<tr><td>$esc.html($c.get("space")) / $esc.html($c.get("id"))</td><td>$esc.html($cwLabel)</td><td>$esc.html($o.get("space")) / $esc.html($o.get("id"))</td><td>$esc.html($downTxt)</td><td>$esc.html($upTxt)</td></tr>
+#end
+</table>
+<table class="bw-table">
+<tr><th>Upstream document</th><th>Work items</th><th>Coverage</th><th>Uncovered items</th></tr>
+#foreach($d in $docList)
+  #if($d.get("upstream"))
+    #cwPct($d.get("covered") $d.get("items"))
+    #set($uncTxt = "")
+    #set($ui = 0)
+    #foreach($u in $d.get("unc"))
+      #if($ui < 100)
+        #if($uncTxt != "")
+          #set($uncTxt = "${uncTxt}, ")
+        #end
+        #set($uncTxt = "${uncTxt}${u}")
+      #end
+      #set($ui = $ui + 1)
+    #end
+    #set($uncN = $d.get("uncN"))
+    #if($uncN > 100)
+      #set($uncTxt = "${uncTxt} ... ($uncN in total)")
+    #end
+<tr><td>$esc.html($d.get("space")) / $esc.html($d.get("id"))</td><td>$d.get("items")</td><td>$esc.html($cwPctOut)</td><td>$esc.html($uncTxt)</td></tr>
+  #end
+#end
+</table>
+#if($showMode == "all")
+  #set($unrelated = "")
+  #foreach($d in $docList)
+    #if(!$linkedKeys.containsKey($d.get("key")))
+      #if($unrelated != "")
+        #set($unrelated = "${unrelated}, ")
+      #end
+      #set($dSp = $d.get("space"))
+      #set($dId = $d.get("id"))
+      #set($unrelated = "${unrelated}${dSp} / ${dId}")
+    #end
+  #end
+  #if($unrelated != "")
+<p class="bw-muted">Documents without relations: $esc.html($unrelated)</p>
+  #end
+#end
+</div>
+#else
+## ----------------------------------------------------------------- browser view (model + inlined JS)
+#set($countsFlag = "1")
+#if(!$showCounts)
+#set($countsFlag = "0")
+#end
+#set($rolesStr = "")
+#foreach($r in $roleIds)
+#if($rolesStr != "")
+#set($rolesStr = "${rolesStr};")
+#end
+#set($rn = $roleName.get($r))
+#set($rolesStr = "${rolesStr}${r}|${rn}")
+#end
+#set($warn = "")
+#if($rolesDropped > 0)
+#set($warn = "Only the first $maxRoles link roles are used ($rolesDropped ignored).")
+#end
+#if($docSelLost > 0)
+#set($warn = "${warn} $docSelLost selected document(s) could not be read.")
+#end
+<div class="cw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
+  <div class="bw-model" style="display:none">
+#foreach($d in $docList)
+#set($upFlag = "0")
+#set($covN = 0)
+#set($uncN = 0)
+#set($uncStr = "")
+#if($d.get("upstream"))
+#set($upFlag = "1")
+#set($covN = $d.get("covered"))
+#set($uncN = $d.get("uncN"))
+#foreach($u in $d.get("unc"))
+#if($uncStr != "")
+#set($uncStr = "${uncStr} ")
+#end
+#set($uncStr = "${uncStr}${u}")
+#end
+#end
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+#end
+#foreach($k in $edgeKeys)
+#set($e = $edges.get($k))
+## data-r "role:links;...", data-u / data-d "role:id id id;..." (upstream items covered / downstream items with links)
+#set($rStr = "")
+#set($uStr = "")
+#set($dStr = "")
+#foreach($r in $roleIds)
+#if($rStr != "")
+#set($rStr = "${rStr};")
+#set($uStr = "${uStr};")
+#set($dStr = "${dStr};")
+#end
+#set($nlk = $e.get("links").get($r))
+#set($rStr = "${rStr}${r}:${nlk}")
+#set($ids = "")
+#foreach($id in $e.get("up").get($r).keySet())
+#if($ids != "")
+#set($ids = "${ids} ")
+#end
+#set($ids = "${ids}${id}")
+#end
+#set($uStr = "${uStr}${r}:${ids}")
+#set($ids = "")
+#foreach($id in $e.get("down").get($r).keySet())
+#if($ids != "")
+#set($ids = "${ids} ")
+#end
+#set($ids = "${ids}${id}")
+#end
+#set($dStr = "${dStr}${r}:${ids}")
+#end
+#set($samplesStr = "")
+#foreach($s in $e.get("samples"))
+#if($samplesStr != "")
+#set($samplesStr = "${samplesStr};")
+#end
+#set($samplesStr = "${samplesStr}${s}")
+#end
+    <i class="bw-e" data-o="$esc.html($e.get('o'))" data-c="$esc.html($e.get('c'))" data-r="$esc.html($rStr)" data-u="$esc.html($uStr)" data-d="$esc.html($dStr)" data-s="$esc.html($samplesStr)"></i>
+#end
+  </div>
+</div>
+## Excel export library (xlsx-js-style, resources/xlsx.js), loaded with the Widget SDK directive.
+<div class="bw-lib" style="display:none">#loadWidgetJs("resources/xlsx.js")</div>
+<script>
+## BW_INLINE_JS
+</script>
+#end
+#end

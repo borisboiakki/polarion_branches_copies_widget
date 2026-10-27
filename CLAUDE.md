@@ -8,10 +8,10 @@ Polarion LiveReport widgets that display the LiveDocs of a project and the **rel
 deduced from **work item links** (and document metadata where available). Two widgets share one client core,
 one build and one test setup:
 - **docBranches** (`widgets/docBranches/`): which document is a branch / copy / derived document of which.
-- **docCoverage** (`widgets/docCoverage/`, planned): for selected documents and 1–5 link roles, which document
+- **docCoverage** (`widgets/docCoverage/`, 0.1.0): for selected documents and 1–5 link roles, which document
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
-  (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (next).
+  (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done, to be validated on 2512).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
 
 ## Required reading before coding
@@ -128,8 +128,9 @@ test-data/                     anonymised sample structures for manual verificat
 - Update the widget's `SPECIFICATION.md` (open questions / decisions log) whenever a requirement is clarified.
 - **Shared code**: a change in `shared/` affects every widget. Rebuild and test all of them (`tools/test-widget.sh all`),
   and bump the version of each widget whose package changes. Keep widget-specific logic in `widgets/<w>/src/`.
-  Each widget has its own root class (`bw-root` for docBranches) so that two widgets on one page never pick up
-  each other's roots.
+  Each widget has its own root class (`bw-root` for docBranches, `cw-root` for docCoverage) so that two widgets on one
+  page never pick up each other's roots. The mock Polarion objects live in `tools/vtest/docBranches/WidgetHarness.java`
+  and are compiled with every harness (`tools/vtest/<w>/*Harness.java`).
 - No customer or project-specific data in the repo. Exception agreed with the PO: the spike test set on the sandbox
   project `VforIA` (`SRS_Test` and its copies/branches). **Never commit raw test results** from the PO's instance (PDF,
   PNG, Excel, JSON): the repository is public and PDF exports carry the company template (logo, confidentiality footer).
