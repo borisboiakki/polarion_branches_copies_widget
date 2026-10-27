@@ -53,6 +53,7 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 |---|---|
 | `SPECIFICATION.md` | Requirements, decisions and open checks |
 | `widget/src/` | Widget sources: `render.vm`, `parameters.vm`, `branches-graph.js` (inlined at build) |
+| `widget/src/resources/` | Third-party library for the Excel export: `xlsx.js` = `dist/xlsx.bundle.js` of [xlsx-js-style](https://github.com/gitbrent/xlsx-js-style) 1.2.0 (Apache-2.0, `LICENSE` next to it) |
 | `widget/dist/docBranches.zip` | Upload package (generated, committed for convenience) |
 | `docs/install.md` | Install and configuration guide |
 | `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vtest/` | Build, Velocity 1.4 harness with mock Polarion objects, browser check |

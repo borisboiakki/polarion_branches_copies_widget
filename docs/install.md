@@ -49,12 +49,15 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 ## Using the widget
 
 - **Toolbar**: documents shown (all / only related), indirect relations, relation kinds (copies / branches / derived), extra fields, highlight search,
-  Fit / zoom, Table / Graph, SVG download, Refresh (reloads the page and re-runs the analysis).
+  Fit / zoom, Table / Graph, SVG download, Excel download, Refresh (reloads the page and re-runs the analysis).
 - **Click a document** to open it. **Hover a line** for counts and coverage; **click a line** for the
   list of linked work items (up to 30).
+- **Excel**: a workbook with the shown relations (counts, metadata, coverage), the shown documents and the linked
+  work items (up to 30 per document pair), with links to Polarion. The toolbar filters apply. If the Excel library
+  could not be loaded, the button downloads the relations as CSV and the status line says so.
 - **PDF export / print**: the widget renders a static graph and a relations table (no JavaScript).
 
-## Known limitations (v0.1)
+## Known limitations
 
 - One project only; links to documents of other projects are ignored.
 - Documents are read through the Open API data service. Permission filtering for viewers who

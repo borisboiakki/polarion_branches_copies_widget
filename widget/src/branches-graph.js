@@ -188,6 +188,7 @@
     for (var p in e) { if (Object.prototype.hasOwnProperty.call(e, p)) { r[p] = e[p]; } }
     r.kinds = kinds;
     r.meta = meta;
+    r.samples = e.samples.filter(function (sm) { return !KIND_STYLE[sm.k] || rel[sm.k]; });
     return r;
   }
 
@@ -380,6 +381,7 @@
       self.render(false);
     });
     this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
+    this.button(btns, 'Excel', 'Download the shown documents and relations as an Excel workbook', function () { self.exportExcel(); });
     this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
 
     this.legend(el('div', { 'class': 'bw-legend' }, root));
@@ -679,6 +681,127 @@
 
   Widget.prototype.exportSvg = function () {
     download(new Blob([this.svgString()], { type: 'image/svg+xml' }), this.fileName('svg'));
+  };
+
+  // ------------------------------------------------------------------ Excel export
+  // Uses the XLSX library (xlsx-js-style) loaded from the widget resources. Exports what is shown
+  // (current filters). Falls back to a CSV of the relations when the library is not available.
+
+  function absUrl(u) {
+    return window.location.protocol + '//' + window.location.host + u;
+  }
+
+  Widget.prototype.shownDocs = function () {
+    return this.lay.linked.concat(this.lay.isolated).slice().sort(function (a, b) {
+      return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
+    });
+  };
+
+  Widget.prototype.sortedEdges = function () {
+    var by = this.model.byKey;
+    return this.edges.slice().sort(function (a, b) {
+      var oa = by[a.o], ob = by[b.o], ca = by[a.c], cb = by[b.c];
+      return (oa.space + '/' + oa.id).localeCompare(ob.space + '/' + ob.id) ||
+        (ca.space + '/' + ca.id).localeCompare(cb.space + '/' + cb.id);
+    });
+  };
+
+  Widget.prototype.relationRows = function () {
+    var self = this;
+    var rows = [['Original space', 'Original document', 'Original title', 'Relation',
+      'Copy / branch / derived space', 'Copy / branch / derived document', 'Copy / branch / derived title',
+      'Copy items', 'Branch items', 'Derived items', 'Branch metadata', 'Derived metadata', 'Indirect',
+      'Linked items', 'Work items in copy', 'Coverage of copy (%)']];
+    this.sortedEdges().forEach(function (e) {
+      var o = self.model.byKey[e.o];
+      var c = self.model.byKey[e.c];
+      var pc = pct(e.ci, c.items);
+      rows.push([o.space, o.id, o.title, kindsLabel(e), c.space, c.id, c.title,
+        e.kinds.copy, e.kinds.branch, e.kinds.derived, e.meta.branch ? 'yes' : 'no', e.meta.derived ? 'yes' : 'no',
+        e.indirect ? 'yes' : 'no', e.total, c.items < 0 ? '' : c.items, pc === null ? '' : pc]);
+    });
+    return rows;
+  };
+
+  Widget.prototype.documentRows = function () {
+    var deg = {};
+    this.edges.forEach(function (e) { deg[e.o] = (deg[e.o] || 0) + 1; deg[e.c] = (deg[e.c] || 0) + 1; });
+    var rows = [['Space', 'Document', 'Title', 'Type', 'Status', 'Author', 'Created', 'Updated', 'Work items', 'Relations shown']];
+    this.shownDocs().forEach(function (n) {
+      rows.push([n.space, n.id, n.title, n.type, n.status, n.author, n.created, n.updated,
+        n.items < 0 ? '' : n.items, deg[n.key] || 0]);
+    });
+    return rows;
+  };
+
+  Widget.prototype.itemRows = function () {
+    var self = this;
+    var rows = [['Original document', 'Copy / branch / derived document', 'Item in copy', 'Original item', 'Relation']];
+    this.sortedEdges().forEach(function (e) {
+      var o = self.model.byKey[e.o];
+      var c = self.model.byKey[e.c];
+      e.samples.forEach(function (sm) {
+        rows.push([o.space + ' / ' + o.id, c.space + ' / ' + c.id, sm.c, sm.o, sm.k]);
+      });
+    });
+    return rows;
+  };
+
+  function sheetFromRows(X, rows, widths, links) {
+    var ws = X.utils.aoa_to_sheet(rows);
+    var head = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '3367D6' } }, alignment: { vertical: 'center' } };
+    for (var c = 0; c < rows[0].length; c++) {
+      var ref = X.utils.encode_cell({ r: 0, c: c });
+      if (ws[ref]) { ws[ref].s = head; }
+    }
+    (links || []).forEach(function (lk) {
+      var cell = ws[X.utils.encode_cell({ r: lk.r, c: lk.c })];
+      if (cell) { cell.l = { Target: lk.url }; cell.s = { font: { color: { rgb: '1A4DB3' }, underline: true } }; }
+    });
+    ws['!cols'] = widths.map(function (w) { return { wch: w }; });
+    if (rows.length > 1) {
+      ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: rows[0].length - 1 } }) };
+    }
+    return ws;
+  }
+
+  Widget.prototype.exportExcel = function () {
+    var X = window.XLSX;
+    if (!X || !X.utils || !X.write) { this.exportCsv(); return; }
+    var self = this;
+    var by = this.model.byKey;
+    var rel = this.relationRows();
+    var relLinks = [];
+    this.sortedEdges().forEach(function (e, i) {
+      relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, by[e.o])) });
+      relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, by[e.c])) });
+    });
+    var docs = this.documentRows();
+    var docLinks = this.shownDocs().map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
+    var items = this.itemRows();
+    var itemLinks = [];
+    for (var r = 1; r < items.length; r++) {
+      itemLinks.push({ r: r, c: 2, url: absUrl(itemUrl(this.project, items[r][2])) });
+      itemLinks.push({ r: r, c: 3, url: absUrl(itemUrl(this.project, items[r][3])) });
+    }
+    var wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, sheetFromRows(X, rel, [14, 28, 34, 22, 14, 28, 34, 10, 10, 10, 10, 10, 9, 11, 12, 12], relLinks), 'Relations');
+    X.utils.book_append_sheet(wb, sheetFromRows(X, docs, [14, 28, 40, 14, 14, 20, 18, 18, 11, 11], docLinks), 'Documents');
+    X.utils.book_append_sheet(wb, sheetFromRows(X, items, [34, 34, 14, 14, 10], itemLinks), 'Linked items (max 30 per pair)');
+    var data = X.write(wb, { bookType: 'xlsx', type: 'array' });
+    download(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), this.fileName('xlsx'));
+  };
+
+  function csvCell(v) {
+    var t = v === null || v === undefined ? '' : String(v);
+    return /[",;]|[^ -~]/.test(t) ? '"' + t.split('"').join('""') + '"' : t;
+  }
+
+  Widget.prototype.exportCsv = function () {
+    var nl = String.fromCharCode(13, 10);
+    var lines = this.relationRows().map(function (row) { return row.map(csvCell).join(','); });
+    download(new Blob([String.fromCharCode(65279) + lines.join(nl) + nl], { type: 'text/csv' }), this.fileName('csv'));
+    this.status.textContent += ' ' + DASH + ' Excel library not loaded: relations exported as CSV.';
   };
 
   // ------------------------------------------------------------------ start

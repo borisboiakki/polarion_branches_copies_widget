@@ -30,6 +30,8 @@ OUT = os.path.join(DIST, WIDGET_ID)
 ZIP = os.path.join(DIST, WIDGET_ID + '.zip')
 MARKER = '## BW_INLINE_JS'
 FILES = ['widget.properties', 'parameters.vm', 'render.vm', 'details.vm', 'description.vm']
+# Static files copied unchanged (third-party library, loaded in the browser with #loadWidgetJs).
+RESOURCES = ['resources/xlsx.js', 'resources/LICENSE']
 MAX_ENTRY_NAME = 30
 MAX_ENTRIES = 30
 
@@ -89,6 +91,10 @@ def main():
         with open(os.path.join(OUT, name), 'w', encoding='utf-8', newline='\n') as f:
             f.write(text)
 
+    for name in RESOURCES:
+        os.makedirs(os.path.dirname(os.path.join(OUT, name)), exist_ok=True)
+        shutil.copyfile(os.path.join(SRC, name), os.path.join(OUT, name))
+
     vm_files = [os.path.join(OUT, n) for n in FILES if n.endswith('.vm')]
     res = subprocess.run([os.path.join(ROOT, 'tools', 'vcheck.sh')] + vm_files,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -96,14 +102,14 @@ def main():
     if res.returncode != 0 or 'ERROR' in res.stdout:
         fail('Velocity 1.4 parse check')
 
-    entries = [WIDGET_ID + '/' + n for n in FILES]
+    entries = [WIDGET_ID + '/' + n for n in FILES + RESOURCES]
     long_names = [e for e in entries if len(e) > MAX_ENTRY_NAME]
     if long_names or len(entries) > MAX_ENTRIES:
         fail('zip limits exceeded: %s' % long_names)
     if os.path.exists(ZIP):
         os.remove(ZIP)
     with zipfile.ZipFile(ZIP, 'w', zipfile.ZIP_DEFLATED) as z:
-        for n in FILES:
+        for n in FILES + RESOURCES:
             info = zipfile.ZipInfo(WIDGET_ID + '/' + n, date_time=(2026, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             with open(os.path.join(OUT, n), 'rb') as f:

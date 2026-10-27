@@ -816,6 +816,8 @@
 #end
   </div>
 </div>
+## Excel export library (xlsx-js-style, resources/xlsx.js), loaded with the Widget SDK directive.
+<div class="bw-lib" style="display:none">#loadWidgetJs("resources/xlsx.js")</div>
 <script>
 ## BW_INLINE_JS
 </script>

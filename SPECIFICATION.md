@@ -53,7 +53,7 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F10b | **Show all documents / only documents with relations**: default set in the widget parameters, and the viewer can switch it in the widget UI (no edit mode needed). A **Refresh** control re-runs the analysis | Must |
 | F10c | **Indirect (inherited) relations hidden by default** (transitive reduction, §7). A viewer toggle "show indirect relations" displays them as faint dashed lines | Must |
 | F11 | Layout: family tree (layered, sources on the left/top) by default; zoom, pan, fit-to-view | Should |
-| F12 | Export the current graph as **SVG** from the widget UI. PNG was dropped in 0.1.2: the browser blocks canvas export on Polarion pages (PO test). PDF is covered by F13 | Could (done) |
+| F12 | Export the current graph as **SVG** from the widget UI, and the shown documents and relations as **Excel** (0.2.0, xlsx-js-style in the widget resources; CSV fallback). PNG was dropped in 0.1.2: the browser blocks canvas export on Polarion pages (PO test). PDF is covered by F13 | Could (done) |
 | F13 | **PDF/print**: static rendering of the graph (no JS) plus a relations table, so standard Polarion PDF export works | Should |
 | F14 | Tabular view of nodes/edges (also the PDF fallback) | Should |
 | F15 | Baseline/Collection-aware view (relations as of a Collection) | Future |
@@ -153,6 +153,11 @@ context (F15), non-LiveDoc documents.
       `uri: subterra:data-service:objects:/default/${User}t0025088` (found by the PO on 2512). References to
       unresolvable objects (author, branched/derived source, link target) are now checked with `isUnresolvable()`.
       Still to confirm on the instance with the document of that user.
+   h. (0.2.0) Multi-value parameter "Relation kinds shown by default" is read correctly (same question as e; falls back to all).
+   i. (0.2.0) `#loadWidgetJs("resources/xlsx.js")` (Widget SDK directive, not yet used on 2512) loads the Excel library:
+      the Excel button must download an `.xlsx`. If it downloads a `.csv` and the status line says "Excel library not
+      loaded", the directive did not work. Also check that the zip entry `docBranches/resources/xlsx.js` (29 chars) is
+      accepted on upload.
 
 ## 11. Decision log
 
@@ -184,3 +189,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Widget 0.1.1: fixes the exception on documents with a deleted author (unresolvable user); all object references are guarded; harness mocks unresolvable objects | `tools/vtest/WidgetHarness.java` |
 | 2026-10-27 | PNG export removed (blocked by the browser on Polarion pages); SVG export kept. Open checks V5c/V6 closed. Widget 0.1.2 | PO |
 | 2026-10-27 | Relation kind filter (copies / branches / derived, default all): parameter "Relation kinds shown by default" + toolbar checkboxes; edges are restricted to the selected kinds (labels and counts too); also applied in the PDF view. Widget 0.2.0. The multi-value parameter read is unverified on 2512 (falls back to all) | PO |
+| 2026-10-27 | Excel export (0.2.0): sheets Relations, Documents, Linked items (max 30 per pair), with links; current filters apply. Library xlsx-js-style 1.2.0 (gitbrent, Apache-2.0) shipped as `resources/xlsx.js` and loaded with `#loadWidgetJs` (unverified on 2512, open check §10.2 i); CSV fallback when it is not loaded | PO |
