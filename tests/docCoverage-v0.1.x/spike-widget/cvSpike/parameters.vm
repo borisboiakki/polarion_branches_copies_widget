@@ -1,0 +1,6 @@
+$parameters.put("test", $factory.customEnum("Test to run").addEnumItem("docs", "C1 Document selector").addEnumItem("roles", "C2 Link role selector and project link roles").addEnumItem("scan", "C3 Link scan between the documents and timing").addEnumItem("coverage", "C4 Coverage and uncovered items").allowNoValue(false).allowMultipleValues(false).singleValue("docs").build())
+$parameters.put("docs", $factory.enumeration("Documents (none = all)", "@document").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("roles", $factory.enumeration("Link roles", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("rolesText", $factory.string("Link roles as text, used if the selector is empty (comma separated)").value("").build())
+$parameters.put("excludedTypes", $factory.string("Work item types not counted (comma separated)").value("heading").build())
+$parameters.put("maxRows", $factory.integer("Max rows to display").value(50).build())

@@ -10,7 +10,8 @@ one build and one test setup:
 - **docBranches** (`widgets/docBranches/`): which document is a branch / copy / derived document of which.
 - **docCoverage** (`widgets/docCoverage/`, planned): for selected documents and 1–5 link roles, which document
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
-  `widgets/` + `shared/` (done), (2) specification + spike on 2512, (3) implementation reusing `shared/`.
+  `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
+  (`tests/docCoverage-v0.1.x/`, waiting for the PO's results), (3) implementation reusing `shared/`.
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
 
 ## Required reading before coding
@@ -110,7 +111,7 @@ tools/vtest/<w>/               Velocity 1.4 harness with mock Polarion objects +
 docs/<w>/                      install guide and previews
 tests/v0.1.x/                  spike of release 0.1.x: spike-tests.md (plan + findings), spike-widget/ (diagnostic widget
                                bwSpike/ + bwSpike.zip = upload package; rebuild the zip after edits). Kept for reference;
-                               tests of later versions go in tests/vN.N.x/
+                               tests of later versions go in tests/vN.N.x/ (docCoverage: tests/docCoverage-vN.N.x/)
 test-data/                     anonymised sample structures for manual verification
 ```
 
@@ -136,7 +137,8 @@ test-data/                     anonymised sample structures for manual verificat
   - arithmetic is reliable on Integer only (verified: Long differences such as `$date.systemTime` ones do not compute)
 - **Always run `tools/vcheck.sh` before committing a `.vm` change.** It parses every template with Velocity 1.4
   (needs Java; it downloads the jars to `tools/.lib/` on first use).
-- After editing `tests/v0.1.x/spike-widget/bwSpike/`, rebuild its `bwSpike.zip` (folder at zip root, Deflated).
+- After editing `tests/v0.1.x/spike-widget/bwSpike/` or `tests/docCoverage-v0.1.x/spike-widget/cvSpike/`, rebuild its zip
+  (folder at zip root, Deflated). `tools/vtest/cvSpike/SpikeHarness.java` smoke-tests cvSpike on the docBranches mocks.
 - **Widget workflow**: edit `widgets/<w>/src/` or `shared/`, then run `tools/test-widget.sh all` (build + Velocity 1.4
   render on mocks + Chromium checks) and commit `widgets/*/dist/` with the sources. `core.js` and `graph.js` must not contain `$`, `#`,
   backslashes or non-ASCII characters (the build enforces it; use `HASH`/`String.fromCharCode`).

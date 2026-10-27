@@ -1,0 +1,1 @@
+Diagnostic widget for the Document Coverage widget (docCoverage). Each instance runs one test selected in its parameters. Read-only.
