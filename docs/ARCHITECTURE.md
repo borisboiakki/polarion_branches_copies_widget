@@ -45,6 +45,7 @@ widgets/<w>/src/render.vm        main template, with markers  "## BW_SHARED <fil
 widgets/<w>/src/parameters.vm    widget parameters ($factory…)
 widgets/<w>/src/graph.js         widget-specific client code
 widgets/<w>/src/widget.properties, details.vm, description.vm   label/tags, short and long description
+widgets/<w>/src/icon.png         widget icon (608 x 405 PNG, from docs/<w>/icon.svg), copied unchanged to the package root
 shared/vm/*.vm                   Velocity snippets inlined at the BW_SHARED markers
 shared/js/core.js                client core, inlined before graph.js
 shared/resources/xlsx.js         xlsx-js-style (unchanged copy) + LICENSE, copied to <w>/resources/
@@ -57,7 +58,7 @@ tools/build-widget.py            assembles widgets/<w>/dist/<w>/ and widgets/<w>
    IIFE per widget, so nothing is global. The build refuses JS that contains `$`, `#`, `\` or non-ASCII characters,
    because Velocity would interpret them. In the JS, use `HASH` and `String.fromCharCode(…)` instead.
 3. It stamps the version from `widgets/<w>/VERSION` (or from `--version`) into the line `#set($bwVersion = "…")`.
-4. It copies `shared/resources/` to `<w>/resources/`.
+4. It copies `src/icon.png` to `<w>/` and `shared/resources/` to `<w>/resources/`.
 5. It parses every `.vm` file of the result with Velocity 1.4 (`tools/vcheck.sh`).
 6. It writes the zip and checks the zip limits: entry names of 30 characters or fewer, 30 entries or fewer.
 
@@ -201,7 +202,7 @@ attaches `<widget>-N.N.N.zip`.
 each widget whose package changes.
 
 **Add a new widget `<w>`.**
-1. Copy the structure of `widgets/docCoverage/src/`.
+1. Copy the structure of `widgets/docCoverage/src/` (including an `icon.png`, 608 x 405).
 2. Choose a new root class (`xx-root`) and pass it to `startWidgets`.
 3. Keep the zip entry names (`<w>/resources/xlsx.js`) within 30 characters.
 4. Add `widgets/<w>/VERSION` and `widgets/<w>/SPECIFICATION.md`, a harness `tools/vtest/<w>/<Name>Harness.java`

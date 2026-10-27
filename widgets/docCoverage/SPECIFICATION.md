@@ -137,3 +137,4 @@ g. 0.1.1: excluded types selector (`workitem-type`) lists the project's types, H
 | 2026-10-27 | Author field removed (user feedback); role selector read with the shared macro `bwRoleIds`. Still 0.1.0 (not released) | PO |
 | 2026-10-27 | PO test of 0.1.0 (without author) on 2512: OK. Ready for release | PO |
 | 2026-10-27 | Widget 0.1.1: the excluded work item types are chosen with a `workitem-type` multi-selector (default Heading, none selected = all types counted) instead of comma-separated text; shared macro `bwRoleIds` renamed `bwOptionIds`. Patch release (PO). To check on 2512: selector lists the types with Heading preselected; counts unchanged with Heading | PO |
+| 2026-10-27 | Widget 0.1.1: `icon.png` (608 x 405, white background) at the package root, as in a widget used by the PO; no reference in other files. Display in the widget list to check on 2512 | PO |

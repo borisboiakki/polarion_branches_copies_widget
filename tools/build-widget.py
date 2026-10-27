@@ -6,6 +6,7 @@ widgets/<id>/src/*              widget sources; render.vm contains the line "## 
 shared/js/core.js               client core, inlined before the widget's src/graph.js
 shared/vm/*.vm                  Velocity snippets (#parse cannot load files from an uploaded widget)
 shared/resources/*              static files copied into <id>/resources/ (loaded with loadWidgetJs)
+widgets/<id>/src/icon.png       widget icon, copied to the widget root
 widgets/<id>/dist/<id>/         assembled widget folder
 widgets/<id>/dist/<id>.zip      upload package (Administration > Velocity Widgets > Upload)
 
@@ -36,6 +37,8 @@ SHARED_RE = re.compile(r'^## BW_SHARED ([A-Za-z0-9_.-]+[.]vm)[ ]*$', re.M)
 FILES = ['widget.properties', 'parameters.vm', 'render.vm', 'details.vm', 'description.vm']
 # Static files copied unchanged (third-party library, loaded in the browser with #loadWidgetJs).
 RESOURCES = ['resources/xlsx.js', 'resources/LICENSE']
+# Binary files of the widget, copied unchanged from src/ to the widget root (icon of the widget list).
+BINARIES = ['icon.png']
 MAX_ENTRY_NAME = 30
 MAX_ENTRIES = 30
 
@@ -111,6 +114,9 @@ def build(widget, override):
         with open(os.path.join(out, name), 'w', encoding='utf-8', newline='\n') as f:
             f.write(text)
 
+    for name in BINARIES:
+        shutil.copyfile(os.path.join(src, name), os.path.join(out, name))
+
     for name in RESOURCES:
         os.makedirs(os.path.dirname(os.path.join(out, name)), exist_ok=True)
         shutil.copyfile(os.path.join(SHARED, name), os.path.join(out, name))
@@ -122,14 +128,14 @@ def build(widget, override):
     if res.returncode != 0 or 'ERROR' in res.stdout:
         fail('Velocity 1.4 parse check')
 
-    entries = [widget + '/' + n for n in FILES + RESOURCES]
+    entries = [widget + '/' + n for n in FILES + BINARIES + RESOURCES]
     long_names = [e for e in entries if len(e) > MAX_ENTRY_NAME]
     if long_names or len(entries) > MAX_ENTRIES:
         fail('zip limits exceeded: %s' % long_names)
     if os.path.exists(zip_path):
         os.remove(zip_path)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as z:
-        for n in FILES + RESOURCES:
+        for n in FILES + BINARIES + RESOURCES:
             info = zipfile.ZipInfo(widget + '/' + n, date_time=(2026, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             with open(os.path.join(out, n), 'rb') as f:
