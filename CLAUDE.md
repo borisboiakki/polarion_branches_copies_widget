@@ -66,6 +66,8 @@ Verified through web search (2026-10-27):
   Branches (even without overwritten items) have `MODULE.FK_URI_BRANCHEDFROM`; derived documents have
   `MODULE.FK_URI_DERIVEDFROM`; copies have no metadata. Tracker SQL accepts `DISTINCT` and `GROUP BY … HAVING`.
   `MODULE.C_ID` and `C_MODULENAME` both hold the document name.
+- **Verified by spike R2 (REST) on 2512**: a copy of a copy keeps the inherited links. E's items link to B **and**
+  to A, so raw link counts contain transitive edges (see SPEC §7 "Inherited links").
 - **Verified by spike V1 on 2512**: widget context classes, `$date.systemTime`, `isPdf()` true in PDF export,
   reflection method listing blocked.
 

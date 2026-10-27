@@ -2256,6 +2256,8 @@ Roles observed in the Siemens standard configuration (reported by a project owne
 
 Copied documents are linked to their source through a "branched from" document field, and copied work items through a "branched from" link (Siemens, Polarion 2016 compare/merge and 2310 bulk branching announcements). Never hard-code these IDs: read them from `workitem-link-role-enum.xml` or expose them as widget parameters.
 
+**Inherited links (verified on 2512)**: copying a document that is itself a copy keeps the copied items' existing links. Items of the copy of a copy link with `duplicates` both to their direct source and to the original (the inherited link keeps its older link revision). Any document-level inference from item links must remove these transitive relations.
+
 ### 10.5 Form Layout (Work Item Editor)
 
 **Administration → Work Items → Form Configuration → Form Layouts.** An XML file per (Interface View × Work Item type). The global `-- Default --` view with the `-- unspecific --` type cannot be deleted (everything else derives from it).

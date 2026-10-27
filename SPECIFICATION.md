@@ -109,6 +109,12 @@ is in the configured role set R(kind).
 - **Verified on 2512 (spike A2 Q3/Q4)**: a branch has `MODULE.FK_URI_BRANCHEDFROM` set, even with no overwritten item
   (the only way to detect such a branch). A derived document has `MODULE.FK_URI_DERIVEDFROM` set. A copy/reuse has
   **no** metadata and is detected only through `duplicates` links.
+- **Inherited links (verified on 2512, spike R2.8)**: copying a copy keeps the links of the copied items. The items of
+  E (copy of B, which is a copy of A) link with `duplicates` to B **and** to A. Raw counting therefore gives an extra
+  edge A → E. Rule (proposed, `[?]` PO): **transitive reduction**. Drop an edge S → T of kind k when there is a
+  document M with S → M and M → T (same kind) and the S → T links are inherited through M. The direct parent is the
+  closest source. A viewer toggle "show indirect relations" shows them again as faint dashed lines. Supporting signal:
+  the inherited link keeps its older link revision (84994 vs 85000).
 - One pair may have several kinds. Draw **one line per pair** labelled with all of its kinds. Style follows the strongest kind: **branch > derived > copy** (decided). The label always lists every kind.
 
 ## 8. Out of scope (v1)
@@ -129,7 +135,8 @@ context (F15), non-LiveDoc documents.
 
 ## 10. Open questions
 
-1. Spike results: see `docs/spike-tests.md`. Waiting on results from the product owner's 2512 instance.
+1. Spike results: Part A done. Waiting on widget tests V2–V7 (`docs/spike-tests.md`).
+2. Inherited links (§7): hide indirect relations by default (transitive reduction) with a toggle to show them?
 
 ## 11. Decision log
 
@@ -153,3 +160,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Line style for a pair with several kinds: precedence branch > derived > copy; label lists all kinds | PO |
 | 2026-10-27 | Spike A2 Q3–Q6: branch/derived metadata confirmed (incl. branch without overwrite), copies have no metadata, DISTINCT/GROUP BY accepted, `c_id` = `c_modulename` = document name. Part A2 complete | `docs/A2_*.xlsx` |
 | 2026-10-27 | Spike A3 R1: REST document attributes do not show branched/derived-from (only `derivedFromLinkRole`/`derivedFields` on the derived doc); relationships not inspected. Not needed: the widget uses SQL. R2 optional | `docs/R1_test_results.txt` |
+| 2026-10-27 | Spike A3 R2: REST confirms roles/direction; copy of a copy keeps the inherited `duplicates` link to the original (E→A besides E→B). Part A complete | `docs/R2_test_results.txt` |

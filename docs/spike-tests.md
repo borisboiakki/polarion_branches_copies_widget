@@ -118,9 +118,7 @@ SQL:(SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_mo
 ```
 Report which of the two returns the items of `SRS_Test` (possibly both).
 
-### A3 — REST calls (document metadata and link direction) — optional
-
-R1 done (see "Results so far"). R2 is **optional**: link direction is already settled by A2. The widget does not use REST.
+### A3 — REST calls (document metadata and link direction) ✅ done (R1 partial, R2 complete)
 
 
 Use your REST token (Postman, curl or similar). The base URL is `https://MYHOST/polarion/rest/v1`.
@@ -245,12 +243,12 @@ If any test shows a Velocity error, copy the message from the widget, or from th
 | A2 Q5 | 2026-10-27 | ✅ `SELECT DISTINCT` and `GROUP BY … HAVING COUNT(*)` are both accepted by the tracker SQL. Both return the same 20 items = all link sources of the 3 roles (B 6, C 2, D 6, E 6). Exports: `docs/A2_Q5_*.xlsx` |
 | A2 Q6 | 2026-10-27 | ✅ `module.c_id` and `module.c_modulename` both hold the document name (`SRS_Test`); both queries return its 6 items. Exports: `docs/A2_Q6_*.xlsx` |
 | A3 R1 | 2026-10-27 | ⚠️ Partial, not needed. In the REST document **attributes**, no `branchedFrom`/`derivedFrom` appears for any of B, C, D, F. Only the derived document D has the extra attributes `derivedFromLinkRole` and `derivedFields`. The file lists attribute names only, so the `relationships` block (where `branchedFrom`/`derivedFrom` would appear as references) is not visible. Not blocking: the widget reads this metadata through SQL (A2 Q3/Q4). Results: `docs/R1_test_results.txt` |
+| A3 R2 | 2026-10-27 | ✅ Roles and direction confirmed through REST for all 10 items (link id `VforIA/<source>/<role>/VforIA/<target>`). R2.1 B→A `duplicates`, R2.2 B heading→A heading, R2.3/R2.4 C→A `branched_from` (VIA-509, VIA-512), R2.5 C heading: none, R2.6/R2.7 D→A `derived_from`, R2.9 F heading: none, R2.10 A: no back-links returned. ⚠️ **R2.8 surprise: the copy of a copy keeps the inherited link.** `VIA-531` (E) has **two** `duplicates` links: → `VIA-516` (B, link revision 85000, created by the copy) **and** → `VIA-509` (A, link revision 84994, inherited from B). Link-based inference therefore also sees an edge A → E. Besides the 3 roles, items carry `parent` links (document structure), which the role filter excludes. Results: `docs/R2_test_results.txt` |
 | V1 | 2026-10-27 | ✅ Runs. Polarion ALM 2512. `$widgetContext` = `RichPageWidgetRenderingContextImpl`, `$transaction` = `ReadOnlyTransactionImpl`, `$transaction.objects()` = `ProxyModelObjects`; `$trackerService`/`getDataService()` are proxies. `$date.systemTime` works. Reflection method listing is blocked (empty), as the guide says. In PDF export `isPdf` = true. `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
 
 ## Results template (copy into your answer)
 
 ```
-A3 R2 (optional): full JSON of R2.1–R2.10 in docs/R2_test_results.txt
 V2 (counts, timings, working getters, field names, branchedFrom/derivedFrom values):
 V3a / V3b:
 V4 (VforIA + large project: SQL ms, scan ms, items, pairs):
