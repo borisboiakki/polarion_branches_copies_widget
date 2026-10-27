@@ -86,5 +86,9 @@ spike/bwSpike/                 diagnostic test widget (spike/bwSpike.zip = uploa
 - Develop on the branch assigned for the session; commit small, descriptive commits; do not open PRs unless asked.
 - Update `SPECIFICATION.md` (open questions / decisions log) whenever a requirement is clarified.
 - No customer or project-specific data in the repo.
+- Velocity pitfall (seen on 2512): **no backslashes in Velocity string literals** (`"[a-z\-]"` causes a
+  `TokenMgrError` lexical error). Put `-` last in regex character classes instead. Keep `$`/`\` out of JS that sits
+  outside `#[[ ... ]]#` blocks.
+- After editing `spike/bwSpike/`, rebuild `spike/bwSpike.zip` (folder at zip root, Deflated).
 - Before finishing work, run through guide §13 validation checklist; say plainly what could not be tested
   (no Polarion instance is available in the sandbox).

@@ -27,7 +27,7 @@
 
 #set($projectId = $page.getReference().projectId())
 #set($projectIdOk = false)
-#if($projectId && $projectId.matches("[A-Za-z0-9_.\-]+"))
+#if($projectId && $projectId.matches("[A-Za-z0-9_.-]+"))
   #set($projectIdOk = true)
 #end
 
@@ -239,7 +239,7 @@
   (function () {
     var boxes = document.querySelectorAll('.bws-res');
     var box = boxes[boxes.length - 1];
-    var loc = (box.getAttribute('data-projloc') || '').replace(/^\/+|\/+$/g, '');
+    var loc = (box.getAttribute('data-projloc') || '').split('/').filter(Boolean).join('/');
     var rel = '.polarion/pages/widgets/bwSpike/resources/spike.js';
     var urls = ['/repo/' + rel, '/polarion/repo/' + rel];
     if (loc) { urls.push('/repo/' + loc + '/' + rel); urls.push('/polarion/repo/' + loc + '/' + rel); }
