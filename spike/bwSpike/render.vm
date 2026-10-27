@@ -21,6 +21,9 @@
 #set($testOpt = $parameters.test.singleValue())
 #set($testId = "")
 #if($testOpt)
+  ## Verified on 2512: singleValue returns the option id as a plain String. If it is an
+  ## option object instead, one of the id accessors below overrides this value.
+  #set($testId = "$testOpt")
   #set($testId = $testOpt.id)
   #set($testId = $testOpt.getId())
   #set($testId = $testOpt.id())

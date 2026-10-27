@@ -310,7 +310,10 @@ $parameters.put("collectionScopeDataSet", $factory.dataSet("MyDataSet").allowCol
 #end
 ```
 
-Inside an *uploaded* widget, parameters are also reachable as `$parameters.<key>`:
+Inside an *uploaded* widget, parameters are also reachable as `$parameters.<key>`.
+
+> **Verified on 2512**: for a `customEnum` parameter, `$parameters.<key>.singleValue` returns the selected option **id as a plain `String`** (e.g. `"docs"`), not an option object, so `.singleValue.id` is empty. Use the value directly. Enumeration parameters backed by Polarion objects (`@document`, `workitem-link-role`) may differ; check with `.getClass().getName()`.
+
 
 ```velocity
 #set($userStoryParameter = $parameters.userStory)
