@@ -1,0 +1,1 @@
+INCLUDE-OK: this text comes from resources/spike.txt

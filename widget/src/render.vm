@@ -1,0 +1,766 @@
+## Document Branches and Copies - render.vm
+## Source: widget/src/render.vm. tools/build-widget.py inlines branches-graph.js at the BW_INLINE_JS marker,
+## checks the result with Velocity 1.4 and writes widget/dist/docBranches.zip.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+#set($bwVersion = "0.1.0")
+<style>
+  .bw-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
+  .bw-toolbar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
+  .bw-ctl { font-size: 12px; padding: 2px 4px; }
+  .bw-search { width: 170px; }
+  .bw-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; }
+  .bw-fields { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  .bw-btns { display: inline-flex; gap: 4px; }
+  .bw-btn { font-size: 12px; padding: 2px 8px; cursor: pointer; border: 1px solid rgb(170,178,195); background: rgb(248,249,252); border-radius: 3px; }
+  .bw-btn:hover { background: rgb(232,237,247); }
+  .bw-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 2px 0 4px 0; }
+  .bw-leg { display: inline-flex; align-items: center; gap: 4px; }
+  .bw-muted { color: rgb(110,118,135); }
+  .bw-status { color: rgb(110,118,135); margin-bottom: 4px; }
+  .bw-view { overflow: auto; border: 1px solid rgb(215,220,230); background: rgb(255,255,255); }
+  .bw-svg { display: block; }
+  .bw-node, .bw-edge, .bw-edge-label { cursor: pointer; }
+  .bw-tip { position: absolute; z-index: 20; background: rgb(255,255,250); border: 1px solid rgb(170,170,170); padding: 4px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); pointer-events: none; max-width: 420px; }
+  .bw-tip-head { font-weight: 600; }
+  .bw-details { border: 1px solid rgb(215,220,230); background: rgb(250,251,253); padding: 6px 8px; margin-bottom: 6px; }
+  .bw-details-head { font-weight: 600; margin-bottom: 4px; }
+  .bw-items { margin: 4px 0 0 18px; padding: 0; max-height: 180px; overflow: auto; }
+  .bw-table { border-collapse: collapse; margin: 4px 0; }
+  .bw-table td, .bw-table th { border: 1px solid rgb(200,205,215); padding: 3px 6px; text-align: left; vertical-align: top; }
+  .bw-table th { background: rgb(238,241,246); }
+  .bw-error, .bw-warn { color: rgb(198,40,40); }
+</style>
+
+## ======================================================================= parameters
+## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
+## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
+#set($bwUnset = "__unset__")
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.copyRoles.value)
+#set($tmp = $parameters.copyRoles.value())
+#set($copyRolesStr = "duplicates")
+#if("$tmp" != $bwUnset && "$tmp" != "")
+  #set($copyRolesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.branchRoles.value)
+#set($tmp = $parameters.branchRoles.value())
+#set($branchRolesStr = "branched_from")
+#if("$tmp" != $bwUnset && "$tmp" != "")
+  #set($branchRolesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.derivedRoles.value)
+#set($tmp = $parameters.derivedRoles.value())
+#set($derivedRolesStr = "derived_from")
+#if("$tmp" != $bwUnset && "$tmp" != "")
+  #set($derivedRolesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.excludedTypes.value)
+#set($tmp = $parameters.excludedTypes.value())
+#set($excludedTypesStr = "heading")
+#if("$tmp" != $bwUnset)
+  #set($excludedTypesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.spaces.value)
+#set($tmp = $parameters.spaces.value())
+#set($spacesStr = "")
+#if("$tmp" != $bwUnset)
+  #set($spacesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.showMode.singleValue)
+#set($tmp = $parameters.showMode.singleValue())
+#set($showMode = "related")
+#if("$tmp" == "all")
+  #set($showMode = "all")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.showIndirect.singleValue)
+#set($tmp = $parameters.showIndirect.singleValue())
+#set($showIndirect = false)
+#if("$tmp" == "show")
+  #set($showIndirect = true)
+#end
+
+#set($extraList = [])
+#set($tmp = false)
+#set($tmp = $parameters.extraFields.values)
+#set($tmp = $parameters.extraFields.values())
+#if($tmp)
+  #foreach($v in $tmp)
+    #set($fid = "$v")
+    #set($fid = $v.id())
+    #set($fidS = "$fid")
+    #if($fidS.matches("type|status|author|created|updated|items") && !$extraList.contains($fidS))
+      #set($void = $extraList.add($fidS))
+    #end
+  #end
+#end
+#set($extrasStr = "")
+#foreach($f in $extraList)
+  #if($extrasStr != "")
+    #set($extrasStr = "${extrasStr},")
+  #end
+  #set($extrasStr = "${extrasStr}${f}")
+#end
+
+## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
+#set($bwInt = 0)
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.threshold.value)
+#set($tmp = $parameters.threshold.value())
+#set($tmpS = "$tmp")
+#set($threshold = 1)
+#if($tmpS.matches("[0-9]{1,6}"))
+  #set($threshold = $bwInt.parseInt($tmpS))
+#end
+#if($threshold < 1)
+  #set($threshold = 1)
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.height.value)
+#set($tmp = $parameters.height.value())
+#set($tmpS = "$tmp")
+#set($graphHeight = 600)
+#if($tmpS.matches("[0-9]{1,5}"))
+  #set($graphHeight = $bwInt.parseInt($tmpS))
+#end
+#if($graphHeight < 200)
+  #set($graphHeight = 600)
+#end
+
+## ======================================================================= lists and kinds
+## Only identifiers are allowed in role and type lists; they go into SQL.
+#macro(bwIdList $bwIn $bwOut)
+  #foreach($bwPart in $bwIn.split(","))
+    #set($bwT = $bwPart.trim())
+    #if($bwT.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwT))
+      #set($void = $bwOut.add($bwT))
+    #end
+  #end
+#end
+
+#set($copyRoles = [])
+#bwIdList($copyRolesStr $copyRoles)
+#set($branchRoles = [])
+#bwIdList($branchRolesStr $branchRoles)
+#set($derivedRoles = [])
+#bwIdList($derivedRolesStr $derivedRoles)
+#set($excludedTypes = [])
+#bwIdList($excludedTypesStr $excludedTypes)
+
+## Space names may contain blanks; they are compared in Velocity only, never put into SQL.
+#set($spaceFilter = [])
+#foreach($bwPart in $spacesStr.split(","))
+  #set($bwT = $bwPart.trim())
+  #if($bwT != "")
+    #set($void = $spaceFilter.add($bwT))
+  #end
+#end
+
+## role -> kind (first kind wins if a role is listed twice)
+#set($roleKind = $objectFactory.newMap())
+#foreach($r in $branchRoles)
+  #if(!$roleKind.containsKey($r))
+    #set($void = $roleKind.put($r, "branch"))
+  #end
+#end
+#foreach($r in $derivedRoles)
+  #if(!$roleKind.containsKey($r))
+    #set($void = $roleKind.put($r, "derived"))
+  #end
+#end
+#foreach($r in $copyRoles)
+  #if(!$roleKind.containsKey($r))
+    #set($void = $roleKind.put($r, "copy"))
+  #end
+#end
+
+#set($roleSql = "")
+#foreach($r in $roleKind.keySet())
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+
+#set($typeSql = "")
+#foreach($t in $excludedTypes)
+  #if($typeSql != "")
+    #set($typeSql = "${typeSql},")
+  #end
+  #set($typeSql = "${typeSql}'${t}'")
+#end
+
+#set($projectIdRaw = "")
+#set($projectIdRaw = $page.getReference().projectId())
+#set($projectId = "$projectIdRaw")
+#set($projectOk = false)
+#if($projectId.matches("[A-Za-z0-9_.-]+"))
+  #set($projectOk = true)
+#end
+
+#set($isStatic = false)
+#if($widgetContext.target().isPdf() || $widgetContext.target().isPrint())
+  #set($isStatic = true)
+#end
+
+## Document key used everywhere: "space/name"
+#macro(bwKey $bwMod)
+  #set($bwKeyOut = "")
+  #set($bwF = "")
+  #set($bwF = $bwMod.getModuleFolder())
+  #set($bwN = "")
+  #set($bwN = $bwMod.getId())
+  #if("$bwN" != "")
+    #set($bwKeyOut = "${bwF}/${bwN}")
+  #end
+#end
+
+#if(!$projectOk)
+  <div class="bw-warn">Document Branches and Copies: place this widget on a page of a project.</div>
+#elseif($roleKind.size() == 0)
+  <div class="bw-warn">Document Branches and Copies: no valid link role in the widget parameters.</div>
+#else
+
+## ======================================================================= documents
+#set($ds = $trackerService.getDataService())
+#set($docList = [])
+#set($docByKey = $objectFactory.newMap())
+#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
+#set($typeFilterSql = "")
+#if($typeSql != "")
+  #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
+#end
+#foreach($m in $ds.sqlSearch($docSql))
+  #bwKey($m)
+  #set($dKey = $bwKeyOut)
+  #set($dSpace = "")
+  #set($dSpace = $m.getModuleFolder())
+  #set($keep = true)
+  #if($dKey == "" || $docByKey.containsKey($dKey))
+    #set($keep = false)
+  #end
+  #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
+    #set($keep = false)
+  #end
+  #if($keep)
+    #set($d = $objectFactory.newMap())
+    #set($dName = $m.getId())
+    #set($dTitle = "")
+    #set($dTitle = $m.getTitle())
+    #if("$dTitle" == "")
+      #set($dTitle = "$dName")
+    #end
+    #set($dType = "")
+    #set($dTypeObj = false)
+    #set($dTypeObj = $m.getType())
+    #if($dTypeObj)
+      #set($dType = $dTypeObj.getId())
+      #set($dType = $dTypeObj.getName())
+    #end
+    #set($dStatus = "")
+    #set($dStatusObj = false)
+    #set($dStatusObj = $m.getStatus())
+    #if($dStatusObj)
+      #set($dStatus = $dStatusObj.getId())
+      #set($dStatus = $dStatusObj.getName())
+    #end
+    #set($dAuthor = "")
+    #set($dAuthorObj = false)
+    #set($dAuthorObj = $m.getAuthor())
+    #if($dAuthorObj)
+      #set($dAuthor = $dAuthorObj.getId())
+      #set($dAuthor = $dAuthorObj.getName())
+    #end
+    #set($dCreated = "")
+    #set($dDate = false)
+    #set($dDate = $m.getCreated())
+    #if($dDate)
+      #set($dCreated = "$dDate")
+      #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
+    #end
+    #set($dUpdated = "")
+    #set($dDate = false)
+    #set($dDate = $m.getUpdated())
+    #if($dDate)
+      #set($dUpdated = "$dDate")
+      #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
+    #end
+    ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
+    #set($spaceStr = "$dSpace")
+    #set($nameStr = "$dName")
+    #set($spaceSql = $spaceStr.replace("'", "''"))
+    #set($nameSql = $nameStr.replace("'", "''"))
+    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
+    #set($dItems = -1)
+    #set($dItems = $ds.sqlSearch($cntSql).size())
+    #set($void = $d.put("key", $dKey))
+    #set($void = $d.put("id", "$dName"))
+    #set($void = $d.put("title", "$dTitle"))
+    #set($void = $d.put("space", "$dSpace"))
+    #set($void = $d.put("type", "$dType"))
+    #set($void = $d.put("status", "$dStatus"))
+    #set($void = $d.put("author", "$dAuthor"))
+    #set($void = $d.put("created", "$dCreated"))
+    #set($void = $d.put("updated", "$dUpdated"))
+    #set($void = $d.put("items", $dItems))
+    #set($void = $d.put("module", $m))
+    #set($void = $docList.add($d))
+    #set($void = $docByKey.put($dKey, $d))
+  #end
+#end
+
+## ======================================================================= relations
+## Edge "orig>copy": orig = document of the link target (original item), copy = document of the
+## link source (copy/branch/derived item). Verified direction on 2512 (spike A2/R2).
+#set($edges = $objectFactory.newMap())
+#set($edgeKeys = [])
+#macro(bwEdge $bwO $bwC)
+  #set($bwOk = $bwO)
+  #set($bwCk = $bwC)
+  #set($bwPk = "${bwOk}>${bwCk}")
+  #if(!$edges.containsKey($bwPk))
+    #set($bwE = $objectFactory.newMap())
+    #set($void = $bwE.put("o", $bwOk))
+    #set($void = $bwE.put("c", $bwCk))
+    #set($void = $bwE.put("copy", $objectFactory.newMap()))
+    #set($void = $bwE.put("branch", $objectFactory.newMap()))
+    #set($void = $bwE.put("derived", $objectFactory.newMap()))
+    #set($void = $bwE.put("oItems", $objectFactory.newMap()))
+    #set($void = $bwE.put("cItems", $objectFactory.newMap()))
+    #set($void = $bwE.put("samples", []))
+    #set($void = $bwE.put("metaBranch", false))
+    #set($void = $bwE.put("metaDerived", false))
+    #set($void = $bwE.put("indirect", false))
+    #set($void = $edges.put($bwPk, $bwE))
+    #set($void = $edgeKeys.add($bwPk))
+  #end
+  #set($bwE = $edges.get($bwPk))
+#end
+
+## 1) Work item links. SQL returns the link-source items of the configured roles whose target is
+## in another document of the same project; the Velocity scan reads their links (spike V4).
+#set($srcTypeSql = "")
+#if($typeSql != "")
+  #set($srcTypeSql = " AND ws.c_type NOT IN (${typeSql})")
+#end
+#set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND wt.fk_uri_project = ws.fk_uri_project AND l.c_role IN (${roleSql}) AND ws.fk_uri_module IS NOT NULL AND wt.fk_uri_module IS NOT NULL AND ws.fk_uri_module <> wt.fk_uri_module${srcTypeSql}")
+#foreach($wi in $ds.sqlSearch($linkSql))
+  #set($srcMod = false)
+  #set($srcMod = $wi.getModule())
+  #set($srcKey = "")
+  #if($srcMod)
+    #bwKey($srcMod)
+    #set($srcKey = $bwKeyOut)
+  #end
+  #if($srcKey != "" && $docByKey.containsKey($srcKey))
+    #set($wiId = $wi.getId())
+    #foreach($ls in $wi.getLinkedWorkItemsStructsDirect())
+      #set($role = "")
+      #set($role = $ls.getLinkRole().getId())
+      #if($roleKind.containsKey($role))
+        #set($tgt = false)
+        #set($tgt = $ls.getLinkedItem())
+        #if($tgt && !$tgt.isUnresolvable())
+          #set($tgtType = "")
+          #set($tgtType = $tgt.getType().getId())
+          #set($tgtMod = false)
+          #set($tgtMod = $tgt.getModule())
+          #set($tgtKey = "")
+          #if($tgtMod)
+            #bwKey($tgtMod)
+            #set($tgtKey = $bwKeyOut)
+          #end
+          #if($tgtKey != "" && $tgtKey != $srcKey && $docByKey.containsKey($tgtKey) && !$excludedTypes.contains("$tgtType"))
+            #set($kind = $roleKind.get($role))
+            #bwEdge($tgtKey $srcKey)
+            #set($tgtId = $tgt.getId())
+            #set($void = $bwE.get($kind).put($wiId, true))
+            #set($void = $bwE.get("cItems").put($wiId, true))
+            #set($void = $bwE.get("oItems").put($tgtId, true))
+            #if($bwE.get("samples").size() < 30)
+              #set($void = $bwE.get("samples").add("${wiId}|${tgtId}|${kind}"))
+            #end
+          #end
+        #end
+      #end
+    #end
+  #end
+#end
+
+## 2) Document metadata: "branched from" and "derived from" (spike A2 Q3/Q4, V2)
+#foreach($d in $docList)
+  #set($m = $d.get("module"))
+  #set($bf = false)
+  #set($bf = $m.getValue("branchedFrom"))
+  #if($bf)
+    #bwKey($bf)
+    #if($bwKeyOut != "" && $bwKeyOut != $d.get("key") && $docByKey.containsKey($bwKeyOut))
+      #bwEdge($bwKeyOut $d.get("key"))
+      #set($void = $bwE.put("metaBranch", true))
+    #end
+  #end
+  #set($df = false)
+  #set($df = $m.getValue("derivedFrom"))
+  #if($df)
+    #bwKey($df)
+    #if($bwKeyOut != "" && $bwKeyOut != $d.get("key") && $docByKey.containsKey($bwKeyOut))
+      #bwEdge($bwKeyOut $d.get("key"))
+      #set($void = $bwE.put("metaDerived", true))
+    #end
+  #end
+#end
+
+## 3) Threshold: keep an edge if it has metadata or at least $threshold linked items
+#set($kept = [])
+#foreach($pk in $edgeKeys)
+  #set($e = $edges.get($pk))
+  #set($n = $e.get("cItems").size())
+  #if($e.get("metaBranch") || $e.get("metaDerived") || $n >= $threshold)
+    #set($void = $kept.add($e))
+  #end
+#end
+
+## 4) Transitive reduction (SPEC 7): an edge S>T without metadata is indirect when there is a
+## document M with S>M and M>T, whatever the kinds (inherited links of copies of copies).
+#set($adj = $objectFactory.newMap())
+#foreach($e in $kept)
+  #if(!$adj.containsKey($e.get("o")))
+    #set($void = $adj.put($e.get("o"), $objectFactory.newMap()))
+  #end
+  #set($void = $adj.get($e.get("o")).put($e.get("c"), true))
+#end
+#foreach($e in $kept)
+  #if(!$e.get("metaBranch") && !$e.get("metaDerived"))
+    #set($sKey = $e.get("o"))
+    #set($tKey = $e.get("c"))
+    #foreach($mKey in $adj.get($sKey).keySet())
+      #if($mKey != $tKey && $adj.containsKey($mKey) && $adj.get($mKey).containsKey($tKey))
+        #set($void = $e.put("indirect", true))
+      #end
+    #end
+  #end
+#end
+
+## ======================================================================= output
+#if($isStatic)
+## ----------------------------------------------------------------- static view (PDF / print)
+## No JavaScript. Elements limited to rect, line, polygon and text (rendered in PDF, spike V7).
+#set($drawEdges = [])
+#set($linkedKeys = $objectFactory.newMap())
+#foreach($e in $kept)
+  #if(!$e.get("indirect") || $showIndirect)
+    #set($void = $drawEdges.add($e))
+    #set($void = $linkedKeys.put($e.get("o"), true))
+    #set($void = $linkedKeys.put($e.get("c"), true))
+  #end
+#end
+## Levels: longest path over direct edges
+#set($lvl = $objectFactory.newMap())
+#foreach($d in $docList)
+  #if($linkedKeys.containsKey($d.get("key")))
+    #set($void = $lvl.put($d.get("key"), 0))
+  #end
+#end
+#foreach($pass in [1..15])
+  #foreach($e in $drawEdges)
+    #if(!$e.get("indirect"))
+      #set($lo = $lvl.get($e.get("o")))
+      #set($lc = $lvl.get($e.get("c")))
+      #if($lc <= $lo && $lo < 30)
+        #set($nl = $lo + 1)
+        #set($void = $lvl.put($e.get("c"), $nl))
+      #end
+    #end
+  #end
+#end
+#set($maxLevel = 0)
+#foreach($k in $lvl.keySet())
+  #if($lvl.get($k) > $maxLevel)
+    #set($maxLevel = $lvl.get($k))
+  #end
+#end
+## Columns: level 0 in document order, then children next to their parents
+#set($cols = [])
+#set($placed = $objectFactory.newMap())
+#foreach($L in [0..$maxLevel])
+  #set($col = [])
+  #if($L > 0)
+    #set($pl = $L - 1)
+    #foreach($p in $cols.get($pl))
+      #foreach($e in $drawEdges)
+        #if(!$e.get("indirect") && $e.get("o") == $p.get("key") && !$placed.containsKey($e.get("c")) && $lvl.get($e.get("c")) == $L)
+          #set($void = $col.add($docByKey.get($e.get("c"))))
+          #set($void = $placed.put($e.get("c"), true))
+        #end
+      #end
+    #end
+  #end
+  #foreach($d in $docList)
+    #if($linkedKeys.containsKey($d.get("key")) && !$placed.containsKey($d.get("key")) && $lvl.get($d.get("key")) == $L)
+      #set($void = $col.add($d))
+      #set($void = $placed.put($d.get("key"), true))
+    #end
+  #end
+  #set($void = $cols.add($col))
+#end
+## Geometry (integers only)
+#set($nW = 220)
+#set($cGap = 170)
+#set($rGap = 16)
+#set($mg = 16)
+#set($nLines = 3 + $extraList.size())
+#set($nH = 16 + 14 * $nLines)
+#set($px = $objectFactory.newMap())
+#set($py = $objectFactory.newMap())
+#set($maxRows = 0)
+#set($ci = 0)
+#foreach($col in $cols)
+  #set($ri = 0)
+  #foreach($d in $col)
+    #set($x = $mg + $ci * ($nW + $cGap))
+    #set($y = $mg + $ri * ($nH + $rGap))
+    #set($void = $px.put($d.get("key"), $x))
+    #set($void = $py.put($d.get("key"), $y))
+    #set($ri = $ri + 1)
+  #end
+  #if($ri > $maxRows)
+    #set($maxRows = $ri)
+  #end
+  #set($ci = $ci + 1)
+#end
+#set($cw = 2 * $mg + ($maxLevel + 1) * $nW + $maxLevel * $cGap)
+#set($ch = 2 * $mg + $maxRows * ($nH + $rGap))
+#set($outW = $cw)
+#set($outH = $ch)
+#if($cw > 700)
+  #set($outW = 700)
+  #set($outH = $ch * 700 / $cw)
+#end
+<div class="bw-root">
+<div><b>Document Branches and Copies</b> &mdash; project $esc.html($projectId) &mdash; $drawEdges.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
+<div class="bw-muted">Arrow: original &rarr; copy / branch / derived. Line style: copy solid blue, branch dashed red, derived dotted green, indirect dashed grey.</div>
+#if($drawEdges.size() == 0)
+<p>No relation found between the documents with the current settings.</p>
+#else
+<svg xmlns="http://www.w3.org/2000/svg" width="$outW" height="$outH" viewBox="0 0 $cw $ch">
+<rect x="0" y="0" width="$cw" height="$ch" fill="rgb(255,255,255)"/>
+#foreach($e in $drawEdges)
+  #set($eo = $e.get("o"))
+  #set($ec = $e.get("c"))
+  #set($half = $nH / 2)
+  #set($x1 = $px.get($eo) + $nW)
+  #set($y1 = $py.get($eo) + $half)
+  #set($x2 = $px.get($ec))
+  #set($y2 = $py.get($ec) + $half)
+  #set($xm = $x2 - $cGap / 2)
+  #set($kb = $e.get("branch").size())
+  #set($kd = $e.get("derived").size())
+  #set($kc = $e.get("copy").size())
+  #set($color = "rgb(51,103,214)")
+  #set($dash = "")
+  #if($kd > 0 || $e.get("metaDerived"))
+    #set($color = "rgb(26,127,55)")
+    #set($dash = "2,4")
+  #end
+  #if($kb > 0 || $e.get("metaBranch"))
+    #set($color = "rgb(198,40,40)")
+    #set($dash = "9,5")
+  #end
+  #set($sw = "2")
+  #if($e.get("indirect"))
+    #set($color = "rgb(150,150,150)")
+    #set($dash = "4,4")
+    #set($sw = "1")
+  #end
+  #set($label = "")
+  #if($kb > 0)
+    #set($label = "branch $kb")
+  #elseif($e.get("metaBranch"))
+    #set($label = "branch")
+  #end
+  #if($kd > 0 || $e.get("metaDerived"))
+    #if($label != "")
+      #set($label = "${label} + ")
+    #end
+    #if($kd > 0)
+      #set($label = "${label}derived $kd")
+    #else
+      #set($label = "${label}derived")
+    #end
+  #end
+  #if($kc > 0)
+    #if($label != "")
+      #set($label = "${label} + ")
+    #end
+    #set($label = "${label}copy $kc")
+  #end
+  #if($e.get("indirect"))
+    #set($label = "${label} (indirect)")
+  #end
+  #set($ax = $x2 - 9)
+  #set($ay1 = $y2 - 5)
+  #set($ay2 = $y2 + 5)
+  #set($lx = $xm + 3)
+  #set($ly = $y2 - 4)
+<line x1="$x1" y1="$y1" x2="$xm" y2="$y1" stroke="$color" stroke-width="$sw" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y1" x2="$xm" y2="$y2" stroke="$color" stroke-width="$sw" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y2" x2="$ax" y2="$y2" stroke="$color" stroke-width="$sw" stroke-dasharray="$dash"/>
+<polygon points="$ax,$ay1 $x2,$y2 $ax,$ay2" fill="$color"/>
+<text x="$lx" y="$ly" font-family="Arial" font-size="9" fill="$color">$esc.html($label)</text>
+#end
+#foreach($col in $cols)
+  #foreach($d in $col)
+    #set($x = $px.get($d.get("key")))
+    #set($y = $py.get($d.get("key")))
+    #set($tx = $x + 7)
+<rect x="$x" y="$y" width="$nW" height="$nH" rx="5" fill="rgb(246,248,252)" stroke="rgb(120,132,155)" stroke-width="1"/>
+    #set($lines = [])
+    #set($void = $lines.add($d.get("id")))
+    #set($void = $lines.add($d.get("title")))
+    #set($void = $lines.add($d.get("space")))
+    #foreach($f in $extraList)
+      #set($fv = "$d.get($f)")
+      #if($f == "items" && $fv == "-1")
+        #set($fv = "")
+      #end
+      #set($fl = $f)
+      #if($f == "type")
+        #set($fl = "Type")
+      #elseif($f == "status")
+        #set($fl = "Status")
+      #elseif($f == "author")
+        #set($fl = "Author")
+      #elseif($f == "created")
+        #set($fl = "Created")
+      #elseif($f == "updated")
+        #set($fl = "Updated")
+      #elseif($f == "items")
+        #set($fl = "Work items")
+      #end
+      #set($void = $lines.add("${fl}: ${fv}"))
+    #end
+    #set($li = 0)
+    #foreach($t in $lines)
+      #set($ts = "$t")
+      #if($ts.length() > 36)
+        #set($ts2 = $ts.substring(0, 35))
+        #set($ts = "${ts2}...")
+      #end
+      #set($ty = $y + 19 + $li * 14)
+      #set($fw = "normal")
+      #if($li == 0)
+        #set($fw = "bold")
+      #end
+<text x="$tx" y="$ty" font-family="Arial" font-size="11" font-weight="$fw" fill="rgb(25,35,55)">$esc.html($ts)</text>
+      #set($li = $li + 1)
+    #end
+  #end
+#end
+</svg>
+#end
+<table class="bw-table">
+<tr><th>Original</th><th>Relation</th><th>Copy / branch / derived</th><th>Linked items</th><th>Coverage of copy</th></tr>
+#foreach($e in $drawEdges)
+  #set($o = $docByKey.get($e.get("o")))
+  #set($c = $docByKey.get($e.get("c")))
+  #set($kb = $e.get("branch").size())
+  #set($kd = $e.get("derived").size())
+  #set($kc = $e.get("copy").size())
+  #set($rel = "")
+  #if($kb > 0 || $e.get("metaBranch"))
+    #set($rel = "branch")
+  #end
+  #if($kd > 0 || $e.get("metaDerived"))
+    #if($rel != "")
+      #set($rel = "${rel} + ")
+    #end
+    #set($rel = "${rel}derived")
+  #end
+  #if($kc > 0)
+    #if($rel != "")
+      #set($rel = "${rel} + ")
+    #end
+    #set($rel = "${rel}copy")
+  #end
+  #if($e.get("indirect"))
+    #set($rel = "${rel} (indirect)")
+  #end
+  #set($n = $e.get("cItems").size())
+  #set($items = $c.get("items"))
+  #set($cov = "-")
+  #if($items > 0)
+    #set($pctv = $n * 100 / $items)
+    #set($cov = "${pctv}% (${n}/${items})")
+  #end
+<tr><td>$esc.html($o.get("space")) / $esc.html($o.get("id"))</td><td>$esc.html($rel)</td><td>$esc.html($c.get("space")) / $esc.html($c.get("id"))</td><td>$n</td><td>$esc.html($cov)</td></tr>
+#end
+</table>
+#if($showMode == "all")
+  #set($unrelated = "")
+  #foreach($d in $docList)
+    #if(!$linkedKeys.containsKey($d.get("key")))
+      #if($unrelated != "")
+        #set($unrelated = "${unrelated}, ")
+      #end
+      #set($dSp = $d.get("space"))
+      #set($dId = $d.get("id"))
+      #set($unrelated = "${unrelated}${dSp} / ${dId}")
+    #end
+  #end
+  #if($unrelated != "")
+<p class="bw-muted">Documents without relations: $esc.html($unrelated)</p>
+  #end
+#end
+</div>
+#else
+#set($indFlag = "0")
+#if($showIndirect)
+#set($indFlag = "1")
+#end
+<div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
+  <div class="bw-model" style="display:none">
+#foreach($d in $docList)
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
+#end
+#foreach($e in $kept)
+#set($mbFlag = "0")
+#if($e.get("metaBranch"))
+#set($mbFlag = "1")
+#end
+#set($mdFlag = "0")
+#if($e.get("metaDerived"))
+#set($mdFlag = "1")
+#end
+#set($eiFlag = "0")
+#if($e.get("indirect"))
+#set($eiFlag = "1")
+#end
+#set($samplesStr = "")
+#foreach($s in $e.get("samples"))
+#if($samplesStr != "")
+#set($samplesStr = "${samplesStr};")
+#end
+#set($samplesStr = "${samplesStr}${s}")
+#end
+    <i class="bw-e" data-o="$esc.html($e.get('o'))" data-c="$esc.html($e.get('c'))" data-kc="$e.get('copy').size()" data-kb="$e.get('branch').size()" data-kd="$e.get('derived').size()" data-mb="$mbFlag" data-md="$mdFlag" data-oi="$e.get('oItems').size()" data-ci="$e.get('cItems').size()" data-n="$e.get('cItems').size()" data-ind="$eiFlag" data-s="$esc.html($samplesStr)"></i>
+#end
+  </div>
+</div>
+<script>
+## BW_INLINE_JS
+</script>
+#end
+#end

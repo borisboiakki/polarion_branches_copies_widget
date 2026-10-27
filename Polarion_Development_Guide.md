@@ -183,6 +183,9 @@ log4j configuration: `[POLARION_HOME]/polarion/plugins/com.polarion.core.util_*/
 
 Parameters are built with `$factory` and registered into `$parameters`. Use `$!` (quiet reference) or `#set($void = …)` so the builder's return value is not printed.
 
+> **Verified on Polarion 2512**: write each builder chain on **one line**. A chain split across lines
+> (`$factory.customEnum("X")` newline `.addEnumItem(…)`) fails with *"Error processing parameters … Encountered "\n .addEnumItem…" … Was expecting one of: "," … ")""*. See [§3.1.9](#319-velocity-14-dialect-in-widgets).
+
 #### String
 ```velocity
 $parameters.put("chartTitleParameter", $factory.string("Chart title").value("My Chart").build())
@@ -200,24 +203,14 @@ $parameters.put("useWidgetParameters", $factory.bool("Use widget's internal para
 
 #### Custom enum (fixed list)
 ```velocity
-$parameters.put("timeScaleParameter", $factory.customEnum("Time Scale")
-  .addEnumItem("Day","Day")
-  .addEnumItem("Week","Week")
-  .addEnumItem("Month","Month")
-  .allowNoValue(false)
-  .allowMultipleValues(false)
-  .singleValue("Month").build())
+$parameters.put("timeScaleParameter", $factory.customEnum("Time Scale").addEnumItem("Day","Day").addEnumItem("Week","Week").addEnumItem("Month","Month").allowNoValue(false).allowMultipleValues(false).singleValue("Month").build())
 ```
 
 #### Polarion enumeration (work item type, severity, link role, …)
 ```velocity
 #set($defaultTypeList = [])
 $!defaultTypeList.add("requirement").null
-$parameters.put("workItemTypeListParameter", $factory.enumeration("Workitem type(s)", "workitem-type")
-  .allowNoValue(false)
-  .allowMultipleValues(true)
-  .values($defaultTypeList)
-  .dependencyTarget(true).build())
+$parameters.put("workItemTypeListParameter", $factory.enumeration("Workitem type(s)", "workitem-type").allowNoValue(false).allowMultipleValues(true).values($defaultTypeList).dependencyTarget(true).build())
 
 ## Single-value form
 $parameters.put("mySingleSeverity", $factory.enumeration("MySingleSeverity", "severity").singleValue("major").build())
@@ -317,7 +310,10 @@ $parameters.put("collectionScopeDataSet", $factory.dataSet("MyDataSet").allowCol
 #end
 ```
 
-Inside an *uploaded* widget, parameters are also reachable as `$parameters.<key>`:
+Inside an *uploaded* widget, parameters are also reachable as `$parameters.<key>`.
+
+> **Verified on 2512**: for a `customEnum` parameter, `$parameters.<key>.singleValue` returns the selected option **id as a plain `String`** (e.g. `"docs"`), not an option object, so `.singleValue.id` is empty. Use the value directly. Enumeration parameters backed by Polarion objects (`@document`, `workitem-link-role`) may differ; check with `.getClass().getName()`.
+
 
 ```velocity
 #set($userStoryParameter = $parameters.userStory)
@@ -564,6 +560,36 @@ Always use the `([...])` array delimiters.
   ## safe to use $target
 #end
 ```
+
+#### 3.1.9 Velocity 1.4 Dialect in Widgets
+
+> **Verified on a Polarion 2512 instance (2026-10-27)**: the Velocity parser used for uploaded widgets
+> (`parameters.vm`, `render.vm`) behaves like **Apache Velocity 1.4**. Two errors raised by the
+> instance were reproduced exactly (same message, line and column) with `velocity-1.4.jar`, while
+> Velocity 1.7 accepted one of the templates. Do not use syntax introduced in Velocity 1.5+.
+
+| Do not use | What happens | Use instead |
+|---|---|---|
+| Method chain split across lines | **Error (seen on 2512)**: `ParseException: Encountered "\n .addEnumItem…" … Was expecting one of: "," … ")"` | One chain per line |
+| Map literal `#set($m = {})` | **Error (seen on 2512)**: `TokenMgrError: Lexical error … Encountered: "{" (123)` | `$objectFactory.newMap()` (§3.4) |
+| Backslash in a Velocity string literal, e.g. `$s.matches("[a-z\-]+")` | **Error (seen on 2512)**: `TokenMgrError: Lexical error … Encountered: "-" (45)` | No backslashes; put `-` last in a regex class: `"[a-z_.-]+"` |
+| A directive name in plain text, e.g. `<code>#include</code>` in HTML | **Parse error** (Velocity 1.4 check) | Rephrase, or write `&#35;include` |
+| Unparsed block `#[[ … ]]#` | No error, but **not unparsed**: `#[[`/`]]#` are emitted as text and `$`/`#` inside are still interpreted | Keep `$` out of inline JS, or load JS as a widget resource |
+| `#break`, `$foreach.count`, `$foreach.hasNext` | No error, but **no effect**: emitted as literal text | Manual counter and `#if` guards: `#set($n = $n + 1)` |
+
+Also avoid, as a precaution (consistent with Velocity 1.4, not individually confirmed on the instance):
+- `$` or `${…}` in inline JavaScript (template literals, jQuery `$`): Velocity treats them as references.
+
+Also verified on 2512:
+- Arithmetic on `Long` values does not compute: `#set($d = $t1 - $t0)` with `$date.systemTime` values leaves `$d` unset. Velocity 1.4 arithmetic is defined for `Integer`. Print the raw values, or compute in JavaScript.
+- `#include("resources/x")` and `#parse("resources/x.vm")` fail with *"Unable to find resource"*: Velocity cannot load files from an uploaded widget's `resources/` folder. Inline the JS/CSS in `render.vm` (Velocity-safe) or load them by URL from the browser.
+
+Hex colour codes (`#c62828`) are safe: hex digits cannot spell a directive name.
+
+**Check templates locally before uploading.** Parse every `.vm` file with `velocity-1.4.jar`
+(Maven Central `velocity:velocity:1.4`, plus `commons-collections`, `commons-lang`, `oro`) through
+`RuntimeSingleton.parse(reader, name)`. A parse error there is a parse error on the server. Parsing
+does not catch runtime problems (wrong method names, null values).
 
 ### 3.2 API Selection Guide
 
@@ -1685,6 +1711,11 @@ Polarion's data layer is PostgreSQL. SQL queries are available as a query type i
 
 > SQL is for complex join-type queries that would be inefficient in Lucene. Prefer Lucene otherwise.
 
+**Without direct database access**, the schema of *your* server is documented by the SDK it serves:
+`https://<host>/polarion/sdk/doc/database/TablesReferenceDetails.html` and `FullDBSchema.pdf` in the
+same folder. Queries can be tested in the Work Items search bar with the `SQL:(…)` prefix (they must
+return `WORKITEM.C_URI`) or inside a widget.
+
 ### 7.1 SQL Safety Rules
 
 Polarion applies the configurable `com.polarion.platform.sql.invalidCommands` blocklist from `polarion.properties`. The exact list can vary by installation, so check the *System Configuration Properties Reference* and the target server before relying on a function or token. Rejected PostgreSQL queries may be logged as errors without a detailed client response.
@@ -1702,6 +1733,7 @@ Polarion applies the configurable `com.polarion.platform.sql.invalidCommands` bl
 - **MUST** default output to `WORKITEM.C_URI` (not `C_ID` or `*`) for Polarion report engine queries.
 - **MUST** ask the user if it is unclear whether the query feeds the report engine (→ select `C_URI` only) or is raw data extraction (→ select business columns).
 - **NOTE**: the report engine resolves `C_URI` to live objects, so skip `C_DELETED` filtering and revision dedup in those queries.
+- **CONSEQUENCE**: report-engine/widget SQL (`$transaction.objects().searchBySql`, `IDataService.sqlSearch`, tracker `SQL:(…)`) returns **objects**, not result rows. A query that returns aggregates (counts, pairs of documents) cannot feed them back directly. Return object URIs instead and aggregate in Velocity, or use one query per group.
 - **MUST** always scope by project: `JOIN PROJECT ON WORKITEM.FK_URI_PROJECT = PROJECT.C_URI` and filter `PROJECT.C_ID = '...'`.
 - **MUST** preserve project ID casing exactly (case-sensitive).
 - **SHOULD** use `LIKE` with `%`/`_` wildcards for pattern matching.
@@ -1753,6 +1785,14 @@ Composite PK `(C_PROJECT, C_TYPE, C_ENUMID, C_ID)`. `C_NAME`, `C_SORTORDER`, `C_
 
 **BASELINE**:
 `C_PK`/`C_URI`/`C_REV`/`C_DELETED`, `C_ID`, `C_NAME`, `C_DESCRIPTION`, `C_LOCATION`, `C_BASEREVISION`, `FK_PROJECT`/`FK_URI_PROJECT`, `FK_AUTHOR`/`FK_URI_AUTHOR`, `FK_BASEOBJECT`/`FK_URI_BASEOBJECT`
+
+**MODULE** (LiveDoc), verified in the 2512 schema documentation: `C_PK`/`C_URI`/`C_REV`/`C_DELETED`, `C_ID`, `C_TITLE`, `C_TYPE`, `C_STATUS`, `C_CREATED`, `C_UPDATED`, `C_LOCATION`, `C_MODULEFOLDER` (space), `C_MODULENAME`, `C_MODULELOCATION`, `C_MODULEABSOLUTELOCATION`, `C_STRUCTURELINKROLE`, `FK_AUTHOR`/`FK_URI_AUTHOR`, `FK_UPDATEDBY`/`FK_URI_UPDATEDBY`, `FK_PROJECT`/`FK_URI_PROJECT`; branching/reuse metadata `FK_BRANCHEDFROM`/`FK_URI_BRANCHEDFROM`, `C_BRANCHEDWITHQUERY`, `C_BRANCHEDWITHINITIALIZEDFIELDS`, `FK_DERIVEDFROM`/`FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`, `C_DERIVEDFIELDS`, `FK_VARIANT`/`FK_URI_VARIANT`. Work items reference their containing document through `WORKITEM.FK_URI_MODULE`.
+> Work items that a branched document only *references* (not overwritten) keep `FK_URI_MODULE` pointing to the original document, so a branch without overwritten items is visible only through `MODULE.FK_URI_BRANCHEDFROM`.
+> **Verified on 2512**: `FK_URI_BRANCHEDFROM` is set on every branch (with or without overwritten items), `FK_URI_DERIVEDFROM` on documents reused with derivation; a plain copy/reuse sets neither and can only be found through its `duplicates` links. `C_ID` and `C_MODULENAME` both hold the document name. Tracker `SQL:(…)` accepts `SELECT DISTINCT` and `GROUP BY … HAVING COUNT(*)`.
+
+**STRUCT_WORKITEM_LINKEDWORKITEMSDERIVED**: same columns as `STRUCT_WORKITEM_LINKEDWORKITEMS` (present in the 2512 schema). Its exact semantics (reverse/back-link view) are not yet verified. Query `STRUCT_WORKITEM_LINKEDWORKITEMS` for links as stored on the source item.
+
+> The 2512 schema documentation lists `C_DELETED` as `CHAR(1)`. If `C_DELETED IS NOT TRUE` (§7.5) is rejected on your server, compare with the stored values instead.
 
 **Document signature tables** (used in §7.9): `MODULE`, `DOCUMENTWORKFLOWSIGNATURE`, `STRUCT_DOCUMENTWORKFLOWSIGNATURE_SIGNATURES` (`FK_URI_SIGNEDBY`, `C_VERDICT`).
 
@@ -1993,13 +2033,15 @@ function fetchRestAPI(resource, options) {
 
 fetchRestAPI("/polarion/rest/v1/projects/drivepilot/workitems/DP-584")
   .then(response => {
-    if (!response.ok) { throw new Error(`HTTP error! Status: ${response.status}`); }
+    if (!response.ok) { throw new Error("HTTP error! Status: " + response.status); }
     return response.json();
   })
   .then(json => console.log("fetchRestAPI json: ", json));
 </script>
 ```
 
+> When this script sits inside a Velocity widget, avoid `${…}` template literals and `$`: Velocity would try to resolve them (§3.1.9).
+>
 > **Security**: this token performs read/write **as the user viewing the page**. Restrict page write permissions to trusted authors, or a malicious widget acts on viewers without their knowledge. REST API Endpoint permissions must also be configured before users can call endpoints.
 
 **Other token types**: `X-Polarion-token-type: jwt` (external JWT; requires a JWT authenticator in `authentication.xml`) and `X-Polarion-token-type: tcss` + `X-Polarion-user-id` (Teamcenter SSO).
@@ -2206,6 +2248,20 @@ Configured in `workitem-link-role-enum.xml` (Administration → Work Items → E
 **Rules** on each role restrict which Work Item types may be linked with it (e.g. `verifies` only from Test Case to Requirement). Defining rules is important — they drive the UI and prevent users from creating traceability that is wrong but looks valid in dashboards.
 
 For links between **Reused or Branched** Documents, use a standard role such as `duplicates` rather than system roles like `branched` or `derived`.
+
+Roles observed in the Siemens standard configuration (reported by a project owner on 2512, configurable per project):
+
+| Operation | Link role created between the work items |
+|---|---|
+| Document copy / LiveDoc reuse | `duplicates` |
+| Branch, work item overwritten in the branch | `branched_from` |
+| Reuse with the derivation option | `derived_from` |
+
+**Direction (verified on 2512)**: for all three roles the link is stored on the copy/branch/derived item (`STRUCT_WORKITEM_LINKEDWORKITEMS.FK_URI_P_WORKITEM`, link source) and points to the original item (`FK_URI_WORKITEM`). A branch links only its *overwritten* items; a branch with nothing overwritten has no such links and is visible only through the document's "branched from" metadata.
+
+Copied documents are linked to their source through a "branched from" document field, and copied work items through a "branched from" link (Siemens, Polarion 2016 compare/merge and 2310 bulk branching announcements). Never hard-code these IDs: read them from `workitem-link-role-enum.xml` or expose them as widget parameters.
+
+**Inherited links (verified on 2512)**: copying a document that is itself a copy keeps the copied items' existing links. Items of the copy of a copy link with `duplicates` both to their direct source and to the original (the inherited link keeps its older link revision). Any document-level inference from item links must remove these transitive relations.
 
 ### 10.5 Form Layout (Work Item Editor)
 
@@ -2666,6 +2722,8 @@ WHERE w.c_deleted IS NOT TRUE
 10. [ ] All parameters have fallbacks/defaults, and missing required parameters render a warning
 11. [ ] User-supplied field values are escaped before being emitted as HTML
 12. [ ] PDF/Print branch avoids JavaScript and external stylesheets
+13. [ ] Velocity 1.4 dialect only (§3.1.9): single-line method chains, no `{}` map literals, no backslashes in string literals, no directive names in plain text; `#[[ ]]#`, `#break` and `$foreach` do nothing
+14. [ ] Every `.vm` file parses with `velocity-1.4.jar` before upload
 
 ### 13.2 Pre-Submission Checklist — Polarion Scripting
 
@@ -2750,7 +2808,8 @@ WHERE w.c_deleted IS NOT TRUE
 ### 13.6 Common Pitfalls
 
 #### Velocity
-- Newlines inside directives break the parser
+- Newlines inside directives break the parser, and so do method chains split across lines (also in `parameters.vm`)
+- Velocity 1.5+/1.7 syntax is rejected (`{}` map literals) or silently ignored (`#[[ ]]#`, `#break`, `$foreach`) by 2512 widgets (§3.1.9)
 - `#if(...)$var#end` inline on one line does not work
 - Undefined variables are rendered as literal text
 - Wrong API for the job (Rendering API for cross-project gathering, or vice versa)
@@ -2977,5 +3036,7 @@ Set in `polarion.properties` unless noted. Those marked *(runtime)* are also edi
 - [Polarion REST API v1 Swagger UI (example instance)](https://industry-solutions.polarion.com/polarion/rest/v1)
 - [Rendering vs Open API — The Polarion Blog](https://polarion.code.blog/2020/06/16/rendering-vs-open-api/)
 - [ITrackerService Javadoc (example instance)](https://testdrive.polarion.com/polarion/sdk/doc/javadoc/com/polarion/alm/tracker/ITrackerService.html)
+- [Polarion database schema reference (example instance)](https://testdrive.polarion.com/polarion/sdk/doc/database/TablesReferenceDetails.html)
+- Findings from the Polarion Branches Widget project spike on a Polarion 2512 instance (2026-10-27): Velocity 1.4 parser behaviour (§3.1.9), link-role conventions (§10.4)
 
 *Last updated: 2026-10-27*
