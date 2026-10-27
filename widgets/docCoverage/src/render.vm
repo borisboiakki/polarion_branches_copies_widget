@@ -60,7 +60,7 @@
 #set($roleVals = false)
 #set($roleVals = $parameters.roles.values)
 #set($roleVals = $parameters.roles.values())
-#bwRoleIds($roleVals $roleAll)
+#bwOptionIds($roleVals $roleAll)
 #set($roleIds = [])
 #foreach($r in $roleAll)
   #if($roleIds.size() < $maxRoles)

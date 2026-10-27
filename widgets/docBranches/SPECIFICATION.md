@@ -47,7 +47,7 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F5 | Link roles per kind are widget parameters with the §3 defaults: `workitem-link-role` multi-selectors since 0.3.0 (no typing) | Must |
 | F6 | Threshold parameter: minimum linked items (absolute and/or %) before an edge is drawn | Should |
 | F7 | Use document-level metadata (§3) when present and flag disagreement with link-based inference | Should |
-| F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target. **Heading items are excluded** from counts by default (parameter: excluded types, default `heading`) | Should |
+| F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target. **Heading items are excluded** from counts by default (parameter: excluded types, `workitem-type` selector, default Heading) | Should |
 | F9 | Click a node to open the document; click an edge to list the linking work items | Should |
 | F10 | Filters: space, document type, status, text | Should |
 | F10b | **Show all documents / only documents with relations**: default set in the widget parameters, and the viewer can switch it in the widget UI (no edit mode needed). A **Refresh** control re-runs the analysis | Must |
@@ -199,3 +199,6 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Shared core changes for docCoverage, still in 0.2.1 (not released yet): line labels are kept clear of the target document box; `documents.vm` can restrict the documents and keeps their work item lists (unused by docBranches) | |
 | 2026-10-27 | Widget 0.3.0: link roles per kind chosen with `workitem-link-role` multi-selectors (shared macro `bwRoleIds`, as docCoverage) instead of comma-separated text; new parameter ids `copyLinkRoles`, `branchLinkRoles`, `derivedLinkRoles` (no backward compatibility, PO). The **author** document field is removed from both widgets (PO, user feedback) | PO |
 | 2026-10-27 | PO test of 0.3.0 on 2512: role selectors with their defaults, graph as before, no author field. Ready for release | PO |
+| 2026-10-27 | Widget 0.3.1: the excluded work item types are chosen with a `workitem-type` multi-selector (default Heading, none selected = all types counted) instead of comma-separated text; shared macro `bwRoleIds` renamed `bwOptionIds`. Patch release (PO). To check on 2512: selector lists the types with Heading preselected; counts unchanged with Heading | PO |
+| 2026-10-27 | Widget 0.3.1: `icon.png` (608 x 405, white background) at the package root, as in a widget used by the PO; no reference in other files. Display in the widget list to check on 2512 | PO |
+| 2026-10-27 | PO test of 0.3.1 on 2512: type selector (Heading preselected, counts as before) and widget icon OK. Ready for release | PO |

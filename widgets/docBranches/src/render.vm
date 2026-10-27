@@ -10,7 +10,7 @@
 ## BW_SHARED params.vm
 
 ## docBranches parameters
-## Link roles per kind: workitem-link-role multi-selectors, read with bwRoleIds (common.vm).
+## Link roles per kind: workitem-link-role multi-selectors, read with bwOptionIds (common.vm).
 #set($copyRoleVals = false)
 #set($copyRoleVals = $parameters.copyLinkRoles.values)
 #set($copyRoleVals = $parameters.copyLinkRoles.values())
@@ -73,11 +73,11 @@
 ## BW_SHARED common.vm
 
 #set($copyRoles = [])
-#bwRoleIds($copyRoleVals $copyRoles)
+#bwOptionIds($copyRoleVals $copyRoles)
 #set($branchRoles = [])
-#bwRoleIds($branchRoleVals $branchRoles)
+#bwOptionIds($branchRoleVals $branchRoles)
 #set($derivedRoles = [])
-#bwRoleIds($derivedRoleVals $derivedRoles)
+#bwOptionIds($derivedRoleVals $derivedRoles)
 
 ## role -> kind (first kind wins if a role is listed twice)
 #set($roleKind = $objectFactory.newMap())

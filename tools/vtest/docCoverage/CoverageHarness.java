@@ -61,7 +61,7 @@ public class CoverageHarness {
         Map<String, WidgetHarness.Param> p = new HashMap<String, WidgetHarness.Param>();
         p.put("docs", new WidgetHarness.Param(null, docs));
         p.put("roles", new WidgetHarness.Param(null, roles));
-        p.put("excludedTypes", new WidgetHarness.Param("heading", null));
+        p.put("excludedTypes", new WidgetHarness.Param(null, list(new WidgetHarness.RoleOpt("heading"))));
         p.put("spaces", new WidgetHarness.Param("", null));
         p.put("showMode", new WidgetHarness.Param("related", null));
         p.put("lineCounts", new WidgetHarness.Param("show", null));
@@ -95,6 +95,12 @@ public class CoverageHarness {
         WidgetHarness.check(pdf.contains("Coverage: 67% (4/6)") && !pdf.contains("<script"), "PDF: static graph with coverage, no script");
         WidgetHarness.check(pdf.contains("VIA-5, VIA-6"), "PDF: uncovered items listed");
 
+        // No excluded type selected: headings are counted (link to the heading VIA-7, 7 items).
+        Map<String, WidgetHarness.Param> allTypes = params(docs, roles);
+        allTypes.put("excludedTypes", new WidgetHarness.Param(null, list()));
+        String typesAll = WidgetHarness.render(dir, allTypes, false, out + "/velocity-alltypes.log");
+        WidgetHarness.check(typesAll.contains("data-c=\"_default/SysReq_A\" data-r=\"satisfies:4;verifies:1\"") && typesAll.contains("data-items=\"7\""),
+            "no excluded type selected: headings counted");
         // No document selected = all documents (Other appears).
         String all = WidgetHarness.render(dir, params(list(), list(new WidgetHarness.RoleOpt("satisfies"))), false, out + "/velocity-all.log");
         WidgetHarness.check(all.contains("data-c=\"_default/Other\""), "no document selected: all documents");

@@ -5,8 +5,10 @@ between them, deduced from work item links. They share one client core, one buil
 
 | Widget | What it shows | Status | Docs |
 |---|---|---|---|
-| **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.3.0** released, validated on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
-| **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.1.0** released, validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
+| <img src="docs/docBranches/icon.svg" width="32" alt=""> **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.3.1** validated on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
+| <img src="docs/docCoverage/icon.svg" width="32" alt=""> **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.1.1** validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
+
+**Users: see the [user manual](docs/USER_MANUAL.md)** (deployment, adding the widgets to a page, parameters, toolbar).
 
 Download the packages from the [releases](../../releases) (`docBranches-N.N.N.zip`, `docCoverage-N.N.N.zip`). Still
 open for both widgets: behaviour for viewers who cannot read some documents (see each specification).
@@ -20,9 +22,14 @@ open for both widgets: behaviour for viewers who cannot read some documents (see
 - Interactive SVG graph (layered layout, zoom, highlight, tooltips, details with the linked work items).
 - Table view, SVG download, Excel workbook download (CSV fallback).
 - Static graph + table in PDF export and print (no JavaScript).
-- Link roles and documents chosen with Polarion selectors in the widget parameters (no typing).
+- Link roles, documents and excluded work item types chosen with Polarion selectors in the widget parameters (no typing).
 - Viewer toggles (relation kinds or roles, item counts, extra document fields), defaults set as widget parameters.
 - Velocity 1.4-safe templates, SQL scoped to one project, `isUnresolvable()` guard on every referenced object.
+
+## Architecture
+
+How the widgets work (server-side Velocity, page model, shared client core, static PDF view, tests) and where to
+change what: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Build and test
 
@@ -64,7 +71,9 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 | `shared/js/core.js` | Client core: layout, SVG drawing, toolbar parts, tooltip, zoom, table, SVG/Excel/CSV export |
 | `shared/vm/` | Velocity snippets inlined at build: CSS, common parameters, lists/project/`bwKey`, document collection |
 | `shared/resources/` | Third-party library for the Excel export: `xlsx.js` = `dist/xlsx.bundle.js` of [xlsx-js-style](https://github.com/gitbrent/xlsx-js-style) 1.2.0 (Apache-2.0, `LICENSE` next to it) |
-| `docs/<widget>/` | Install and configuration guide, previews |
+| `docs/USER_MANUAL.md` | User manual of both widgets |
+| `docs/ARCHITECTURE.md` | Architecture of the widgets and how to extend them |
+| `docs/<widget>/` | Install and configuration guide, previews, icon source (`icon.svg`; the package icon is `widgets/<widget>/src/icon.png`) |
 | `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vcheck.sh` | Build, tests, Velocity 1.4 parse check |
 | `tools/vtest/<widget>/` | Velocity 1.4 harness with mock Polarion objects (`WidgetHarness.java`) and browser check (`browser-check.js`) |
 | `tests/v0.1.x/` | Spike of docBranches 0.1.x, kept for reference: test plan with the findings, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- original document -->
+  <path d="M6 22h14l5 5v17H6z" fill="#fff" stroke="#3a4a66" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M10 32h11M10 37h11" stroke="#3a4a66" stroke-width="2" stroke-linecap="round"/>
+  <!-- copy (blue solid) -->
+  <path d="M26 30C34 30 34 12 42 12" fill="none" stroke="#3367d6" stroke-width="3"/>
+  <!-- branch (red dashed) -->
+  <path d="M26 34C34 34 34 52 42 52" fill="none" stroke="#c62828" stroke-width="3" stroke-dasharray="5,3"/>
+  <!-- copy and branch documents -->
+  <path d="M42 3h12l5 5v13H42z" fill="#e8effc" stroke="#3367d6" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M42 43h12l5 5v13H42z" fill="#fbe9e9" stroke="#c62828" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>

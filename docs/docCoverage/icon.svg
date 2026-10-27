@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- upstream document (left) with a coverage ring -->
+  <path d="M4 14h18l6 6v32H4z" fill="#fff" stroke="#3a4a66" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="15" cy="36" r="7" fill="none" stroke="#dde3ec" stroke-width="4"/>
+  <circle cx="15" cy="36" r="7" fill="none" stroke="#1a7f37" stroke-width="4" stroke-dasharray="36.4,44" transform="rotate(-90 15 36)"/>
+  <!-- downstream documents (right) -->
+  <path d="M44 4h12l5 5v14H44z" fill="#e8effc" stroke="#3367d6" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M44 41h12l5 5v14H44z" fill="#e8effc" stroke="#3367d6" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- links downstream -> upstream -->
+  <path d="M43 14C36 14 38 26 33 28" fill="none" stroke="#3367d6" stroke-width="3"/>
+  <path d="M43 50C36 50 38 42 33 40" fill="none" stroke="#3367d6" stroke-width="3" stroke-dasharray="5,3"/>
+  <path d="M29 30l7-6v9z M29 38l7 6v-9z" fill="#3367d6"/>
+</svg>
