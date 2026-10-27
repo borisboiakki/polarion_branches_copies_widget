@@ -33,6 +33,20 @@ tools/vcheck.sh                 # parse every .vm file with Velocity 1.4
 
 Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the browser check).
 
+## Continuous integration and releases
+
+- **CI** (`.github/workflows/ci.yml`): on every push and pull request, runs `tools/test-widget.sh`, checks that the
+  committed `widget/dist` matches the sources, and keeps the zip and screenshots as a build artifact.
+- **Release** (`.github/workflows/release.yml`): versions are **N.N.N** (semantic versioning: major = incompatible
+  change of parameters or behaviour, minor = new feature, patch = fix). To release:
+  1. update `VERSION` (e.g. `0.2.0`) in the change that goes to `main`;
+  2. on GitHub, **Releases → Draft a new release**, tag `v0.2.0` on `main`, **Publish**;
+  3. the workflow tests the widget, stamps the version and attaches **`docBranches-0.2.0.zip`** to the release.
+     Upload that zip in Polarion (see [`docs/install.md`](docs/install.md)).
+
+  A tag that is not `N.N.N`/`vN.N.N` fails the workflow. The workflow can also be re-run by hand
+  (*Actions → Release → Run workflow*) with an existing tag.
+
 ## Repository contents
 
 | File | Purpose |

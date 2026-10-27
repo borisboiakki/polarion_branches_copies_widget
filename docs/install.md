@@ -1,10 +1,12 @@
 # Document Branches and Copies — install and configuration
 
-Widget id `docBranches`, version 0.1.0. Target: Polarion 2512 (keep compatible with 2606).
+Widget id `docBranches`, version in `VERSION` (N.N.N; shown in the PDF header and as `data-version`). Target: Polarion 2512 (keep compatible with 2606).
 
 ## Install
 
-1. Download `widget/dist/docBranches.zip` from the repository (built by `tools/build-widget.py`).
+1. Download the package: from a GitHub **release**, the asset `docBranches-N.N.N.zip` (recommended), or
+   `widget/dist/docBranches.zip` from the repository (development build). The folder inside is always
+   `docBranches/`, so a new version overwrites the previous one on upload.
 2. **Administration → Documents and Pages → Velocity Widgets → Upload**. Choose the scope:
    - a **project** (to try it), or
    - **Repository** (global, available to every project).

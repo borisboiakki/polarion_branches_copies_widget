@@ -1,0 +1,62 @@
+# Build and test the widget on every push and pull request.
+# Runs tools/test-widget.sh (Velocity 1.4 render on mock Polarion data + Chromium check) and
+# verifies that the committed widget/dist matches the sources.
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Velocity 1.4 jars
+        uses: actions/cache@v4
+        with:
+          path: tools/.lib
+          key: velocity-1.4-jars-v1
+
+      - name: Install Playwright (Chromium)
+        run: |
+          npm install --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+
+      - name: Build and test the widget
+        run: tools/test-widget.sh "$RUNNER_TEMP/widget-test"
+
+      - name: Check that widget/dist is up to date with widget/src
+        run: |
+          if ! git diff --exit-code -- widget/dist ':(exclude)widget/dist/docBranches.zip'; then
+            echo "::error::widget/dist differs from a fresh build. Run python3 tools/build-widget.py and commit widget/dist."
+            exit 1
+          fi
+
+      - name: Upload widget package and screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: docBranches-ci-${{ github.sha }}
+          path: |
+            widget/dist/docBranches.zip
+            ${{ runner.temp }}/widget-test/*.png
+            ${{ runner.temp }}/widget-test/*.svg

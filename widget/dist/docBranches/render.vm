@@ -550,7 +550,7 @@
   #set($outH = $ch * 700 / $cw)
 #end
 <div class="bw-root">
-<div><b>Document Branches and Copies</b> &mdash; project $esc.html($projectId) &mdash; $drawEdges.size() relations</div>
+<div><b>Document Branches and Copies</b> &mdash; project $esc.html($projectId) &mdash; $drawEdges.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
 <div class="bw-muted">Arrow: original &rarr; copy / branch / derived. Line style: copy solid blue, branch dashed red, derived dotted green, indirect dashed grey.</div>
 #if($drawEdges.size() == 0)
 <p>No relation found between the documents with the current settings.</p>

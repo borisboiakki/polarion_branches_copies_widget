@@ -123,5 +123,8 @@ spike/bwSpike/                 diagnostic test widget (spike/bwSpike.zip = uploa
   Chromium screenshots) and commit `widget/dist/` with the sources. `branches-graph.js` must not contain `$`, `#`,
   backslashes or non-ASCII characters (the build enforces it; use `HASH`/`String.fromCharCode`).
 - Keep `tools/vtest/WidgetHarness.java` mocks in line with behaviour observed on 2512 (e.g. `singleValue()` is a String).
+- **Versioning**: `VERSION` holds N.N.N (semver). Bump it in every change meant for a release (patch = fix, minor =
+  feature, major = incompatible parameters/behaviour). Releases are GitHub releases tagged `vN.N.N`; the Release
+  workflow attaches `docBranches-N.N.N.zip`. CI fails if `widget/dist` is not rebuilt after a source change.
 - Before finishing work, run through guide §13 validation checklist; say plainly what could not be tested
   (no Polarion instance is available in the sandbox).

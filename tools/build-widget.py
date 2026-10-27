@@ -10,8 +10,13 @@ Checks:
   (Velocity would interpret them, see guide 3.1.9);
 - every .vm file parses with Velocity 1.4 (tools/vcheck.sh);
 - zip limits from guide 1.3 (entry name length, number of entries).
+
+Version: N.N.N from the VERSION file, or --version (used by the release workflow with the tag).
+It is stamped into render.vm ($bwVersion).
 """
+import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -46,7 +51,25 @@ def check_js(js):
         fail('JavaScript is not Velocity-safe:\n  ' + '\n  '.join(problems))
 
 
+VERSION_RE = re.compile(r'^[0-9]+[.][0-9]+[.][0-9]+$')
+VERSION_LINE_RE = re.compile(r'^[#]set[(][$]bwVersion = "[^"]*"[)]$', re.M)
+
+
+def read_version(override):
+    version = override
+    if not version:
+        with open(os.path.join(ROOT, 'VERSION'), encoding='utf-8') as f:
+            version = f.read().strip()
+    if not VERSION_RE.match(version):
+        fail('version "%s" is not N.N.N' % version)
+    return version
+
+
 def main():
+    ap = argparse.ArgumentParser(description='Build the docBranches widget package.')
+    ap.add_argument('--version', help='N.N.N; default: content of the VERSION file')
+    version = read_version(ap.parse_args().version)
+
     with open(os.path.join(SRC, 'branches-graph.js'), encoding='utf-8') as f:
         js = f.read()
     check_js(js)
@@ -60,6 +83,9 @@ def main():
             if text.count(MARKER) != 1:
                 fail('render.vm must contain the marker line "%s" exactly once' % MARKER)
             text = text.replace(MARKER, js.rstrip('\n'))
+            if len(VERSION_LINE_RE.findall(text)) != 1:
+                fail('render.vm must contain exactly one line #set($bwVersion = "...")')
+            text = VERSION_LINE_RE.sub('#set($bwVersion = "%s")' % version, text)
         with open(os.path.join(OUT, name), 'w', encoding='utf-8', newline='\n') as f:
             f.write(text)
 
@@ -82,7 +108,7 @@ def main():
             info.compress_type = zipfile.ZIP_DEFLATED
             with open(os.path.join(OUT, n), 'rb') as f:
                 z.writestr(info, f.read())
-    print('Built %s (%d bytes)' % (os.path.relpath(ZIP, ROOT), os.path.getsize(ZIP)))
+    print('Built %s version %s (%d bytes)' % (os.path.relpath(ZIP, ROOT), version, os.path.getsize(ZIP)))
 
 
 if __name__ == '__main__':
