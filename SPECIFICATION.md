@@ -106,6 +106,9 @@ is in the configured role set R(kind).
 - Direction (**verified on 2512, spike A2**): for all three roles the copy/branch/derived item is the **link source** and
   the original item is the **link target**. So the edge is drawn original (link target's document) → copy (link source's document).
 - Document metadata (`branched from` / `derived from`) creates an edge even without links. If both sources exist and disagree, show a warning marker.
+- **Verified on 2512 (spike A2 Q3/Q4)**: a branch has `MODULE.FK_URI_BRANCHEDFROM` set, even with no overwritten item
+  (the only way to detect such a branch). A derived document has `MODULE.FK_URI_DERIVEDFROM` set. A copy/reuse has
+  **no** metadata and is detected only through `duplicates` links.
 - One pair may have several kinds. Draw **one line per pair** labelled with all of its kinds. Style follows the strongest kind: **branch > derived > copy** (decided). The label always lists every kind.
 
 ## 8. Out of scope (v1)
@@ -121,7 +124,7 @@ context (F15), non-LiveDoc documents.
 | R2 ✅ (2512) | Exact `MODULE` column names (`FK_URI_BRANCHEDFROM`, `FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`) found in the published DB schema docs, not checked on 2512/2606 | Check the SDK DB schema docs on the target server, tracker `SQL:` queries and REST document resources (spike A1–A3) |
 | R3 | Exact Velocity syntax to load widget `resources/` JS/CSS (SDK macro) | Check Widget SDK PDF on the target server. Fallback: inline the JS in `render.vm` |
 | R4 ✅ (2512) | Link direction for `duplicates` / `branched_from` / `derived_from` | Inspect `STRUCT_WORKITEM_LINKEDWORKITEMS` on sample documents |
-| R5 | SQL firewall (`invalidCommands`) may block `GROUP BY`/`COUNT`/`DISTINCT` variants | Test queries on the target server |
+| R5 ✅ tracker (2512) | SQL firewall (`invalidCommands`) may block `GROUP BY`/`COUNT`/`DISTINCT` variants | `DISTINCT` and `GROUP BY … HAVING COUNT(*)` accepted in tracker SQL (spike A2 Q5); widget-side check in V3a/V3b |
 | R6 | 2606 changes unknown | Re-test the widget on 2606 once available |
 
 ## 10. Open questions
@@ -148,3 +151,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Spike A2 Q1/Q2: link direction verified (copy/branch/derived item → original item) for `duplicates`, `branched_from`, `derived_from`; branch links exist only for overwritten items | `docs/A2_*.xlsx` |
 | 2026-10-27 | Heading work items are excluded from link counts and coverage by default (parameter: excluded work item types, default `heading`) | PO |
 | 2026-10-27 | Line style for a pair with several kinds: precedence branch > derived > copy; label lists all kinds | PO |
+| 2026-10-27 | Spike A2 Q3–Q6: branch/derived metadata confirmed (incl. branch without overwrite), copies have no metadata, DISTINCT/GROUP BY accepted, `c_id` = `c_modulename` = document name. Part A2 complete | `docs/A2_*.xlsx` |

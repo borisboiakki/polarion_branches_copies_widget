@@ -48,7 +48,7 @@ In table **MODULE**, check whether these columns exist and note the exact names:
 `FK_URI_BRANCHEDFROM`, `FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`, and the columns for the document's space and name
 (e.g. `C_MODULEFOLDER`, `C_MODULENAME`). Also check that **WORKITEM** has `FK_URI_MODULE`.
 
-### A2 — Tracker SQL queries
+### A2 — Tracker SQL queries ✅ done (Q1–Q6, see "Results so far")
 
 In **Work Items** (tracker table view), paste each query into the search bar. Add the **Document** column to the table so
 you can see which document each item belongs to. A tracker `SQL:(...)` query must return work item URIs (`c_uri`), so
@@ -188,14 +188,14 @@ If any test shows a Velocity error, copy the message from the widget, or from th
 |---|---|---|
 | A1 | 2026-10-27 | ✅ Columns confirmed (see A1 above). `docs/A1_FullDBSchema.pdf` |
 | A2 Q1/Q2 | 2026-10-27 | ✅ **Exactly as expected: links point from the copy/branch/derived item (link source) to the original (link target).** Cross-document joins on `struct_workitem_linkedworkitems` + `workitem.fk_uri_module` are accepted by the tracker. Counts: `duplicates`: B 6 → A 6, E 6 → B 6; `branched_from`: C 2 (only the overwritten items VIA-522/523) → A (VIA-509/512); `derived_from`: D 6 → A 6. F and G appear nowhere. Each document's title/heading item (e.g. VIA-514 "SRS_Test") is linked too. Exports: `docs/A2_Q1_results_*.xlsx`, `docs/A2_Q2_results_*.xlsx` |
+| A2 Q3/Q4 | 2026-10-27 | ✅ **Document metadata confirmed.** `fk_uri_branchedfrom` is set on both branches: `SRS_Test_Branch_Test_C` (its 2 overwritten items + its own title heading VIA-521) **and `SRS_Test_F_nooverwrite`** (its own title heading VIA-536), so F *is* detectable through metadata. `fk_uri_derivedfrom` is set only on `SRS_Test_TestD_Derived` (6 items). The copies B and E carry **neither** field, so copies can be detected only through `duplicates` links. Note: a branch's own title heading is new and not linked; in copies and derived documents the heading is linked like the other items. Exports: `docs/A2_Q3_results.xlsx`, `docs/A2_Q4_results.xlsx` |
+| A2 Q5 | 2026-10-27 | ✅ `SELECT DISTINCT` and `GROUP BY … HAVING COUNT(*)` are both accepted by the tracker SQL. Both return the same 20 items = all link sources of the 3 roles (B 6, C 2, D 6, E 6). Exports: `docs/A2_Q5_*.xlsx` |
+| A2 Q6 | 2026-10-27 | ✅ `module.c_id` and `module.c_modulename` both hold the document name (`SRS_Test`); both queries return its 6 items. Exports: `docs/A2_Q6_*.xlsx` |
 | V1 | 2026-10-27 | ✅ Runs. Polarion ALM 2512. `$widgetContext` = `RichPageWidgetRenderingContextImpl`, `$transaction` = `ReadOnlyTransactionImpl`, `$transaction.objects()` = `ProxyModelObjects`; `$trackerService`/`getDataService()` are proxies. `$date.systemTime` works. Reflection method listing is blocked (empty), as the guide says. In PDF export `isPdf` = true. `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
 
 ## Results template (copy into your answer)
 
 ```
-A2 Q3 / Q4 documents:
-A2 Q5 DISTINCT / GROUP BY accepted?:
-A2 Q6 c_id / c_modulename:
 A3 R1 JSON (B, C, D, F):
 A3 R2 JSON (one item each in B, C, D):
 V2 (counts, timings, working getters, field names, branchedFrom/derivedFrom values):

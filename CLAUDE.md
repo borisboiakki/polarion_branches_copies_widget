@@ -63,6 +63,9 @@ Verified through web search (2026-10-27):
 - **Verified by spike A2 on 2512**: links with roles `duplicates`, `branched_from`, `derived_from` go from the
   copy/branch/derived item (`fk_uri_p_workitem`, link source) to the original item (`fk_uri_workitem`, target).
   A branch only links its overwritten items; a branch with nothing overwritten has no links (metadata only).
+  Branches (even without overwritten items) have `MODULE.FK_URI_BRANCHEDFROM`; derived documents have
+  `MODULE.FK_URI_DERIVEDFROM`; copies have no metadata. Tracker SQL accepts `DISTINCT` and `GROUP BY … HAVING`.
+  `MODULE.C_ID` and `C_MODULENAME` both hold the document name.
 - **Verified by spike V1 on 2512**: widget context classes, `$date.systemTime`, `isPdf()` true in PDF export,
   reflection method listing blocked.
 
