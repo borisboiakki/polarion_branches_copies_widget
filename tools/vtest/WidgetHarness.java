@@ -10,7 +10,7 @@ import org.apache.velocity.runtime.log.LogSystem;
 
 /**
  * Renders the built widget (widget/dist/docBranches/render.vm) with Velocity 1.4 against mock
- * Polarion objects that reproduce the VforIA spike test set (docs/spike-tests.md section 0).
+ * Polarion objects that reproduce the VforIA spike test set (tests/v0.1.x/spike-tests.md section 0).
  *
  * Usage: java WidgetHarness <widgetDir> <outDir>
  * Writes browser.html and pdf.html (static mode) and velocity.log to outDir.

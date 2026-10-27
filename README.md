@@ -4,7 +4,7 @@ A Siemens Polarion **LiveReport widget** that shows the documents of a project a
 each other — which documents are **branches** of which, and which are **copies** (reuse) of which.
 
 > Status: **v0.1.0 — first implementation, to be validated on Polarion 2512.** Spike complete
-> (`docs/spike-tests.md`). Install: [`docs/install.md`](docs/install.md). Requirements: [`SPECIFICATION.md`](SPECIFICATION.md).
+> (`tests/v0.1.x/spike-tests.md`). Install: [`docs/install.md`](docs/install.md). Requirements: [`SPECIFICATION.md`](SPECIFICATION.md).
 
 ![Widget preview rendered from the VforIA test set (mock data)](docs/preview-graph.png)
 
@@ -56,8 +56,7 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 | `widget/dist/docBranches.zip` | Upload package (generated, committed for convenience) |
 | `docs/install.md` | Install and configuration guide |
 | `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vtest/` | Build, Velocity 1.4 harness with mock Polarion objects, browser check |
-| `docs/spike-tests.md` | SQL and widget tests to run on a Polarion 2512 instance |
-| `spike/bwSpike/`, `spike/bwSpike.zip` | Diagnostic test widget (upload package) |
+| `tests/v0.1.x/` | Spike of release 0.1.x, kept for reference: test plan, the results sent from Polarion, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
 | `CLAUDE.md` | Instructions for Claude Code working in this repo |
 | `Polarion_Development_Guide.md` | Polarion development best practices (baseline: Polarion 2512) |
 

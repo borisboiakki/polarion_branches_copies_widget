@@ -164,16 +164,16 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Node fields: ID, title, space by default; extra fields selectable (parameter + UI toggle) | PO |
 | 2026-10-27 | "All / only related" switch: parameter default + runtime UI switch with Refresh | PO |
 | 2026-10-27 | One line per document pair, labelled with kind(s) | PO |
-| 2026-10-27 | Spike tests (SQL + test widget) handed to PO for execution on 2512 | `docs/spike-tests.md` |
+| 2026-10-27 | Spike tests (SQL + test widget) handed to PO for execution on 2512 | `tests/v0.1.x/spike-tests.md` |
 | 2026-10-27 | No direct DB access for the PO: spike uses tracker `SQL:(...)` queries, the test widget and REST calls instead | PO |
-| 2026-10-27 | Spike A1: MODULE branching/derivation columns confirmed in the 2512 schema; V1 passed | `docs/A1_FullDBSchema.pdf`, `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
-| 2026-10-27 | Spike test set: project `VforIA`, original `SRS_Test` with copies/branches B–G | `docs/spike-tests.md` §0 |
-| 2026-10-27 | Spike A2 Q1/Q2: link direction verified (copy/branch/derived item → original item) for `duplicates`, `branched_from`, `derived_from`; branch links exist only for overwritten items | `docs/A2_*.xlsx` |
+| 2026-10-27 | Spike A1: MODULE branching/derivation columns confirmed in the 2512 schema; V1 passed | `tests/v0.1.x/results/A1_FullDBSchema.pdf`, `tests/v0.1.x/results/SpikeTest_Results_Widget_27-10-1116.pdf` |
+| 2026-10-27 | Spike test set: project `VforIA`, original `SRS_Test` with copies/branches B–G | `tests/v0.1.x/spike-tests.md` §0 |
+| 2026-10-27 | Spike A2 Q1/Q2: link direction verified (copy/branch/derived item → original item) for `duplicates`, `branched_from`, `derived_from`; branch links exist only for overwritten items | `tests/v0.1.x/results/A2_*.xlsx` |
 | 2026-10-27 | Heading work items are excluded from link counts and coverage by default (parameter: excluded work item types, default `heading`) | PO |
 | 2026-10-27 | Line style for a pair with several kinds: precedence branch > derived > copy; label lists all kinds | PO |
-| 2026-10-27 | Spike A2 Q3–Q6: branch/derived metadata confirmed (incl. branch without overwrite), copies have no metadata, DISTINCT/GROUP BY accepted, `c_id` = `c_modulename` = document name. Part A2 complete | `docs/A2_*.xlsx` |
-| 2026-10-27 | Spike A3 R1: REST document attributes do not show branched/derived-from (only `derivedFromLinkRole`/`derivedFields` on the derived doc); relationships not inspected. Not needed: the widget uses SQL. R2 optional | `docs/R1_test_results.txt` |
-| 2026-10-27 | Spike A3 R2: REST confirms roles/direction; copy of a copy keeps the inherited `duplicates` link to the original (E→A besides E→B). Part A complete | `docs/R2_test_results.txt` |
+| 2026-10-27 | Spike A2 Q3–Q6: branch/derived metadata confirmed (incl. branch without overwrite), copies have no metadata, DISTINCT/GROUP BY accepted, `c_id` = `c_modulename` = document name. Part A2 complete | `tests/v0.1.x/results/A2_*.xlsx` |
+| 2026-10-27 | Spike A3 R1: REST document attributes do not show branched/derived-from (only `derivedFromLinkRole`/`derivedFields` on the derived doc); relationships not inspected. Not needed: the widget uses SQL. R2 optional | `tests/v0.1.x/results/R1_test_results.txt` |
+| 2026-10-27 | Spike A3 R2: REST confirms roles/direction; copy of a copy keeps the inherited `duplicates` link to the original (E→A besides E→B). Part A complete | `tests/v0.1.x/results/R2_test_results.txt` |
 | 2026-10-27 | Indirect relations from inherited links are hidden by default (transitive reduction), with a viewer toggle to show them | PO |
 | 2026-10-27 | Spike Part B (V1–V7) on `EOLE_AI_MCP_TESTS`: data approach (b) validated and fast; `#include`/`#parse` of resources fail → JS/CSS inlined; inline JS + SVG export work in the browser; static SVG renders in PDF. Transitive reduction made kind-agnostic. Pending: V5c/V6 browser screenshots | `docs/V*_*.pdf` |
 | 2026-10-27 | Start widget implementation (v0.1) before V5c/V6 browser results; tracked as open check §10.1 | PO |

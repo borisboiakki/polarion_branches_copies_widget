@@ -1,5 +1,5 @@
 ## Branches Widget - spike tests. Read-only diagnostics, one test per widget instance.
-## See docs/spike-tests.md for what each test checks and what to report.
+## See tests/v0.1.x/spike-tests.md for what each test checks and what to report.
 <style>
   .bws { font-family: Arial, sans-serif; font-size: 12px; }
   .bws h4 { margin: 4px 0 8px 0; }
