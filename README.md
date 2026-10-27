@@ -5,8 +5,11 @@ between them, deduced from work item links. They share one client core, one buil
 
 | Widget | What it shows | Status | Docs |
 |---|---|---|---|
-| **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | 0.2.x, in use on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
-| **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | 0.1.0, to be validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
+| **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.3.0** released, validated on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
+| **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.1.0** released, validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
+
+Download the packages from the [releases](../../releases) (`docBranches-N.N.N.zip`, `docCoverage-N.N.N.zip`). Still
+open for both widgets: behaviour for viewers who cannot read some documents (see each specification).
 
 ![docBranches preview rendered from the VforIA test set (mock data)](docs/docBranches/preview-graph.png)
 
@@ -17,7 +20,8 @@ between them, deduced from work item links. They share one client core, one buil
 - Interactive SVG graph (layered layout, zoom, highlight, tooltips, details with the linked work items).
 - Table view, SVG download, Excel workbook download (CSV fallback).
 - Static graph + table in PDF export and print (no JavaScript).
-- Viewer toggles (relation kinds, item counts, extra document fields), defaults set as widget parameters.
+- Link roles and documents chosen with Polarion selectors in the widget parameters (no typing).
+- Viewer toggles (relation kinds or roles, item counts, extra document fields), defaults set as widget parameters.
 - Velocity 1.4-safe templates, SQL scoped to one project, `isUnresolvable()` guard on every referenced object.
 
 ## Build and test
@@ -38,10 +42,13 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 - **Release** (`.github/workflows/release.yml`): each widget has its own version in `widgets/<widget>/VERSION`
   (**N.N.N**, semantic versioning: major = incompatible change of parameters or behaviour, minor = new feature,
   patch = fix). To release a widget:
-  1. update `widgets/<widget>/VERSION` (e.g. `0.2.1`) in the change that goes to `main`;
-  2. on GitHub, **Releases → Draft a new release**, tag **`<widget>-vN.N.N`** (e.g. `docBranches-v0.2.1`) on `main`, **Publish**;
+  1. update `widgets/<widget>/VERSION` (e.g. `0.3.1`) in the change that goes to `main`;
+  2. on GitHub, **Releases → Draft a new release**, in *Choose a tag* type the new tag **`<widget>-vN.N.N`**
+     (e.g. `docBranches-v0.3.1`), pick *Create new tag on publish*, target `main`, **Publish**;
   3. the workflow tests that widget, stamps the version and attaches **`<widget>-N.N.N.zip`** to the release.
      Upload that zip in Polarion (see the widget's install guide).
+
+  One release = one widget: to release both widgets, publish two releases, one per tag.
 
   A tag that is not `<widget>-vN.N.N` fails the workflow. The workflow can also be re-run by hand
   (*Actions → Release → Run workflow*) with an existing tag. Releases up to `v0.2.0` (tags `vN.N.N`) are docBranches
