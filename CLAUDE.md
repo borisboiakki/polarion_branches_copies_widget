@@ -31,15 +31,15 @@ metadata). See `SPECIFICATION.md` for requirements (draft, to be refined with th
 - Respect PDF/print rendering: no JS or external stylesheets in those modes (guide §11/§13).
 - Keep the interactive path within the 10 s scripting/render budget; push heavy work into SQL or a cache.
 
-## Technology decision (provisional — see SPEC §6)
+## Technology decision (settled 2026-10-27 — see SPEC §6)
 
-Preferred order, per guide §9.4 (choose Java only when necessary):
-1. **Velocity widget** (uploaded widget in a project's `.polarion/pages/widgets`) + SQL/Lucene for data,
-   graph rendered client-side (inline SVG or a small bundled JS lib) with a static fallback for PDF/print.
-2. **Java extension** (OSGi bundle, widget via the Rendering/Widget SDK) only if Velocity can't meet
-   interactivity/performance needs. Requires a server restart; deployed under `<Polarion>/polarion/extensions/`.
-
-Do not start implementation until SPEC §6 is settled with the user.
+- **Velocity widget** (uploaded `.zip`, folder `branchesWidget/`) with bundled vanilla JS/CSS in `resources/`.
+  No CDN, no Java extension.
+- Target **Polarion 2512**, stay compatible with **2606**: public Rendering API + documented SQL tables only.
+- Data: SQL scoped to one project (≈100 LiveDocs / 20k work items). Never loop over all work items in Velocity.
+- Interactive graph = client-side SVG. PDF/print = static server-side SVG + table, no JS.
+- Default link roles: copy `duplicates`, branch `branched_from`, derived `derived_from`. All of them are parameters.
+- Work the technical risks in SPEC §9 (spike) before building features on top of them.
 
 ## Research notes (verified vs. unverified)
 
@@ -57,9 +57,13 @@ Verified through web search (2026-10-27):
   (e.g. json-editor, aad-synchronizer, interceptor-manager, generic). No SBB widget repo found; they are
   useful as a **Java/Maven build and packaging reference**, not as a widget reference.
 
+- Published DB schema docs (testdrive SDK) list `MODULE.FK_URI_BRANCHEDFROM`, `MODULE.FK_URI_DERIVEDFROM`,
+  `MODULE.C_DERIVEDFROMLINKROLE` (seen in search results; not yet checked on 2512/2606).
+
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
-- Exact SQL column / `IModule` getter for a document's "branched from" source.
-- The exact link-role ids used for branched/copied work items in the target instance.
+- That the `MODULE` columns above exist unchanged in 2512/2606.
+- Velocity syntax/macro for loading `resources/` JS/CSS in a widget (Widget SDK mentions such macros).
+- Whether `searchBySql` can return aggregate rows (it resolves objects by `C_URI`). See SPEC §9 R1.
 - Whether the Widget SDK extension point is suitable for our needs vs. Velocity.
 
 Never present the unverified items as fact in code comments or docs.

@@ -3,7 +3,7 @@
 A Siemens Polarion **LiveReport widget** that shows the documents of a project and how they relate to
 each other — which documents are **branches** of which, and which are **copies** (reuse) of which.
 
-> Status: **inception.** Requirements are drafted in [`SPECIFICATION.md`](SPECIFICATION.md) and are to be refined.
+> Status: **specification v0.2.** Approach decided (Velocity widget, Polarion 2512, compatible with 2606). Technical spike next. See [`SPECIFICATION.md`](SPECIFICATION.md).
 > No implementation yet.
 
 ## Why
@@ -19,11 +19,11 @@ Relations are **deduced from work item links** between documents' work items (pl
 1. Collect the documents in scope (project, space, or a selection).
 2. Read the links between their work items using configurable link roles.
 3. Aggregate item-level links into document-to-document relations (e.g. "≥ N items of B are linked to A").
-4. Classify each relation (branch / copy) and render a graph or tree.
+4. Classify each relation (copy / branch / derived) and render a graph or tree.
 
 ## Planned deliverables
 
-- Widget (Velocity first; Java only if needed) with configurable parameters (scope, link roles, filters).
+- Velocity widget with configurable parameters (scope, link roles: `duplicates` / `branched_from` / `derived_from`, filters).
 - Interactive graph + tabular fallback; static rendering for PDF/print.
 - Install and configuration guide.
 
