@@ -147,14 +147,14 @@ context (F15), non-LiveDoc documents.
       for documents in the default space.
    c. Document link URL `#/project/<id>/wiki/<space>/<document>` opens the document (default space included).
    d. `getType()/getStatus().getName()`, `getAuthor().getName()` and `$date.format` give readable values.
-   e. Multi-value parameter "Extra document fields" is read correctly (`values()` type not yet observed on 2512).
+   e. Multi-value parameter "Extra document fields" is read correctly. Same code path as h (verified), so very likely fine; confirm by ticking fields in the parameter.
    f. ~~PNG export~~ removed in 0.1.2 (blocked by the browser).
    g. (fixed in 0.1.1) A document whose author user was deleted made the widget fail with
       `uri: subterra:data-service:objects:/default/${User}t0025088` (found by the PO on 2512). References to
       unresolvable objects (author, branched/derived source, link target) are now checked with `isUnresolvable()`.
       Still to confirm on the instance with the document of that user.
-   h. (0.2.0) Multi-value parameter "Relation kinds shown by default" is read correctly (same question as e; falls back to all).
-   i. (0.2.0) `#loadWidgetJs("resources/xlsx.js")` (Widget SDK directive, not yet used on 2512) loads the Excel library:
+   h. **Verified on 2512 (PO, 0.2.0).** Multi-value parameter "Relation kinds shown by default" is read correctly (same question as e; falls back to all).
+   i. **Verified on 2512 (PO, 0.2.0): the Excel export works.** `#loadWidgetJs("resources/xlsx.js")` (Widget SDK directive, not yet used on 2512) loads the Excel library:
       the Excel button must download an `.xlsx`. If it downloads a `.csv` and the status line says "Excel library not
       loaded", the directive did not work. Also check that the zip entry `docBranches/resources/xlsx.js` (29 chars) is
       accepted on upload.
@@ -191,3 +191,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Relation kind filter (copies / branches / derived, default all): parameter "Relation kinds shown by default" + toolbar checkboxes; edges are restricted to the selected kinds (labels and counts too); also applied in the PDF view. Widget 0.2.0. The multi-value parameter read is unverified on 2512 (falls back to all) | PO |
 | 2026-10-27 | Excel export (0.2.0): sheets Relations, Documents, Linked items (max 30 per pair), with links; current filters apply. Library xlsx-js-style 1.2.0 (gitbrent, Apache-2.0) shipped as `resources/xlsx.js` and loaded with `#loadWidgetJs` (unverified on 2512, open check §10.2 i); CSV fallback when it is not loaded | PO |
 | 2026-10-27 | Linked item counts on the line labels can be hidden: parameter "Linked item counts on the lines by default" (shown/hidden) + toolbar toggle "Item counts"; applies to all kinds and to the PDF view; tooltips, details, table and Excel keep the counts. Widget 0.2.0 | PO |
+| 2026-10-27 | PO test of 0.2.0 on 2512: upload with `resources/xlsx.js` accepted, Excel export works (`#loadWidgetJs` verified), relation kind filter and parameter work, item count toggle and parameter work (PDF too). Open checks h and i closed | PO |

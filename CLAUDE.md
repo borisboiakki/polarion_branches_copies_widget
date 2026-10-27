@@ -78,12 +78,13 @@ Verified through web search (2026-10-27):
   - `#include`/`#parse` **cannot** load files from the widget's `resources/` folder → inline JS/CSS in `render.vm`.
   - Long arithmetic does not compute (`$t1 - $t0` on `$date.systemTime` is empty), as expected for Velocity 1.4.
   - Inline JS runs in the browser view (SVG export downloaded); no JS in PDF export; static inline SVG renders in PDF.
+- **Verified by the PO on 2512 with widget 0.2.0**: `#loadWidgetJs("resources/xlsx.js")` (Widget SDK directive) loads a script
+  from the widget's `resources/` folder (Excel export works; zip entry `docBranches/resources/xlsx.js` accepted). Multi-value
+  `customEnum` parameters are read with `values()` ("Relation kinds shown by default" works).
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.
 - Whether the Widget SDK extension point is suitable for our needs vs. Velocity.
-- That `#loadWidgetJs("resources/xlsx.js")` (documented in the Widget SDK, testdrive.polarion.com widget-sdk.pdf) loads
-  widget resources on 2512 (used by the Excel export since 0.2.0; the widget falls back to CSV if not).
 
 Never present the unverified items as fact in code comments or docs.
 
