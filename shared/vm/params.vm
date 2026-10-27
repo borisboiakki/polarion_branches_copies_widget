@@ -1,0 +1,73 @@
+## Shared snippet params.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED params.vm".
+## Parameters common to the document widgets: excludedTypes, spaces, showMode, lineCounts, extraFields, height.
+## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
+## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
+## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
+#set($bwUnset = "__unset__")
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.excludedTypes.value)
+#set($tmp = $parameters.excludedTypes.value())
+#set($excludedTypesStr = "heading")
+#if("$tmp" != $bwUnset)
+  #set($excludedTypesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.spaces.value)
+#set($tmp = $parameters.spaces.value())
+#set($spacesStr = "")
+#if("$tmp" != $bwUnset)
+  #set($spacesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.showMode.singleValue)
+#set($tmp = $parameters.showMode.singleValue())
+#set($showMode = "related")
+#if("$tmp" == "all")
+  #set($showMode = "all")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.lineCounts.singleValue)
+#set($tmp = $parameters.lineCounts.singleValue())
+#set($showCounts = true)
+#if("$tmp" == "hide")
+  #set($showCounts = false)
+#end
+
+#set($extraList = [])
+#set($tmp = false)
+#set($tmp = $parameters.extraFields.values)
+#set($tmp = $parameters.extraFields.values())
+#if($tmp)
+  #foreach($v in $tmp)
+    #set($fid = "$v")
+    #set($fid = $v.id())
+    #set($fidS = "$fid")
+    #if($fidS.matches("type|status|author|created|updated|items") && !$extraList.contains($fidS))
+      #set($void = $extraList.add($fidS))
+    #end
+  #end
+#end
+#set($extrasStr = "")
+#foreach($f in $extraList)
+  #if($extrasStr != "")
+    #set($extrasStr = "${extrasStr},")
+  #end
+  #set($extrasStr = "${extrasStr}${f}")
+#end
+
+#set($bwInt = 0)
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.height.value)
+#set($tmp = $parameters.height.value())
+#set($tmpS = "$tmp")
+#set($graphHeight = 600)
+#if($tmpS.matches("[0-9]{1,5}"))
+  #set($graphHeight = $bwInt.parseInt($tmpS))
+#end
+#if($graphHeight < 200)
+  #set($graphHeight = 600)
+#end

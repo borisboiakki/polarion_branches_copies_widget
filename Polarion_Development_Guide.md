@@ -590,7 +590,8 @@ Also avoid, as a precaution (consistent with Velocity 1.4, not individually conf
 
 Also verified on 2512:
 - Arithmetic on `Long` values does not compute: `#set($d = $t1 - $t0)` with `$date.systemTime` values leaves `$d` unset. Velocity 1.4 arithmetic is defined for `Integer`. Print the raw values, or compute in JavaScript.
-- `#include("resources/x")` and `#parse("resources/x.vm")` fail with *"Unable to find resource"*: Velocity cannot load files from an uploaded widget's `resources/` folder. Inline the JS/CSS in `render.vm` (Velocity-safe) or load them by URL from the browser.
+- `#include("resources/x")` and `#parse("resources/x.vm")` fail with *"Unable to find resource"*: Velocity cannot load files from an uploaded widget's `resources/` folder. Inline small JS/CSS in `render.vm` (Velocity-safe). For a large third-party script, ship it in `resources/` and load it with the Widget SDK directive `#loadWidgetJs("resources/x.js")` (verified on 2512 with a 425 KB library; keep the zip entry name, e.g. `widget/resources/x.js`, within 30 characters).
+- Multi-value `customEnum` parameters (`allowMultipleValues(true)`) are read with `$parameters.<id>.values()`; each value's `id()` (or its string form) is the option id.
 
 Hex colour codes (`#c62828`) are safe: hex digits cannot spell a directive name.
 

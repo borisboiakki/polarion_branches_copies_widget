@@ -1,41 +1,15 @@
 ## Document Branches and Copies - render.vm
-## Source: widget/src/render.vm. tools/build-widget.py inlines branches-graph.js at the BW_INLINE_JS marker,
-## checks the result with Velocity 1.4 and writes widget/dist/docBranches.zip.
+## Source: widgets/docBranches/src/render.vm. tools/build-widget.py inlines the shared snippets (shared/vm) at the
+## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
+## Velocity 1.4 and writes widgets/docBranches/dist/docBranches.zip.
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
 #set($bwVersion = "0.1.0")
-<style>
-  .bw-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
-  .bw-toolbar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
-  .bw-ctl { font-size: 12px; padding: 2px 4px; }
-  .bw-search { width: 170px; }
-  .bw-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; }
-  .bw-fields { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
-  .bw-btns { display: inline-flex; gap: 4px; }
-  .bw-btn { font-size: 12px; padding: 2px 8px; cursor: pointer; border: 1px solid rgb(170,178,195); background: rgb(248,249,252); border-radius: 3px; }
-  .bw-btn:hover { background: rgb(232,237,247); }
-  .bw-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 2px 0 4px 0; }
-  .bw-leg { display: inline-flex; align-items: center; gap: 4px; }
-  .bw-muted { color: rgb(110,118,135); }
-  .bw-status { color: rgb(110,118,135); margin-bottom: 4px; }
-  .bw-view { overflow: auto; border: 1px solid rgb(215,220,230); background: rgb(255,255,255); }
-  .bw-svg { display: block; }
-  .bw-node, .bw-edge, .bw-edge-label { cursor: pointer; }
-  .bw-tip { position: absolute; z-index: 20; background: rgb(255,255,250); border: 1px solid rgb(170,170,170); padding: 4px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); pointer-events: none; max-width: 420px; }
-  .bw-tip-head { font-weight: 600; }
-  .bw-details { border: 1px solid rgb(215,220,230); background: rgb(250,251,253); padding: 6px 8px; margin-bottom: 6px; }
-  .bw-details-head { font-weight: 600; margin-bottom: 4px; }
-  .bw-items { margin: 4px 0 0 18px; padding: 0; max-height: 180px; overflow: auto; }
-  .bw-table { border-collapse: collapse; margin: 4px 0; }
-  .bw-table td, .bw-table th { border: 1px solid rgb(200,205,215); padding: 3px 6px; text-align: left; vertical-align: top; }
-  .bw-table th { background: rgb(238,241,246); }
-  .bw-error, .bw-warn { color: rgb(198,40,40); }
-</style>
+## BW_SHARED style.vm
 
 ## ======================================================================= parameters
-## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
-## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
-#set($bwUnset = "__unset__")
+## BW_SHARED params.vm
 
+## docBranches parameters
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.copyRoles.value)
 #set($tmp = $parameters.copyRoles.value())
@@ -61,65 +35,11 @@
 #end
 
 #set($tmp = $bwUnset)
-#set($tmp = $parameters.excludedTypes.value)
-#set($tmp = $parameters.excludedTypes.value())
-#set($excludedTypesStr = "heading")
-#if("$tmp" != $bwUnset)
-  #set($excludedTypesStr = "$tmp")
-#end
-
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.spaces.value)
-#set($tmp = $parameters.spaces.value())
-#set($spacesStr = "")
-#if("$tmp" != $bwUnset)
-  #set($spacesStr = "$tmp")
-#end
-
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.showMode.singleValue)
-#set($tmp = $parameters.showMode.singleValue())
-#set($showMode = "related")
-#if("$tmp" == "all")
-  #set($showMode = "all")
-#end
-
-#set($tmp = $bwUnset)
 #set($tmp = $parameters.showIndirect.singleValue)
 #set($tmp = $parameters.showIndirect.singleValue())
 #set($showIndirect = false)
 #if("$tmp" == "show")
   #set($showIndirect = true)
-#end
-
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.lineCounts.singleValue)
-#set($tmp = $parameters.lineCounts.singleValue())
-#set($showCounts = true)
-#if("$tmp" == "hide")
-  #set($showCounts = false)
-#end
-
-#set($extraList = [])
-#set($tmp = false)
-#set($tmp = $parameters.extraFields.values)
-#set($tmp = $parameters.extraFields.values())
-#if($tmp)
-  #foreach($v in $tmp)
-    #set($fid = "$v")
-    #set($fid = $v.id())
-    #set($fidS = "$fid")
-    #if($fidS.matches("type|status|author|created|updated|items") && !$extraList.contains($fidS))
-      #set($void = $extraList.add($fidS))
-    #end
-  #end
-#end
-#set($extrasStr = "")
-#foreach($f in $extraList)
-  #if($extrasStr != "")
-    #set($extrasStr = "${extrasStr},")
-  #end
-  #set($extrasStr = "${extrasStr}${f}")
 #end
 
 #set($relList = [])
@@ -150,7 +70,6 @@
 #end
 
 ## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
-#set($bwInt = 0)
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.threshold.value)
 #set($tmp = $parameters.threshold.value())
@@ -163,28 +82,8 @@
   #set($threshold = 1)
 #end
 
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.height.value)
-#set($tmp = $parameters.height.value())
-#set($tmpS = "$tmp")
-#set($graphHeight = 600)
-#if($tmpS.matches("[0-9]{1,5}"))
-  #set($graphHeight = $bwInt.parseInt($tmpS))
-#end
-#if($graphHeight < 200)
-  #set($graphHeight = 600)
-#end
-
 ## ======================================================================= lists and kinds
-## Only identifiers are allowed in role and type lists; they go into SQL.
-#macro(bwIdList $bwIn $bwOut)
-  #foreach($bwPart in $bwIn.split(","))
-    #set($bwT = $bwPart.trim())
-    #if($bwT.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwT))
-      #set($void = $bwOut.add($bwT))
-    #end
-  #end
-#end
+## BW_SHARED common.vm
 
 #set($copyRoles = [])
 #bwIdList($copyRolesStr $copyRoles)
@@ -192,17 +91,6 @@
 #bwIdList($branchRolesStr $branchRoles)
 #set($derivedRoles = [])
 #bwIdList($derivedRolesStr $derivedRoles)
-#set($excludedTypes = [])
-#bwIdList($excludedTypesStr $excludedTypes)
-
-## Space names may contain blanks; they are compared in Velocity only, never put into SQL.
-#set($spaceFilter = [])
-#foreach($bwPart in $spacesStr.split(","))
-  #set($bwT = $bwPart.trim())
-  #if($bwT != "")
-    #set($void = $spaceFilter.add($bwT))
-  #end
-#end
 
 ## role -> kind (first kind wins if a role is listed twice)
 #set($roleKind = $objectFactory.newMap())
@@ -230,47 +118,6 @@
   #set($roleSql = "${roleSql}'${r}'")
 #end
 
-#set($typeSql = "")
-#foreach($t in $excludedTypes)
-  #if($typeSql != "")
-    #set($typeSql = "${typeSql},")
-  #end
-  #set($typeSql = "${typeSql}'${t}'")
-#end
-
-#set($projectIdRaw = "")
-#set($projectIdRaw = $page.getReference().projectId())
-#set($projectId = "$projectIdRaw")
-#set($projectOk = false)
-#if($projectId.matches("[A-Za-z0-9_.-]+"))
-  #set($projectOk = true)
-#end
-
-#set($isStatic = false)
-#if($widgetContext.target().isPdf() || $widgetContext.target().isPrint())
-  #set($isStatic = true)
-#end
-
-## Document key used everywhere: "space/name"
-## Referenced objects (document of a link, "branched from" source) can be unresolvable (deleted, no access).
-## Any access other than isUnresolvable() then throws, so they are only used when isUnresolvable() is false.
-#macro(bwKey $bwMod)
-  #set($bwKeyOut = "")
-  #set($bwUr = "unknown")
-  #if($bwMod)
-    #set($bwUr = $bwMod.isUnresolvable())
-  #end
-  #if("$bwUr" == "false")
-    #set($bwF = "")
-    #set($bwF = $bwMod.getModuleFolder())
-    #set($bwN = "")
-    #set($bwN = $bwMod.getId())
-    #if("$bwN" != "")
-      #set($bwKeyOut = "${bwF}/${bwN}")
-    #end
-  #end
-#end
-
 #if(!$projectOk)
   <div class="bw-warn">Document Branches and Copies: place this widget on a page of a project.</div>
 #elseif($roleKind.size() == 0)
@@ -278,99 +125,7 @@
 #else
 
 ## ======================================================================= documents
-#set($ds = $trackerService.getDataService())
-#set($docList = [])
-#set($docByKey = $objectFactory.newMap())
-#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
-#set($typeFilterSql = "")
-#if($typeSql != "")
-  #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
-#end
-#foreach($m in $ds.sqlSearch($docSql))
-  #bwKey($m)
-  #set($dKey = $bwKeyOut)
-  #set($dSpace = "")
-  #set($dSpace = $m.getModuleFolder())
-  #set($keep = true)
-  #if($dKey == "" || $docByKey.containsKey($dKey))
-    #set($keep = false)
-  #end
-  #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
-    #set($keep = false)
-  #end
-  #if($keep)
-    #set($d = $objectFactory.newMap())
-    #set($dName = $m.getId())
-    #set($dTitle = "")
-    #set($dTitle = $m.getTitle())
-    #if("$dTitle" == "")
-      #set($dTitle = "$dName")
-    #end
-    #set($dType = "")
-    #set($dTypeObj = false)
-    #set($dTypeObj = $m.getType())
-    #if($dTypeObj)
-      #set($dType = $dTypeObj.getId())
-      #set($dType = $dTypeObj.getName())
-    #end
-    #set($dStatus = "")
-    #set($dStatusObj = false)
-    #set($dStatusObj = $m.getStatus())
-    #if($dStatusObj)
-      #set($dStatus = $dStatusObj.getId())
-      #set($dStatus = $dStatusObj.getName())
-    #end
-    ## The author can be a deleted user: unresolvable objects throw on any access, see bwKey.
-    #set($dAuthor = "")
-    #set($dAuthorObj = false)
-    #set($dAuthorObj = $m.getAuthor())
-    #set($dAuthorUr = "unknown")
-    #if($dAuthorObj)
-      #set($dAuthorUr = $dAuthorObj.isUnresolvable())
-    #end
-    #if("$dAuthorUr" == "false")
-      #set($dAuthor = $dAuthorObj.getId())
-      #set($dAuthor = $dAuthorObj.getName())
-    #elseif($dAuthorObj)
-      #set($dAuthor = "(unknown user)")
-    #end
-    #set($dCreated = "")
-    #set($dDate = false)
-    #set($dDate = $m.getCreated())
-    #if($dDate)
-      #set($dCreated = "$dDate")
-      #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
-    #end
-    #set($dUpdated = "")
-    #set($dDate = false)
-    #set($dDate = $m.getUpdated())
-    #if($dDate)
-      #set($dUpdated = "$dDate")
-      #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
-    #end
-    ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
-    #set($spaceStr = "$dSpace")
-    #set($nameStr = "$dName")
-    #set($spaceSql = $spaceStr.replace("'", "''"))
-    #set($nameSql = $nameStr.replace("'", "''"))
-    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
-    #set($dItems = -1)
-    #set($dItems = $ds.sqlSearch($cntSql).size())
-    #set($void = $d.put("key", $dKey))
-    #set($void = $d.put("id", "$dName"))
-    #set($void = $d.put("title", "$dTitle"))
-    #set($void = $d.put("space", "$dSpace"))
-    #set($void = $d.put("type", "$dType"))
-    #set($void = $d.put("status", "$dStatus"))
-    #set($void = $d.put("author", "$dAuthor"))
-    #set($void = $d.put("created", "$dCreated"))
-    #set($void = $d.put("updated", "$dUpdated"))
-    #set($void = $d.put("items", $dItems))
-    #set($void = $d.put("module", $m))
-    #set($void = $docList.add($d))
-    #set($void = $docByKey.put($dKey, $d))
-  #end
-#end
+## BW_SHARED documents.vm
 
 ## ======================================================================= relations
 ## Edge "orig>copy": orig = document of the link target (original item), copy = document of the

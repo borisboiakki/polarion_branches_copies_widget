@@ -1,22 +1,19 @@
-/*
- * Polarion Branches Widget - client-side graph.
- *
- * Inlined into render.vm by tools/build-widget.py. Velocity parses render.vm, so this file
- * must not contain the dollar sign, the hash sign or backslashes (the build checks this).
- * Use HASH for the hash character in URLs.
- */
-(function () {
-  'use strict';
+  /*
+   * Shared client core of the document widgets (docBranches, docCoverage).
+   *
+   * tools/build-widget.py places this fragment inside each widget's IIFE, before the widget's own
+   * graph.js code, so nothing is global. Velocity parses the result: no dollar sign, hash sign,
+   * backslash or non-ASCII character in this file (the build checks it). Use HASH in URLs.
+   *
+   * Edge categories ("cats") describe the kinds of relation a widget draws:
+   *   [{ id: 'branch', name: 'branch', label: 'Branches', color: 'rgb(...)', dash: '9,5' }, ...]
+   * in precedence order (the first category present on an edge gives its line style). An edge is
+   *   { o: originKey, c: targetKey, kinds: { catId: count }, meta: { catId: bool }, indirect: bool,
+   *     samples: [{ c: itemInTarget, o: itemInOrigin, k: catId }], ... widget fields }
+   */
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var HASH = String.fromCharCode(35);
-  var KINDS = ['branch', 'derived', 'copy'];
-  var KIND_STYLE = {
-    branch: { color: 'rgb(198,40,40)', dash: '9,5', name: 'branch' },
-    derived: { color: 'rgb(26,127,55)', dash: '2,4', name: 'derived' },
-    copy: { color: 'rgb(51,103,214)', dash: '', name: 'copy' }
-  };
-  var KIND_LABEL = { branch: 'Branches', derived: 'Derived', copy: 'Copies' };
   var INDIRECT_COLOR = 'rgb(150,150,150)';
   var EXTRA_FIELDS = [
     ['type', 'Type'], ['status', 'Status'], ['author', 'Author'],
@@ -91,9 +88,35 @@
     return basePath() + HASH + '/project/' + encodeURIComponent(project) + '/workitem?id=' + encodeURIComponent(id);
   }
 
-  // ------------------------------------------------------------------ model
+  function absUrl(u) {
+    return window.location.protocol + '//' + window.location.host + u;
+  }
 
-  function readModel(root) {
+  function bez(a, b, c, d, t) {
+    var u = 1 - t;
+    return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+  }
+
+  function fieldIndex(f) {
+    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return i; } }
+    return 99;
+  }
+
+  function fieldLabel(f) {
+    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return EXTRA_FIELDS[i][1]; } }
+    return f;
+  }
+
+  function download(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name }, document.body);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.parentNode.removeChild(a); }, 1000);
+  }
+
+  // ------------------------------------------------------------------ model helpers
+
+  function readNodes(root) {
     var nodes = [];
     var byKey = {};
     var nEls = root.querySelectorAll('.bw-model .bw-n');
@@ -103,30 +126,18 @@
         key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
         type: d.type || '', status: d.status || '', author: d.author || '',
         created: d.created || '', updated: d.updated || '',
-        items: d.items === '' || d.items === undefined ? -1 : toInt(d.items)
+        items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
+        el: nEls[i]
       };
       if (n.key && !byKey[n.key]) {
         byKey[n.key] = n;
         nodes.push(n);
       }
     }
-    var edges = [];
-    var eEls = root.querySelectorAll('.bw-model .bw-e');
-    for (var j = 0; j < eEls.length; j++) {
-      var a = eEls[j].dataset;
-      if (!byKey[a.o] || !byKey[a.c] || a.o === a.c) { continue; }
-      edges.push({
-        o: a.o, c: a.c,
-        kinds: { copy: toInt(a.kc), branch: toInt(a.kb), derived: toInt(a.kd) },
-        meta: { branch: a.mb === '1', derived: a.md === '1' },
-        oi: toInt(a.oi), ci: toInt(a.ci), total: toInt(a.n),
-        indirect: a.ind === '1',
-        samples: parseSamples(a.s)
-      });
-    }
-    return { nodes: nodes, byKey: byKey, edges: edges };
+    return { nodes: nodes, byKey: byKey };
   }
 
+  // "c|o|k;c|o|k" -> [{ c, o, k }]
   function parseSamples(s) {
     var out = [];
     if (!s) { return out; }
@@ -138,48 +149,50 @@
     return out;
   }
 
-  function mainKind(e) {
-    for (var i = 0; i < KINDS.length; i++) {
-      var k = KINDS[i];
-      if (e.kinds[k] > 0 || e.meta[k]) { return k; }
+  function catById(cats, id) {
+    for (var i = 0; i < cats.length; i++) { if (cats[i].id === id) { return cats[i]; } }
+    return null;
+  }
+
+  // First category present on the edge (precedence order); the last category as fallback.
+  function mainKind(e, cats) {
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      if (e.kinds[k] > 0 || e.meta[k]) { return cats[i]; }
     }
-    return 'copy';
+    return cats[cats.length - 1];
   }
 
   // noCounts: kind names only (line labels when the viewer hides the linked item counts).
-  function kindsLabel(e, noCounts) {
+  function kindsLabel(e, cats, noCounts) {
     var parts = [];
-    for (var i = 0; i < KINDS.length; i++) {
-      var k = KINDS[i];
-      if (e.kinds[k] > 0) { parts.push(KIND_STYLE[k].name + (noCounts ? '' : ' ' + e.kinds[k])); }
-      else if (e.meta[k]) { parts.push(KIND_STYLE[k].name); }
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      if (e.kinds[k] > 0) { parts.push(cats[i].name + (noCounts ? '' : ' ' + e.kinds[k])); }
+      else if (e.meta[k]) { parts.push(cats[i].name); }
     }
     return parts.join(' + ');
   }
 
-  // ------------------------------------------------------------------ layout
-
-  function nodeHeight(state) {
-    return PAD * 2 + LINE_H * (3 + state.extras.length);
-  }
-
-  function relFromData(s) {
+  // "a,b" -> { a: true, b: true }; empty or unknown -> every category.
+  function relFromData(s, cats) {
     var r = {};
+    var any = false;
     var parts = (s || '').split(',');
     for (var i = 0; i < parts.length; i++) {
-      if (KIND_STYLE[parts[i]]) { r[parts[i]] = true; }
+      if (catById(cats, parts[i])) { r[parts[i]] = true; any = true; }
     }
-    if (!r.copy && !r.branch && !r.derived) { r = { copy: true, branch: true, derived: true }; }
+    if (!any) { cats.forEach(function (c) { r[c.id] = true; }); }
     return r;
   }
 
-  // Edge restricted to the selected kinds (null when none of its kinds is selected).
-  function restrictEdge(e, rel) {
+  // Edge restricted to the selected categories (null when none of its categories is selected).
+  function restrictEdge(e, cats, rel) {
     var kinds = {};
     var meta = {};
     var any = false;
-    for (var i = 0; i < KINDS.length; i++) {
-      var k = KINDS[i];
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
       kinds[k] = rel[k] ? e.kinds[k] : 0;
       meta[k] = rel[k] ? !!e.meta[k] : false;
       if (kinds[k] > 0 || meta[k]) { any = true; }
@@ -189,21 +202,19 @@
     for (var p in e) { if (Object.prototype.hasOwnProperty.call(e, p)) { r[p] = e[p]; } }
     r.kinds = kinds;
     r.meta = meta;
-    r.samples = e.samples.filter(function (sm) { return !KIND_STYLE[sm.k] || rel[sm.k]; });
+    r.samples = e.samples.filter(function (sm) { return !catById(cats, sm.k) || rel[sm.k]; });
     return r;
   }
 
-  function visibleEdges(model, state) {
-    var out = [];
-    for (var i = 0; i < model.edges.length; i++) {
-      var e = model.edges[i];
-      if (e.indirect && !state.indirect) { continue; }
-      var r = restrictEdge(e, state.rel);
-      if (r) { out.push(r); }
-    }
-    return out;
+  // ------------------------------------------------------------------ layout
+
+  function nodeHeight(state) {
+    return PAD * 2 + LINE_H * ((state.baseLines || 3) + state.extras.length);
   }
 
+  // Layered layout: origin documents on the left (longest path over direct edges), barycentre
+  // ordering to reduce crossings, documents without a shown edge in a grid below (mode 'all').
+  // state.keep(node) can force a node without edges into the grid.
   function layout(model, state, edges) {
     var h = nodeHeight(state);
     var degree = {};
@@ -215,6 +226,7 @@
     var isolated = [];
     for (var j = 0; j < model.nodes.length; j++) {
       var n = model.nodes[j];
+      if (state.hidden && state.hidden[n.key]) { continue; }
       if (degree[n.key]) { linked.push(n); }
       else if (state.mode === 'all') { isolated.push(n); }
     }
@@ -257,7 +269,7 @@
         for (var r = 0; r < cols[q].length; r++) { order[cols[q][r].key] = r; }
       }
     }
-    function bary(list, rel) {
+    function bary(list) {
       if (!list || !list.length) { return null; }
       var s = 0;
       for (var t = 0; t < list.length; t++) { s += order[list[t]]; }
@@ -265,7 +277,7 @@
     }
     function sortCol(col, rel) {
       var keyed = col.map(function (n2, idx) {
-        var bv = bary(rel[n2.key], rel);
+        var bv = bary(rel[n2.key]);
         return { n: n2, v: bv === null ? idx : bv, idx: idx };
       });
       keyed.sort(function (x, y) { return x.v - y.v || x.idx - y.idx; });
@@ -313,57 +325,71 @@
     };
   }
 
-  // ------------------------------------------------------------------ widget
+  // ------------------------------------------------------------------ base widget
+  // Methods shared by the widgets; each widget constructor calls initBase(this, root) and
+  // defines cats, filePrefix, emptyText, edgeSummary(e), showDetails(e), drawTable(), exportExcel().
 
-  function Widget(root) {
-    this.root = root;
-    this.model = readModel(root);
+  var Base = {};
+
+  function initBase(self, root, model) {
+    self.root = root;
+    self.model = model;
     var ds = root.dataset;
-    this.project = ds.project || '';
-    this.state = {
+    self.project = ds.project || '';
+    self.height = toInt(ds.height) || 600;
+    self.state = {
       mode: ds.mode === 'all' ? 'all' : 'related',
-      indirect: ds.indirect === '1',
-      rel: relFromData(ds.rel),
       counts: ds.counts !== '0',
       extras: (ds.extras || '').split(',').filter(function (x) { return x; }),
       filter: '',
       zoom: 1,
       view: 'graph'
     };
-    this.height = toInt(ds.height) || 600;
-    this.build();
-    this.render(true);
   }
 
-  Widget.prototype.build = function () {
+  function extendBase(Ctor) {
+    for (var k in Base) { if (Object.prototype.hasOwnProperty.call(Base, k)) { Ctor.prototype[k] = Base[k]; } }
+  }
+
+  Base.checkbox = function (parent, label, checked, onChange) {
+    var lab = el('label', { 'class': 'bw-check' }, parent);
+    var cb = el('input', { type: 'checkbox' }, lab);
+    cb.checked = !!checked;
+    el('span', null, lab, label);
+    cb.addEventListener('change', function () { onChange(cb.checked); });
+    return lab;
+  };
+
+  Base.button = function (parent, label, title, onClick) {
+    var b = el('button', { type: 'button', 'class': 'bw-btn', title: title }, parent, label);
+    b.addEventListener('click', onClick);
+    return b;
+  };
+
+  // Toolbar group with one checkbox per category (state.rel).
+  Base.kindChecks = function (bar, title) {
     var self = this;
-    var root = this.root;
-    var bar = el('div', { 'class': 'bw-toolbar' }, root);
-
-    var mode = el('select', { 'class': 'bw-ctl', title: 'Documents shown' }, bar);
-    el('option', { value: 'related' }, mode, 'Only documents with relations');
-    el('option', { value: 'all' }, mode, 'All documents');
-    mode.value = this.state.mode;
-    mode.addEventListener('change', function () { self.state.mode = mode.value; self.render(true); });
-
-    var ind = this.checkbox(bar, 'Indirect relations', this.state.indirect, function (on) {
-      self.state.indirect = on; self.render(true);
-    });
-    ind.title = 'Relations inherited through an intermediate copy (hidden by default)';
-
-    var kindsBox = el('span', { 'class': 'bw-fields' }, bar);
-    el('span', { 'class': 'bw-muted' }, kindsBox, 'Relations:');
-    KINDS.forEach(function (k) {
-      self.checkbox(kindsBox, KIND_LABEL[k], self.state.rel[k], function (on) {
-        self.state.rel[k] = on; self.render(true);
+    var box = el('span', { 'class': 'bw-fields' }, bar);
+    el('span', { 'class': 'bw-muted' }, box, title);
+    this.cats.forEach(function (cat) {
+      self.checkbox(box, cat.label, self.state.rel[cat.id], function (on) {
+        self.state.rel[cat.id] = on; self.render(true);
       });
     });
+    return box;
+  };
 
+  Base.countsCheck = function (bar) {
+    var self = this;
     var cnt = this.checkbox(bar, 'Item counts', this.state.counts, function (on) {
       self.state.counts = on; self.render(false);
     });
     cnt.title = 'Show the number of linked work items on the lines';
+    return cnt;
+  };
 
+  Base.fieldChecks = function (bar) {
+    var self = this;
     var fields = el('span', { 'class': 'bw-fields' }, bar);
     el('span', { 'class': 'bw-muted' }, fields, 'Fields:');
     EXTRA_FIELDS.forEach(function (f) {
@@ -375,10 +401,18 @@
         self.render(false);
       });
     });
+    return fields;
+  };
 
+  Base.searchBox = function (bar) {
+    var self = this;
     var search = el('input', { 'class': 'bw-ctl bw-search', type: 'search', placeholder: 'Highlight documents' + ELLIPSIS }, bar);
     search.addEventListener('input', function () { self.state.filter = search.value.trim().toLowerCase(); self.render(false); });
+    return search;
+  };
 
+  Base.viewButtons = function (bar) {
+    var self = this;
     var btns = el('span', { 'class': 'bw-btns' }, bar);
     this.button(btns, 'Fit', 'Fit the graph to the view', function () { self.fit(); });
     this.button(btns, MINUS, 'Zoom out', function () { self.setZoom(self.state.zoom / 1.25); });
@@ -390,7 +424,12 @@
     this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
     this.button(btns, 'Excel', 'Download the shown documents and relations as an Excel workbook', function () { self.exportExcel(); });
     this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
+    return btns;
+  };
 
+  // Areas below the toolbar: legend, status, details, graph view, table, tooltip.
+  Base.buildAreas = function () {
+    var root = this.root;
     this.legend(el('div', { 'class': 'bw-legend' }, root));
     this.status = el('div', { 'class': 'bw-status' }, root);
     this.details = el('div', { 'class': 'bw-details' }, root);
@@ -403,49 +442,20 @@
     this.tip.style.display = 'none';
   };
 
-  function fieldIndex(f) {
-    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return i; } }
-    return 99;
-  }
-
-  Widget.prototype.checkbox = function (parent, label, checked, onChange) {
-    var lab = el('label', { 'class': 'bw-check' }, parent);
-    var cb = el('input', { type: 'checkbox' }, lab);
-    cb.checked = !!checked;
-    el('span', null, lab, label);
-    cb.addEventListener('change', function () { onChange(cb.checked); });
-    return lab;
-  };
-
-  Widget.prototype.button = function (parent, label, title, onClick) {
-    var b = el('button', { type: 'button', 'class': 'bw-btn', title: title }, parent, label);
-    b.addEventListener('click', onClick);
-    return b;
-  };
-
-  Widget.prototype.legend = function (box) {
-    KINDS.forEach(function (k) {
+  Base.legendKinds = function (box) {
+    this.cats.forEach(function (cat) {
       var item = el('span', { 'class': 'bw-leg' }, box);
       var s = svg('svg', { width: 34, height: 10 }, item);
-      svg('line', { x1: 1, y1: 5, x2: 33, y2: 5, stroke: KIND_STYLE[k].color, 'stroke-width': 2.5, 'stroke-dasharray': KIND_STYLE[k].dash || null }, s);
-      el('span', null, item, KIND_STYLE[k].name);
+      svg('line', { x1: 1, y1: 5, x2: 33, y2: 5, stroke: cat.color, 'stroke-width': 2.5, 'stroke-dasharray': cat.dash || null }, s);
+      el('span', null, item, cat.name);
     });
-    var it = el('span', { 'class': 'bw-leg' }, box);
-    var s2 = svg('svg', { width: 34, height: 10 }, it);
-    svg('line', { x1: 1, y1: 5, x2: 33, y2: 5, stroke: INDIRECT_COLOR, 'stroke-width': 1.5, 'stroke-dasharray': '4,4' }, s2);
-    el('span', null, it, 'indirect');
-    el('span', { 'class': 'bw-muted' }, box, 'Arrow: original ' + ARROW + ' copy / branch / derived. Click a document to open it, a line for details.');
   };
 
-  Widget.prototype.render = function (refit) {
+  // Redraws graph and table after a state change; statusText(edges) gives the status line.
+  Base.layoutAndDraw = function (edges, refit) {
     var st = this.state;
-    var edges = visibleEdges(this.model, st);
     this.lay = layout(this.model, st, edges);
     this.edges = edges;
-    var hidden = this.model.edges.length - edges.length;
-    var shown = this.lay.linked.length + this.lay.isolated.length;
-    this.status.textContent = shown + ' of ' + this.model.nodes.length + ' documents, ' + edges.length + ' relations' +
-      (hidden > 0 ? ' (' + hidden + ' hidden by the indirect / relation filters)' : '');
     this.viewBtn.textContent = st.view === 'graph' ? 'Table' : 'Graph';
     this.view.style.display = st.view === 'graph' ? '' : 'none';
     this.table.style.display = st.view === 'table' ? '' : 'none';
@@ -454,7 +464,22 @@
     if (refit) { this.fit(); } else { this.applyZoom(); }
   };
 
-  Widget.prototype.drawGraph = function () {
+  // Text lines of a document box; widgets can override it (keep it in line with state.baseLines).
+  Base.nodeLines = function (n) {
+    var lines = [
+      { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
+      { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
+      { text: n.space, weight: 400, color: 'rgb(110,118,135)' }
+    ];
+    this.state.extras.forEach(function (f) {
+      var v = n[f];
+      if (f === 'items') { v = n.items >= 0 ? String(n.items) : ''; }
+      lines.push({ text: fieldLabel(f) + ': ' + (v || DASH), weight: 400, color: 'rgb(80,88,105)' });
+    });
+    return lines;
+  };
+
+  Base.drawGraph = function () {
     var self = this;
     var root = this.svgEl;
     while (root.firstChild) { root.removeChild(root.firstChild); }
@@ -463,7 +488,7 @@
     svg('rect', { x: 0, y: 0, width: lay.width, height: lay.height, fill: 'rgb(255,255,255)' }, root);
     if (!lay.linked.length && !lay.isolated.length) {
       svg('text', { x: MARGIN, y: MARGIN + 14, 'font-family': FONT, 'font-size': 13, fill: 'rgb(90,90,90)' }, root,
-        'No relation found between the documents with the current settings.');
+        this.emptyText);
       return;
     }
     if (lay.isolated.length && lay.linked.length) {
@@ -489,12 +514,12 @@
         c1y = c2y = Math.max(4, Math.min(y1, y2) - h / 2 - lay.topPad - 30);
       }
       var d = 'M' + x1 + ',' + y1 + ' C' + c1x + ',' + c1y + ' ' + c2x + ',' + c2y + ' ' + (x2 - 2) + ',' + y2;
-      var k = mainKind(e);
-      var color = e.indirect ? INDIRECT_COLOR : KIND_STYLE[k].color;
+      var cat = mainKind(e, self.cats);
+      var color = e.indirect ? INDIRECT_COLOR : cat.color;
       var g = svg('g', { 'class': 'bw-edge' }, gEdges);
       svg('path', {
         d: d, fill: 'none', stroke: color, 'stroke-width': e.indirect ? 1.4 : 2.2,
-        'stroke-dasharray': e.indirect ? '4,4' : (KIND_STYLE[k].dash || null),
+        'stroke-dasharray': e.indirect ? '4,4' : (cat.dash || null),
         opacity: e.indirect ? 0.7 : 1
       }, g);
       svg('polygon', { points: (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5), fill: color }, g);
@@ -503,7 +528,7 @@
       var lt = 0.8;
       var mx = bez(x1, c1x, c2x, x2, lt);
       var my = bez(y1, c1y, c2y, y2, lt) - 3;
-      var label = kindsLabel(e, !self.state.counts) + (e.indirect ? ' (indirect)' : '');
+      var label = kindsLabel(e, self.cats, !self.state.counts) + (e.indirect ? ' (indirect)' : '');
       var lg = svg('g', { 'class': 'bw-edge-label' }, gLabels);
       var bg = svg('rect', { fill: 'rgb(255,255,255)', opacity: 0.9, rx: 3 }, lg);
       var t = svg('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-family': FONT, 'font-size': 11, fill: color }, lg, label);
@@ -529,54 +554,18 @@
         fill: 'rgb(246,248,252)', stroke: filter && match ? 'rgb(230,126,34)' : 'rgb(120,132,155)',
         'stroke-width': filter && match ? 2.5 : 1.2
       }, g);
-      var lines = [
-        { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
-        { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
-        { text: n.space, weight: 400, color: 'rgb(110,118,135)' }
-      ];
-      self.state.extras.forEach(function (f) {
-        var v = n[f];
-        if (f === 'items') { v = n.items >= 0 ? String(n.items) : ''; }
-        lines.push({ text: fieldLabel(f) + ': ' + (v || DASH), weight: 400, color: 'rgb(80,88,105)' });
-      });
-      lines.forEach(function (ln, i) {
+      self.nodeLines(n).forEach(function (ln, i) {
         svg('text', {
           x: p.x + PAD, y: p.y + PAD + 11 + i * LINE_H, 'font-family': FONT, 'font-size': 12,
           'font-weight': ln.weight, fill: ln.color
         }, g, trunc(ln.text, 36));
       });
       svg('title', null, a, n.space + ' / ' + n.id + ' ' + DASH + ' ' + n.title);
+      if (self.onNode) { self.onNode(a, n); }
     });
   };
 
-  function bez(a, b, c, d, t) {
-    var u = 1 - t;
-    return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
-  }
-
-  function fieldLabel(f) {
-    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return EXTRA_FIELDS[i][1]; } }
-    return f;
-  }
-
-  Widget.prototype.edgeSummary = function (e) {
-    var o = this.model.byKey[e.o];
-    var c = this.model.byKey[e.c];
-    var lines = [o.id + '  ' + ARROW + '  ' + c.id, kindsLabel(e) + (e.indirect ? '  (indirect, inherited links)' : '')];
-    if (e.total > 0) {
-      var pc = pct(e.ci, c.items);
-      var po = pct(e.oi, o.items);
-      lines.push(e.total + ' linked items' +
-        (pc !== null ? ', ' + pc + '% of ' + c.id : '') + (po !== null ? ', ' + po + '% of ' + o.id : ''));
-    } else {
-      lines.push('No linked item: relation from document metadata only');
-    }
-    if (e.meta.branch) { lines.push('Document metadata: branched from ' + o.id); }
-    if (e.meta.derived) { lines.push('Document metadata: derived from ' + o.id); }
-    return lines;
-  };
-
-  Widget.prototype.showTip = function (ev, lines) {
+  Base.showTip = function (ev, lines) {
     var tip = this.tip;
     tip.textContent = '';
     lines.forEach(function (l, i) { el('div', i === 0 ? { 'class': 'bw-tip-head' } : null, tip, l); });
@@ -586,73 +575,67 @@
     tip.style.top = (ev.clientY - r.top + 14) + 'px';
   };
 
-  Widget.prototype.hideTip = function () { this.tip.style.display = 'none'; };
+  Base.hideTip = function () { this.tip.style.display = 'none'; };
 
-  Widget.prototype.showDetails = function (e) {
-    var self = this;
+  // Opens the details box with a header "origin -> target" and a Close button; returns the box.
+  Base.openDetails = function (o, c) {
     var box = this.details;
-    var o = this.model.byKey[e.o];
-    var c = this.model.byKey[e.c];
     box.textContent = '';
     box.style.display = 'block';
     var head = el('div', { 'class': 'bw-details-head' }, box);
     el('a', { href: docUrl(this.project, o), target: '_top' }, head, o.id);
-    el('span', null, head, '  ' + ARROW + '  ');
-    el('a', { href: docUrl(this.project, c), target: '_top' }, head, c.id);
+    if (c) {
+      el('span', null, head, '  ' + ARROW + '  ');
+      el('a', { href: docUrl(this.project, c), target: '_top' }, head, c.id);
+    }
     var close = this.button(head, 'Close', 'Close the details', function () { box.style.display = 'none'; });
     close.style.marginLeft = '12px';
-    this.edgeSummary(e).slice(1).forEach(function (l) { el('div', null, box, l); });
-    if (e.samples.length) {
-      el('div', { 'class': 'bw-muted' }, box, 'Linked work items (copy ' + ARROW + ' original):');
-      var ul = el('ul', { 'class': 'bw-items' }, box);
-      e.samples.forEach(function (s) {
-        var li = el('li', null, ul);
-        el('a', { href: itemUrl(self.project, s.c), target: '_top' }, li, s.c);
-        el('span', null, li, ' ' + ARROW + ' ');
-        el('a', { href: itemUrl(self.project, s.o), target: '_top' }, li, s.o);
-        el('span', { 'class': 'bw-muted' }, li, ' (' + KIND_STYLE[s.k].name + ')');
-      });
-      if (e.total > e.samples.length) {
-        el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (e.total - e.samples.length) + ' more');
-      }
+    return box;
+  };
+
+  // List of work item pairs (target item -> origin item) with the category name.
+  Base.sampleList = function (box, e, title) {
+    var self = this;
+    if (!e.samples.length) { return; }
+    el('div', { 'class': 'bw-muted' }, box, title);
+    var ul = el('ul', { 'class': 'bw-items' }, box);
+    e.samples.forEach(function (s) {
+      var li = el('li', null, ul);
+      el('a', { href: itemUrl(self.project, s.c), target: '_top' }, li, s.c);
+      el('span', null, li, ' ' + ARROW + ' ');
+      el('a', { href: itemUrl(self.project, s.o), target: '_top' }, li, s.o);
+      var cat = catById(self.cats, s.k);
+      el('span', { 'class': 'bw-muted' }, li, ' (' + (cat ? cat.name : s.k) + ')');
+    });
+    if (e.total > e.samples.length) {
+      el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (e.total - e.samples.length) + ' more');
     }
   };
 
-  Widget.prototype.drawTable = function () {
-    var self = this;
+  // Simple HTML table: header names and rows of cells ({ text, href } or plain text).
+  Base.htmlTable = function (headers, rows, emptyText) {
     var wrap = this.table;
-    wrap.textContent = '';
-    if (this.state.view !== 'table') { return; }
     var t = el('table', { 'class': 'bw-table' }, wrap);
     var hr = el('tr', null, el('thead', null, t));
-    ['Original', 'Relation', 'Copy / branch / derived', 'Linked items', 'Coverage of copy'].forEach(function (x) { el('th', null, hr, x); });
+    headers.forEach(function (x) { el('th', null, hr, x); });
     var tb = el('tbody', null, t);
-    var rows = this.edges.slice().sort(function (a, b) {
-      var oa = self.model.byKey[a.o], ob = self.model.byKey[b.o];
-      var ca = self.model.byKey[a.c], cb = self.model.byKey[b.c];
-      return (oa.space + '/' + oa.id).localeCompare(ob.space + '/' + ob.id) ||
-        (ca.space + '/' + ca.id).localeCompare(cb.space + '/' + cb.id);
-    });
-    rows.forEach(function (e) {
-      var o = self.model.byKey[e.o];
-      var c = self.model.byKey[e.c];
+    rows.forEach(function (row) {
       var tr = el('tr', null, tb);
-      el('a', { href: docUrl(self.project, o), target: '_top' }, el('td', null, tr), o.space + ' / ' + o.id);
-      el('td', null, tr, kindsLabel(e) + (e.indirect ? ' (indirect)' : ''));
-      el('a', { href: docUrl(self.project, c), target: '_top' }, el('td', null, tr), c.space + ' / ' + c.id);
-      el('td', null, tr, String(e.total));
-      var pc = pct(e.ci, c.items);
-      el('td', null, tr, pc === null ? DASH : pc + '% (' + e.ci + '/' + c.items + ')');
+      row.forEach(function (cell) {
+        var td = el('td', null, tr);
+        if (cell && cell.href) { el('a', { href: cell.href, target: '_top' }, td, cell.text); }
+        else { td.textContent = cell === null || cell === undefined ? '' : String(cell); }
+      });
     });
-    if (!rows.length) { el('div', { 'class': 'bw-muted' }, wrap, 'No relation found.'); }
+    if (!rows.length) { el('div', { 'class': 'bw-muted' }, wrap, emptyText); }
   };
 
-  Widget.prototype.setZoom = function (z) {
+  Base.setZoom = function (z) {
     this.state.zoom = Math.max(0.1, Math.min(3, z));
     this.applyZoom();
   };
 
-  Widget.prototype.applyZoom = function () {
+  Base.applyZoom = function () {
     var lay = this.lay;
     var z = this.state.zoom;
     setAttrs(this.svgEl, {
@@ -661,7 +644,7 @@
     });
   };
 
-  Widget.prototype.fit = function () {
+  Base.fit = function () {
     var lay = this.lay;
     var w = this.view.clientWidth || 800;
     var h = this.view.clientHeight || this.height;
@@ -669,42 +652,27 @@
     this.setZoom(Math.max(z, 0.2));
   };
 
-  Widget.prototype.svgString = function () {
+  Base.svgString = function () {
     var clone = this.svgEl.cloneNode(true);
     setAttrs(clone, { xmlns: SVG_NS, width: this.lay.width, height: this.lay.height });
     return new XMLSerializer().serializeToString(clone);
   };
 
-  Widget.prototype.fileName = function (ext) {
-    return 'document-relations-' + (this.project || 'project') + '.' + ext;
+  Base.fileName = function (ext) {
+    return this.filePrefix + (this.project || 'project') + '.' + ext;
   };
 
-  function download(blob, name) {
-    var url = URL.createObjectURL(blob);
-    var a = el('a', { href: url, download: name }, document.body);
-    a.click();
-    setTimeout(function () { URL.revokeObjectURL(url); a.parentNode.removeChild(a); }, 1000);
-  }
-
-  Widget.prototype.exportSvg = function () {
+  Base.exportSvg = function () {
     download(new Blob([this.svgString()], { type: 'image/svg+xml' }), this.fileName('svg'));
   };
 
-  // ------------------------------------------------------------------ Excel export
-  // Uses the XLSX library (xlsx-js-style) loaded from the widget resources. Exports what is shown
-  // (current filters). Falls back to a CSV of the relations when the library is not available.
-
-  function absUrl(u) {
-    return window.location.protocol + '//' + window.location.host + u;
-  }
-
-  Widget.prototype.shownDocs = function () {
+  Base.shownDocs = function () {
     return this.lay.linked.concat(this.lay.isolated).slice().sort(function (a, b) {
       return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
     });
   };
 
-  Widget.prototype.sortedEdges = function () {
+  Base.sortedEdges = function () {
     var by = this.model.byKey;
     return this.edges.slice().sort(function (a, b) {
       var oa = by[a.o], ob = by[b.o], ca = by[a.c], cb = by[b.c];
@@ -713,46 +681,10 @@
     });
   };
 
-  Widget.prototype.relationRows = function () {
-    var self = this;
-    var rows = [['Original space', 'Original document', 'Original title', 'Relation',
-      'Copy / branch / derived space', 'Copy / branch / derived document', 'Copy / branch / derived title',
-      'Copy items', 'Branch items', 'Derived items', 'Branch metadata', 'Derived metadata', 'Indirect',
-      'Linked items', 'Work items in copy', 'Coverage of copy (%)']];
-    this.sortedEdges().forEach(function (e) {
-      var o = self.model.byKey[e.o];
-      var c = self.model.byKey[e.c];
-      var pc = pct(e.ci, c.items);
-      rows.push([o.space, o.id, o.title, kindsLabel(e), c.space, c.id, c.title,
-        e.kinds.copy, e.kinds.branch, e.kinds.derived, e.meta.branch ? 'yes' : 'no', e.meta.derived ? 'yes' : 'no',
-        e.indirect ? 'yes' : 'no', e.total, c.items < 0 ? '' : c.items, pc === null ? '' : pc]);
-    });
-    return rows;
-  };
-
-  Widget.prototype.documentRows = function () {
-    var deg = {};
-    this.edges.forEach(function (e) { deg[e.o] = (deg[e.o] || 0) + 1; deg[e.c] = (deg[e.c] || 0) + 1; });
-    var rows = [['Space', 'Document', 'Title', 'Type', 'Status', 'Author', 'Created', 'Updated', 'Work items', 'Relations shown']];
-    this.shownDocs().forEach(function (n) {
-      rows.push([n.space, n.id, n.title, n.type, n.status, n.author, n.created, n.updated,
-        n.items < 0 ? '' : n.items, deg[n.key] || 0]);
-    });
-    return rows;
-  };
-
-  Widget.prototype.itemRows = function () {
-    var self = this;
-    var rows = [['Original document', 'Copy / branch / derived document', 'Item in copy', 'Original item', 'Relation']];
-    this.sortedEdges().forEach(function (e) {
-      var o = self.model.byKey[e.o];
-      var c = self.model.byKey[e.c];
-      e.samples.forEach(function (sm) {
-        rows.push([o.space + ' / ' + o.id, c.space + ' / ' + c.id, sm.c, sm.o, sm.k]);
-      });
-    });
-    return rows;
-  };
+  // ------------------------------------------------------------------ Excel export
+  // Uses the XLSX library (xlsx-js-style) loaded from the widget resources with loadWidgetJs.
+  // sheets: [{ name, rows (first row = header), widths, links: [{ r, c, url }] }].
+  // Falls back to a CSV of the first sheet when the library is not available.
 
   function sheetFromRows(X, rows, widths, links) {
     var ws = X.utils.aoa_to_sheet(rows);
@@ -772,59 +704,40 @@
     return ws;
   }
 
-  Widget.prototype.exportExcel = function () {
-    var X = window.XLSX;
-    if (!X || !X.utils || !X.write) { this.exportCsv(); return; }
-    var self = this;
-    var by = this.model.byKey;
-    var rel = this.relationRows();
-    var relLinks = [];
-    this.sortedEdges().forEach(function (e, i) {
-      relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, by[e.o])) });
-      relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, by[e.c])) });
-    });
-    var docs = this.documentRows();
-    var docLinks = this.shownDocs().map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
-    var items = this.itemRows();
-    var itemLinks = [];
-    for (var r = 1; r < items.length; r++) {
-      itemLinks.push({ r: r, c: 2, url: absUrl(itemUrl(this.project, items[r][2])) });
-      itemLinks.push({ r: r, c: 3, url: absUrl(itemUrl(this.project, items[r][3])) });
-    }
-    var wb = X.utils.book_new();
-    X.utils.book_append_sheet(wb, sheetFromRows(X, rel, [14, 28, 34, 22, 14, 28, 34, 10, 10, 10, 10, 10, 9, 11, 12, 12], relLinks), 'Relations');
-    X.utils.book_append_sheet(wb, sheetFromRows(X, docs, [14, 28, 40, 14, 14, 20, 18, 18, 11, 11], docLinks), 'Documents');
-    X.utils.book_append_sheet(wb, sheetFromRows(X, items, [34, 34, 14, 14, 10], itemLinks), 'Linked items (max 30 per pair)');
-    var data = X.write(wb, { bookType: 'xlsx', type: 'array' });
-    download(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), this.fileName('xlsx'));
-  };
-
   function csvCell(v) {
     var t = v === null || v === undefined ? '' : String(v);
     return /[",;]|[^ -~]/.test(t) ? '"' + t.split('"').join('""') + '"' : t;
   }
 
-  Widget.prototype.exportCsv = function () {
+  Base.exportWorkbook = function (sheets) {
+    var X = window.XLSX;
+    if (!X || !X.utils || !X.write) { this.exportCsv(sheets[0].rows, sheets[0].what); return; }
+    var wb = X.utils.book_new();
+    sheets.forEach(function (sh) {
+      X.utils.book_append_sheet(wb, sheetFromRows(X, sh.rows, sh.widths, sh.links), sh.name);
+    });
+    var data = X.write(wb, { bookType: 'xlsx', type: 'array' });
+    download(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), this.fileName('xlsx'));
+  };
+
+  Base.exportCsv = function (rows, what) {
     var nl = String.fromCharCode(13, 10);
-    var lines = this.relationRows().map(function (row) { return row.map(csvCell).join(','); });
+    var lines = rows.map(function (row) { return row.map(csvCell).join(','); });
     download(new Blob([String.fromCharCode(65279) + lines.join(nl) + nl], { type: 'text/csv' }), this.fileName('csv'));
-    this.status.textContent += ' ' + DASH + ' Excel library not loaded: relations exported as CSV.';
+    this.status.textContent += ' ' + DASH + ' Excel library not loaded: ' + (what || 'data') + ' exported as CSV.';
   };
 
   // ------------------------------------------------------------------ start
 
-  function start() {
-    var roots = document.querySelectorAll('.bw-root');
+  function startWidgets(rootClass, Ctor, name) {
+    var roots = document.querySelectorAll('.' + rootClass);
     for (var i = 0; i < roots.length; i++) {
       if (roots[i].getAttribute('data-bw-ready') === '1') { continue; }
       roots[i].setAttribute('data-bw-ready', '1');
       try {
-        new Widget(roots[i]);
+        new Ctor(roots[i]);
       } catch (err) {
-        roots[i].appendChild(el('div', { 'class': 'bw-error' }, null, 'Branches widget error: ' + err));
+        roots[i].appendChild(el('div', { 'class': 'bw-error' }, null, name + ' widget error: ' + err));
       }
     }
   }
-
-  start();
-})();

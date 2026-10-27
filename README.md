@@ -1,63 +1,64 @@
-# Polarion Branches Widget
+# Polarion document widgets
 
-A Siemens Polarion **LiveReport widget** that shows the documents of a project and how they relate to
-each other — which documents are **branches** of which, and which are **copies** (reuse) of which.
+Siemens Polarion **LiveReport widgets** that show the LiveDocs of a project as a graph and the relations
+between them, deduced from work item links. They share one client core, one build and one test setup.
 
-> Status: **v0.1.0 — first implementation, to be validated on Polarion 2512.** Spike complete
-> (`tests/v0.1.x/spike-tests.md`). Install: [`docs/install.md`](docs/install.md). Requirements: [`SPECIFICATION.md`](SPECIFICATION.md).
+| Widget | What it shows | Status | Docs |
+|---|---|---|---|
+| **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | 0.2.x, in use on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
+| **docCoverage** — Document Coverage | For selected documents and link roles, which document covers which, with link counts, coverage % and uncovered items | planned | (to come) |
 
-![Widget preview rendered from the VforIA test set (mock data)](docs/preview-graph.png)
+![docBranches preview rendered from the VforIA test set (mock data)](docs/docBranches/preview-graph.png)
 
-## Why
+## Common features
 
-Polarion tracks branching and copying, but there is no single at-a-glance view of the document family
-tree of a project. This widget aims to provide one, embeddable in any LiveReport page.
-
-## How it is expected to work
-
-Relations are **deduced from work item links** between documents' work items (plus document-level
-"branched from" metadata where available):
-
-1. Collect the documents in scope (project, space, or a selection).
-2. Read the links between their work items using configurable link roles.
-3. Aggregate item-level links into document-to-document relations (e.g. "≥ N items of B are linked to A").
-4. Classify each relation (copy / branch / derived) and render a graph or tree.
+- Interactive SVG graph (layered layout, zoom, highlight, tooltips, details with the linked work items).
+- Table view, SVG download, Excel workbook download (CSV fallback).
+- Static graph + table in PDF export and print (no JavaScript).
+- Viewer toggles (relation kinds, item counts, extra document fields), defaults set as widget parameters.
+- Velocity 1.4-safe templates, SQL scoped to one project, `isUnresolvable()` guard on every referenced object.
 
 ## Build and test
 
 ```
-python3 tools/build-widget.py   # inline the JS, check with Velocity 1.4, write widget/dist/docBranches.zip
-tools/test-widget.sh            # build + render with Velocity 1.4 on mock data + Chromium screenshots
-tools/vcheck.sh                 # parse every .vm file with Velocity 1.4
+python3 tools/build-widget.py                 # all widgets: inline shared code, check with Velocity 1.4, write the zips
+python3 tools/build-widget.py --widget docBranches
+tools/test-widget.sh [widget|all] [outDir]    # build + Velocity 1.4 render on mock data + Chromium checks
+tools/vcheck.sh                               # parse every .vm file with Velocity 1.4
 ```
 
 Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the browser check).
 
 ## Continuous integration and releases
 
-- **CI** (`.github/workflows/ci.yml`): on every push and pull request, runs `tools/test-widget.sh`, checks that the
-  committed `widget/dist` matches the sources, and keeps the zip and screenshots as a build artifact.
-- **Release** (`.github/workflows/release.yml`): versions are **N.N.N** (semantic versioning: major = incompatible
-  change of parameters or behaviour, minor = new feature, patch = fix). To release:
-  1. update `VERSION` (e.g. `0.2.0`) in the change that goes to `main`;
-  2. on GitHub, **Releases → Draft a new release**, tag `v0.2.0` on `main`, **Publish**;
-  3. the workflow tests the widget, stamps the version and attaches **`docBranches-0.2.0.zip`** to the release.
-     Upload that zip in Polarion (see [`docs/install.md`](docs/install.md)).
+- **CI** (`.github/workflows/ci.yml`): on every push and pull request, builds and tests every widget, checks that the
+  committed `widgets/*/dist` match the sources, and keeps the zips and screenshots as a build artifact.
+- **Release** (`.github/workflows/release.yml`): each widget has its own version in `widgets/<widget>/VERSION`
+  (**N.N.N**, semantic versioning: major = incompatible change of parameters or behaviour, minor = new feature,
+  patch = fix). To release a widget:
+  1. update `widgets/<widget>/VERSION` (e.g. `0.2.1`) in the change that goes to `main`;
+  2. on GitHub, **Releases → Draft a new release**, tag **`<widget>-vN.N.N`** (e.g. `docBranches-v0.2.1`) on `main`, **Publish**;
+  3. the workflow tests that widget, stamps the version and attaches **`<widget>-N.N.N.zip`** to the release.
+     Upload that zip in Polarion (see the widget's install guide).
 
-  A tag that is not `N.N.N`/`vN.N.N` fails the workflow. The workflow can also be re-run by hand
-  (*Actions → Release → Run workflow*) with an existing tag.
+  A tag that is not `<widget>-vN.N.N` fails the workflow. The workflow can also be re-run by hand
+  (*Actions → Release → Run workflow*) with an existing tag. Releases up to `v0.2.0` (tags `vN.N.N`) are docBranches
+  releases made before the repository held several widgets.
 
 ## Repository contents
 
-| File | Purpose |
+| Path | Purpose |
 |---|---|
-| `SPECIFICATION.md` | Requirements, decisions and open checks |
-| `widget/src/` | Widget sources: `render.vm`, `parameters.vm`, `branches-graph.js` (inlined at build) |
-| `widget/src/resources/` | Third-party library for the Excel export: `xlsx.js` = `dist/xlsx.bundle.js` of [xlsx-js-style](https://github.com/gitbrent/xlsx-js-style) 1.2.0 (Apache-2.0, `LICENSE` next to it) |
-| `widget/dist/docBranches.zip` | Upload package (generated, committed for convenience) |
-| `docs/install.md` | Install and configuration guide |
-| `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vtest/` | Build, Velocity 1.4 harness with mock Polarion objects, browser check |
-| `tests/v0.1.x/` | Spike of release 0.1.x, kept for reference: test plan with the findings, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
+| `widgets/<widget>/src/` | Widget sources: `render.vm` (markers `## BW_SHARED <file>` and `## BW_INLINE_JS`), `parameters.vm`, `graph.js`, … |
+| `widgets/<widget>/dist/` | Generated by the build: widget folder and upload zip (committed for convenience) |
+| `widgets/<widget>/VERSION`, `SPECIFICATION.md` | Version, requirements, decisions and open checks of the widget |
+| `shared/js/core.js` | Client core: layout, SVG drawing, toolbar parts, tooltip, zoom, table, SVG/Excel/CSV export |
+| `shared/vm/` | Velocity snippets inlined at build: CSS, common parameters, lists/project/`bwKey`, document collection |
+| `shared/resources/` | Third-party library for the Excel export: `xlsx.js` = `dist/xlsx.bundle.js` of [xlsx-js-style](https://github.com/gitbrent/xlsx-js-style) 1.2.0 (Apache-2.0, `LICENSE` next to it) |
+| `docs/<widget>/` | Install and configuration guide, previews |
+| `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vcheck.sh` | Build, tests, Velocity 1.4 parse check |
+| `tools/vtest/<widget>/` | Velocity 1.4 harness with mock Polarion objects (`WidgetHarness.java`) and browser check (`browser-check.js`) |
+| `tests/v0.1.x/` | Spike of docBranches 0.1.x, kept for reference: test plan with the findings, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
 | `CLAUDE.md` | Instructions for Claude Code working in this repo |
 | `Polarion_Development_Guide.md` | Polarion development best practices (baseline: Polarion 2512) |
 

@@ -1,6 +1,7 @@
-# Package the widget for deployment when a GitHub release is published.
-# The release tag must be N.N.N or vN.N.N (e.g. v0.2.0). The version is stamped into the widget,
-# the tests run, and docBranches-N.N.N.zip is attached to the release.
+# Package a widget for deployment when a GitHub release is published.
+# The release tag names the widget and the version: <widget>-vN.N.N (e.g. docCoverage-v0.1.0,
+# docBranches-v0.2.1). Releases up to v0.2.0 used plain vN.N.N tags (docBranches only, old layout).
+# The version is stamped into the widget, the tests run, and <widget>-N.N.N.zip is attached to the release.
 name: Release
 
 on:
@@ -9,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag to (re)package, e.g. v0.1.0'
+        description: 'Existing release tag to (re)package, e.g. docBranches-v0.2.1'
         required: true
 
 permissions:
@@ -21,24 +22,31 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
-      - name: Check the version number
+      - name: Check the widget and version number
         id: version
         run: |
-          version="${TAG#v}"
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Release tag '$TAG' is not N.N.N or vN.N.N"
+          if [[ "$TAG" =~ ^([A-Za-z][A-Za-z0-9]*)-v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            widget="${BASH_REMATCH[1]}"; version="${BASH_REMATCH[2]}"
+          else
+            echo "::error::Release tag '$TAG' is not <widget>-vN.N.N (e.g. docBranches-v0.2.1)"
             exit 1
           fi
+          echo "widget=$widget" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
 
-      - name: Warn if VERSION differs from the tag
+      - name: Check the widget exists and warn if its VERSION differs from the tag
         run: |
-          if [ "$(tr -d '[:space:]' < VERSION)" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::warning::VERSION file contains '$(cat VERSION)' but the release is ${{ steps.version.outputs.version }}. The package uses the release version; update VERSION in the next change."
+          f="widgets/${{ steps.version.outputs.widget }}/VERSION"
+          if [ ! -f "$f" ]; then
+            echo "::error::No widget '${{ steps.version.outputs.widget }}' in widgets/ at tag $TAG"
+            exit 1
+          fi
+          if [ "$(tr -d '[:space:]' < "$f")" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::warning::$f contains '$(cat "$f")' but the release is ${{ steps.version.outputs.version }}. The package uses the release version; update VERSION in the next change."
           fi
 
       - uses: actions/setup-java@v4
@@ -66,15 +74,16 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Test the widget
-        run: tools/test-widget.sh "$RUNNER_TEMP/widget-test"
+        run: tools/test-widget.sh "${{ steps.version.outputs.widget }}" "$RUNNER_TEMP/widget-test"
 
       - name: Build the release package
         run: |
-          python3 tools/build-widget.py --version "${{ steps.version.outputs.version }}"
-          cp widget/dist/docBranches.zip "docBranches-${{ steps.version.outputs.version }}.zip"
-          unzip -l "docBranches-${{ steps.version.outputs.version }}.zip"
+          w="${{ steps.version.outputs.widget }}"; v="${{ steps.version.outputs.version }}"
+          python3 tools/build-widget.py --widget "$w" --version "$v"
+          cp "widgets/$w/dist/$w.zip" "$w-$v.zip"
+          unzip -l "$w-$v.zip"
 
       - name: Attach the package to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" "docBranches-${{ steps.version.outputs.version }}.zip" --clobber
+        run: gh release upload "$TAG" "${{ steps.version.outputs.widget }}-${{ steps.version.outputs.version }}.zip" --clobber

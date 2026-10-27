@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Parse Velocity templates with Velocity 1.4, which reproduces the parser errors of Polarion 2512.
-# Usage: tools/vcheck.sh [files...]   (default: every .vm file under tests/ and widget/)
+# Usage: tools/vcheck.sh [files...]   (default: every .vm file under tests/, widgets/ and shared/)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 lib="$here/.lib"
@@ -14,7 +14,7 @@ cp="$lib/velocity-1.4.jar:$lib/commons-collections-3.2.2.jar:$lib/commons-lang-2
 [ -f "$lib/VCheck.class" ] || javac -nowarn -cp "$cp" -d "$lib" "$here/VCheck.java"
 if [ $# -eq 0 ]; then
   root="$(dirname "$here")"
-  mapfile -t files < <(find "$root/tests" "$root/widget" -name '*.vm' 2>/dev/null | sort)
+  mapfile -t files < <(find "$root/tests" "$root/widgets" "$root/shared" -name '*.vm' 2>/dev/null | sort)
   set -- "${files[@]}"
 fi
 java -cp "$lib:$cp" VCheck "$@" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS'
