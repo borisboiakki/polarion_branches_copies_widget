@@ -106,6 +106,9 @@ Verified through web search (2026-10-27):
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.
 - Whether the Widget SDK extension point is suitable for our needs vs. Velocity.
+- Whether a Velocity widget can have its own icon in the widget list. The Widget SDK guide (2606, same as 2512 per the PO)
+  documents only `label`, `tags`, `isRestricted` in `widget.properties` and no icon file. Icons exist for the documentation
+  only (`docs/<w>/icon.svg`); the PO is looking for a widget example before anything is added to the packages.
 
 Never present the unverified items as fact in code comments or docs.
 

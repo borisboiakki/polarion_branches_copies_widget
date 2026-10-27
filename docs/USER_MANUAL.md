@@ -4,8 +4,8 @@ This manual is for Polarion users who want to show these widgets on a LiveReport
 
 | Widget | Answers the question |
 |---|---|
-| **Document Branches and Copies** | Which LiveDocs of the project are copies, branches or derived documents of which? |
-| **Document Coverage** | For the documents I choose and the link roles I choose (e.g. *satisfies*), which document covers which, how much (%), and which items are not covered? |
+| <img src="docBranches/icon.svg" width="32" alt=""> **Document Branches and Copies** | Which LiveDocs of the project are copies, branches or derived documents of which? |
+| <img src="docCoverage/icon.svg" width="32" alt=""> **Document Coverage** | For the documents I choose and the link roles I choose (e.g. *satisfies*), which document covers which, how much (%), and which items are not covered? |
 
 Both widgets work on the documents of the **current project**. They look the same and have the same toolbar.
 
@@ -50,7 +50,7 @@ Settings available in both places are marked "Live: yes" in the tables below.
 
 ---
 
-## 4. Document Branches and Copies
+## 4. <img src="docBranches/icon.svg" width="28" alt=""> Document Branches and Copies
 
 ![Document Branches and Copies](docBranches/preview-graph.png)
 
@@ -87,7 +87,7 @@ The number on a line is the number of work items linked between the two document
 
 ---
 
-## 5. Document Coverage
+## 5. <img src="docCoverage/icon.svg" width="28" alt=""> Document Coverage
 
 ![Document Coverage](docCoverage/preview-graph.png)
 

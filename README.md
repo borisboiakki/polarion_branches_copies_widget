@@ -5,8 +5,8 @@ between them, deduced from work item links. They share one client core, one buil
 
 | Widget | What it shows | Status | Docs |
 |---|---|---|---|
-| **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.3.0** released, validated on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
-| **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.1.0** released, validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
+| <img src="docs/docBranches/icon.svg" width="32" alt=""> **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.3.0** released, validated on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
+| <img src="docs/docCoverage/icon.svg" width="32" alt=""> **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.1.0** released, validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
 
 **Users: see the [user manual](docs/USER_MANUAL.md)** (deployment, adding the widgets to a page, parameters, toolbar).
 
@@ -73,7 +73,7 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 | `shared/resources/` | Third-party library for the Excel export: `xlsx.js` = `dist/xlsx.bundle.js` of [xlsx-js-style](https://github.com/gitbrent/xlsx-js-style) 1.2.0 (Apache-2.0, `LICENSE` next to it) |
 | `docs/USER_MANUAL.md` | User manual of both widgets |
 | `docs/ARCHITECTURE.md` | Architecture of the widgets and how to extend them |
-| `docs/<widget>/` | Install and configuration guide, previews |
+| `docs/<widget>/` | Install and configuration guide, previews, icon (`icon.svg`, documentation only: the Widget SDK guide documents no icon for Velocity widgets) |
 | `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vcheck.sh` | Build, tests, Velocity 1.4 parse check |
 | `tools/vtest/<widget>/` | Velocity 1.4 harness with mock Polarion objects (`WidgetHarness.java`) and browser check (`browser-check.js`) |
 | `tests/v0.1.x/` | Spike of docBranches 0.1.x, kept for reference: test plan with the findings, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
