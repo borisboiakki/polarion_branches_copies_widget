@@ -70,11 +70,17 @@ Verified through web search (2026-10-27):
   to A, so raw link counts contain transitive edges (see SPEC §7 "Inherited links").
 - **Verified by spike V1 on 2512**: widget context classes, `$date.systemTime`, `isPdf()` true in PDF export,
   reflection method listing blocked.
+- **Verified by spike V1–V7 on 2512 (`EOLE_AI_MCP_TESTS`, 120 docs)**:
+  - `$parameters.<customEnum>.singleValue` returns the option id as a **String**; `.value()`/`.value` work for strings/integers.
+  - `$trackerService.getDataService().sqlSearch(sql)` returns `IModule`/`IWorkItem` objects fast; `DISTINCT` and
+    `GROUP BY … HAVING` accepted. Data approach = SPEC §9 R1 option (b) (SQL link-source items + Velocity scan): 22 ms + 84 ms.
+  - `IModule.getValue("branchedFrom")` returns the source module object (revision-pinned).
+  - `#include`/`#parse` **cannot** load files from the widget's `resources/` folder → inline JS/CSS in `render.vm`.
+  - Long arithmetic does not compute (`$t1 - $t0` on `$date.systemTime` is empty), as expected for Velocity 1.4.
+  - Inline JS runs in the browser view (SVG export downloaded); no JS in PDF export; static inline SVG renders in PDF.
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.
-- Velocity syntax/macro for loading `resources/` JS/CSS in a widget (Widget SDK mentions such macros).
-- Whether `searchBySql` can return aggregate rows (it resolves objects by `C_URI`). See SPEC §9 R1.
 - Whether the Widget SDK extension point is suitable for our needs vs. Velocity.
 
 Never present the unverified items as fact in code comments or docs.
@@ -107,7 +113,7 @@ spike/bwSpike/                 diagnostic test widget (spike/bwSpike.zip = uploa
   - no backslashes in Velocity string literals (`"[a-z\-]"` → lexical error); put `-` last in a regex class
   - no directive names in plain text/HTML/JS (e.g. writing `#include` in a sentence); hex colours are fine;
     avoid `$` in inline JS
-  - arithmetic is reliable on Integer only (Long results, e.g. `$date.systemTime` differences, may not compute)
+  - arithmetic is reliable on Integer only (verified: Long differences such as `$date.systemTime` ones do not compute)
 - **Always run `tools/vcheck.sh` before committing a `.vm` change.** It parses every template with Velocity 1.4
   (needs Java; it downloads the jars to `tools/.lib/` on first use).
 - After editing `spike/bwSpike/`, rebuild `spike/bwSpike.zip` (folder at zip root, Deflated).

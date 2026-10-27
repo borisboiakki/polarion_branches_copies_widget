@@ -579,8 +579,10 @@ Always use the `([...])` array delimiters.
 
 Also avoid, as a precaution (consistent with Velocity 1.4, not individually confirmed on the instance):
 - `$` or `${…}` in inline JavaScript (template literals, jQuery `$`): Velocity treats them as references.
-- Arithmetic on `Long` values (e.g. differences of `$date.systemTime`): Velocity 1.4 arithmetic is
-  defined for `Integer`. Print the raw values as a fallback.
+
+Also verified on 2512:
+- Arithmetic on `Long` values does not compute: `#set($d = $t1 - $t0)` with `$date.systemTime` values leaves `$d` unset. Velocity 1.4 arithmetic is defined for `Integer`. Print the raw values, or compute in JavaScript.
+- `#include("resources/x")` and `#parse("resources/x.vm")` fail with *"Unable to find resource"*: Velocity cannot load files from an uploaded widget's `resources/` folder. Inline the JS/CSS in `render.vm` (Velocity-safe) or load them by URL from the browser.
 
 Hex colour codes (`#c62828`) are safe: hex digits cannot spell a directive name.
 

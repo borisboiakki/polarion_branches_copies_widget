@@ -112,8 +112,9 @@ is in the configured role set R(kind).
   **no** metadata and is detected only through `duplicates` links.
 - **Inherited links (verified on 2512, spike R2.8)**: copying a copy keeps the links of the copied items. The items of
   E (copy of B, which is a copy of A) link with `duplicates` to B **and** to A. Raw counting therefore gives an extra
-  edge A → E. Rule (**decided**): **transitive reduction**. Drop an edge S → T of kind k when there is a
-  document M with S → M and M → T (same kind) and the S → T links are inherited through M. The direct parent is the
+  edge A → E. Rule (**decided**): **transitive reduction**. Drop an edge S → T when there is a document M
+  with S → M and M → T, **whatever the kinds** (spike V4: a branch of a copy also inherits the copy's
+  `duplicates` links to the copy's own source), and the S → T links are inherited through M. The direct parent is the
   closest source. A viewer toggle "show indirect relations" shows them again as faint dashed lines. Supporting signal:
   the inherited link keeps its older link revision (84994 vs 85000).
 - One pair may have several kinds. Draw **one line per pair** labelled with all of its kinds. Style follows the strongest kind: **branch > derived > copy** (decided). The label always lists every kind.
@@ -127,16 +128,16 @@ context (F15), non-LiveDoc documents.
 
 | # | Risk | Mitigation |
 |---|---|---|
-| R1 | `$transaction.objects.searchBySql` resolves **objects** (by `C_URI`), so it cannot return aggregate rows (doc pair + count) | Spike. Options: (a) one SQL per document returning related `MODULE` URIs, with counts via count queries (≤100 × kinds), (b) SQL returning link-source work item URIs then grouping in Velocity by `getModule`, (c) a DB API available to widgets returning raw rows |
+| R1 ✅ (2512) | `$transaction.objects.searchBySql` resolves **objects** (by `C_URI`), so it cannot return aggregate rows (doc pair + count) | Spike. Options: (a) one SQL per document returning related `MODULE` URIs, with counts via count queries (≤100 × kinds), (b) SQL returning link-source work item URIs then grouping in Velocity by `getModule`, (c) a DB API available to widgets returning raw rows. **Decided: (b)**. Spike V4 on 120 documents: SQL 22 ms + scan of 1631 items / 2597 links in 84 ms |
 | R2 ✅ (2512) | Exact `MODULE` column names (`FK_URI_BRANCHEDFROM`, `FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`) found in the published DB schema docs, not checked on 2512/2606 | Check the SDK DB schema docs on the target server, tracker `SQL:` queries and REST document resources (spike A1–A3) |
-| R3 | Exact Velocity syntax to load widget `resources/` JS/CSS (SDK macro) | Check Widget SDK PDF on the target server. Fallback: inline the JS in `render.vm` |
+| R3 ⚠️ (2512) | Exact Velocity syntax to load widget `resources/` JS/CSS (SDK macro) | Spike V5a/V5b: `#include`/`#parse` cannot load widget resources. V5c (URL) pending. **Plan: inline the JS/CSS in `render.vm`**, written Velocity-safe (no `$`, no directive names), unless V5c finds a working URL |
 | R4 ✅ (2512) | Link direction for `duplicates` / `branched_from` / `derived_from` | Inspect `STRUCT_WORKITEM_LINKEDWORKITEMS` on sample documents |
 | R5 ✅ tracker (2512) | SQL firewall (`invalidCommands`) may block `GROUP BY`/`COUNT`/`DISTINCT` variants | `DISTINCT` and `GROUP BY … HAVING COUNT(*)` accepted in tracker SQL (spike A2 Q5); widget-side check in V3a/V3b |
 | R6 | 2606 changes unknown | Re-test the widget on 2606 once available |
 
 ## 10. Open questions
 
-1. Spike results: Part A done. Waiting on widget tests V2–V7 (`docs/spike-tests.md`).
+1. V5c / V6: browser screenshots (not PDF) to confirm the resource URL test and PNG export.
 
 ## 11. Decision log
 
@@ -162,3 +163,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Spike A3 R1: REST document attributes do not show branched/derived-from (only `derivedFromLinkRole`/`derivedFields` on the derived doc); relationships not inspected. Not needed: the widget uses SQL. R2 optional | `docs/R1_test_results.txt` |
 | 2026-10-27 | Spike A3 R2: REST confirms roles/direction; copy of a copy keeps the inherited `duplicates` link to the original (E→A besides E→B). Part A complete | `docs/R2_test_results.txt` |
 | 2026-10-27 | Indirect relations from inherited links are hidden by default (transitive reduction), with a viewer toggle to show them | PO |
+| 2026-10-27 | Spike Part B (V1–V7) on `EOLE_AI_MCP_TESTS`: data approach (b) validated and fast; `#include`/`#parse` of resources fail → JS/CSS inlined; inline JS + SVG export work in the browser; static SVG renders in PDF. Transitive reduction made kind-agnostic. Pending: V5c/V6 browser screenshots | `docs/V*_*.pdf` |

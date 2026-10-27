@@ -247,13 +247,25 @@ If any test shows a Velocity error, copy the message from the widget, or from th
 | V1 | 2026-10-27 | ✅ Runs. Polarion ALM 2512. `$widgetContext` = `RichPageWidgetRenderingContextImpl`, `$transaction` = `ReadOnlyTransactionImpl`, `$transaction.objects()` = `ProxyModelObjects`; `$trackerService`/`getDataService()` are proxies. `$date.systemTime` works. Reflection method listing is blocked (empty), as the guide says. In PDF export `isPdf` = true. `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
 | V1 (2nd project) | 2026-10-27 | ✅ Same environment on the larger project `EOLE_AI_MCP_TESTS` (location `/sandbox/SBE/EOLE_AI_MCP_TESTS`). ❌ **Spike bug**: the instance meant for V2 also ran V1. The "Test to run" parameter was read as `.singleValue.id` (property style), which does not resolve on 2512, so every instance fell back to `env`; the other parameters fell back to their defaults the same way. Fixed in the spike: every accessor form is tried (`singleValue()`/`id()`/`value()`), and V1 now prints the parameter values as read. **Re-upload `spike/bwSpike.zip` before running V2–V7.** Second try: V1 showed `option: docs / class: java.lang.String`. On 2512, `$parameters.<customEnum>.singleValue` returns the option **id as a String**, so `.id` on it is empty. Fixed by using the String itself. |
 
+### Part B results on `EOLE_AI_MCP_TESTS` (120 documents), 2026-10-27
+
+Timings are computed from the printed start/end stamps (the widget could not subtract them, see V-notes).
+The PO reports that everything was smooth and fast.
+
+| Test | Result |
+|---|---|
+| V1 | ✅ Parameters now read correctly (`singleValue` = String option id). `isPdf` = true in PDF export. `docs/V1_*.pdf` |
+| V2 | ✅ Both APIs return the 120 documents. Rendering API `searchBySql` → `ProxyModelObjectsSqlSearch` of `ProxyDocument` (≈96 ms incl. iteration). Open API `IDataService.sqlSearch` → `WeakPObjectList` of modules (≈2 ms). All `IModule` getters work (`getId`, `getModuleFolder`, `getTitle`, `getType().getId()`, `getStatus().getId()`, `getAuthor().getId()`, `getCreated`, `getUpdated`). `getValue("branchedFrom")` returns the **source `Module` object**, pinned to a revision (`…11 EOLE Customer Requirements#A EOLE SSS%85033`): filled for the 6 `*_branched_noverwrite`/`*_branched_2` documents, empty elsewhere. The derived documents (`…der`) were past the 50 displayed rows, so `getValue("derivedFrom")` was not seen in the widget (SQL Q4 confirms the column). Prototype key names listed (incl. `branchedFrom`, `derivedFrom`, `derivedFromLinkRole`, `variant`, `moduleFolder`). `docs/V2_*.pdf` |
+| V3a / V3b | ✅ `DISTINCT` and `GROUP BY … HAVING COUNT(DISTINCT …)` accepted by `sqlSearch`. Both return the same 21 documents (≈24 / 21 ms) |
+| V4 | ✅ **Data approach validated.** SQL returns 1631 link-source items (≈22 ms). The Velocity scan of their links gives 2597 cross-document links and 31 (document, role, document) pairs in ≈84 ms. Inherited links appear as expected, e.g. `B EOLE Capella Model` → `A EOLE Capella Model` (360) **and** → `EOLE Capella Model` (360). New case: a branch inherits its source's copy links too (`A EOLE Capella Model_branched_over`: `branched_from` → `A EOLE Capella Model` 342 **and** `duplicates` → `EOLE Capella Model` 342), so transitive reduction must ignore the kind. `docs/V4_*.pdf` |
+| V5a / V5b | ❌ `#include("resources/spike.txt")` / `#parse("resources/spike.vm")`: "Unable to find resource". Velocity cannot load files from the widget's `resources/` folder. `docs/V5A.png`, `docs/V5B.png` |
+| V5c | ⏳ Not conclusive: the PDF export does not run JavaScript ("running…"). **Needs a browser screenshot** |
+| V6 | ⚠️ The PDF shows "JS NOT executed" (expected: no JS in PDF). But `docs/V6_export_bw-spike.svg` was downloaded from the browser, so **inline JS runs and SVG export works**. PNG export not confirmed. **Needs a browser screenshot** of the OK/FAIL lines |
+| V7 | ✅ Static inline SVG (boxes, dashed line, arrow, label) and the HTML fallback both render in the PDF export. `docs/V7_*.pdf` |
+
 ## Results template (copy into your answer)
 
 ```
-V2 (counts, timings, working getters, field names, branchedFrom/derivedFrom values):
-V3a / V3b:
-V4 (VforIA + large project: SQL ms, scan ms, items, pairs):
-V5a / V5b / V5c:
-V6:
-V7:
+V5c (browser screenshot, not PDF):
+V6 (browser screenshot, not PDF; did "Download PNG" work?):
 ```
