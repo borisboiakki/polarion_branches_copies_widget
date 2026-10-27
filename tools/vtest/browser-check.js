@@ -26,9 +26,10 @@ const { chromium } = require('playwright');
   await p.click('button:has-text("Graph")');
   const [d1] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("SVG")')]);
   await d1.saveAs(dir + '/export.svg');
-  const [d2] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("PNG")')]);
-  await d2.saveAs(dir + '/export.png');
-  console.log('downloads:', d1.suggestedFilename(), d2.suggestedFilename());
+  const svgText = require('fs').readFileSync(dir + '/export.svg', 'utf8');
+  if (!svgText.startsWith('<svg') || svgText.indexOf('SRS_Test') < 0) { throw new Error('SVG export is empty or incomplete'); }
+  if (await p.locator('button:has-text("PNG")').count() !== 0) { throw new Error('PNG button should not exist'); }
+  console.log('downloads:', d1.suggestedFilename(), '(' + svgText.length + ' chars)');
   await p.goto('file://' + dir + '/pdf.html');
   await p.screenshot({ path: dir + '/shot-pdf.png', fullPage: true });
   console.log('errors:', JSON.stringify(errors));

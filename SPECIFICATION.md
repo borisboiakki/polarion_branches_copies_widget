@@ -53,7 +53,7 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F10b | **Show all documents / only documents with relations**: default set in the widget parameters, and the viewer can switch it in the widget UI (no edit mode needed). A **Refresh** control re-runs the analysis | Must |
 | F10c | **Indirect (inherited) relations hidden by default** (transitive reduction, §7). A viewer toggle "show indirect relations" displays them as faint dashed lines | Must |
 | F11 | Layout: family tree (layered, sources on the left/top) by default; zoom, pan, fit-to-view | Should |
-| F12 | Export the current graph as **SVG and PNG** from the widget UI | Could (a plus) |
+| F12 | Export the current graph as **SVG** from the widget UI. PNG was dropped in 0.1.2: the browser blocks canvas export on Polarion pages (PO test). PDF is covered by F13 | Could (done) |
 | F13 | **PDF/print**: static rendering of the graph (no JS) plus a relations table, so standard Polarion PDF export works | Should |
 | F14 | Tabular view of nodes/edges (also the PDF fallback) | Should |
 | F15 | Baseline/Collection-aware view (relations as of a Collection) | Future |
@@ -79,7 +79,7 @@ branchesWidget/              (folder name = widget id)
 ├── details.vm / description.vm
 ├── render.vm                data collection (SQL) → model → HTML/SVG or static PDF view
 └── resources/
-    ├── branches-graph.js    vanilla JS: layered layout, SVG render, zoom/pan, export SVG/PNG
+    ├── branches-graph.js    vanilla JS: layered layout, SVG render, zoom/pan, export SVG
     └── branches-graph.css
 ```
 
@@ -137,10 +137,9 @@ context (F15), non-LiveDoc documents.
 
 ## 10. Open questions
 
-1. **OPEN CHECK (PO, pending)**: spike V5c and V6 browser screenshots (not PDF). V5c: does any `/repo/...` URL serve
-   widget resources (HTTP 200)? If yes, the JS could move to a separate file. V6: OK/FAIL lines and whether
-   "Download PNG" works (decides if the widget's PNG export works as built). Implementation continues meanwhile
-   (decision 2026-10-27); the widget inlines its JS, so V5c does not block it.
+1. ~~V5c / V6 browser checks~~ **Closed (2026-10-27)**: PNG export is blocked by the browser, so the feature was removed
+   (0.1.2); SVG export works. V5c (loading JS from a URL) is not needed because the JS is inlined.
+
 2. **OPEN CHECKS for widget v0.1.0 on 2512** (only verifiable on the instance; the Velocity 1.4 harness uses mocks):
    a. Viewer permissions (N1): documents are read via `IDataService.sqlSearch` (Open API). Check with a user who
       cannot read some documents; switch to the Rendering API if they appear.
@@ -149,7 +148,7 @@ context (F15), non-LiveDoc documents.
    c. Document link URL `#/project/<id>/wiki/<space>/<document>` opens the document (default space included).
    d. `getType()/getStatus().getName()`, `getAuthor().getName()` and `$date.format` give readable values.
    e. Multi-value parameter "Extra document fields" is read correctly (`values()` type not yet observed on 2512).
-   f. PNG export works in the browser (linked to open check 1 / spike V6).
+   f. ~~PNG export~~ removed in 0.1.2 (blocked by the browser).
    g. (fixed in 0.1.1) A document whose author user was deleted made the widget fail with
       `uri: subterra:data-service:objects:/default/${User}t0025088` (found by the PO on 2512). References to
       unresolvable objects (author, branched/derived source, link target) are now checked with `isUnresolvable()`.
@@ -183,3 +182,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Start widget implementation (v0.1) before V5c/V6 browser results; tracked as open check §10.1 | PO |
 | 2026-10-27 | Widget v0.1.0 implemented (`widget/src`, id `docBranches`): Velocity data collection + inlined JS graph, static PDF view. Tested with Velocity 1.4 on mocks and in Chromium; open checks §10.2 | `tools/test-widget.sh` |
 | 2026-10-27 | Widget 0.1.1: fixes the exception on documents with a deleted author (unresolvable user); all object references are guarded; harness mocks unresolvable objects | `tools/vtest/WidgetHarness.java` |
+| 2026-10-27 | PNG export removed (blocked by the browser on Polarion pages); SVG export kept. Open checks V5c/V6 closed. Widget 0.1.2 | PO |

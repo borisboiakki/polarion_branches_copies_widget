@@ -339,7 +339,6 @@
       self.render(false);
     });
     this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
-    this.button(btns, 'PNG', 'Download the graph as PNG', function () { self.exportPng(); });
     this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
 
     this.legend(el('div', { 'class': 'bw-legend' }, root));
@@ -639,31 +638,6 @@
 
   Widget.prototype.exportSvg = function () {
     download(new Blob([this.svgString()], { type: 'image/svg+xml' }), this.fileName('svg'));
-  };
-
-  Widget.prototype.exportPng = function () {
-    var self = this;
-    var lay = this.lay;
-    var scale = 2;
-    var img = new Image();
-    var url = URL.createObjectURL(new Blob([this.svgString()], { type: 'image/svg+xml' }));
-    img.onload = function () {
-      try {
-        var cv = document.createElement('canvas');
-        cv.width = lay.width * scale;
-        cv.height = lay.height * scale;
-        var ctx = cv.getContext('2d');
-        ctx.fillStyle = 'rgb(255,255,255)';
-        ctx.fillRect(0, 0, cv.width, cv.height);
-        ctx.drawImage(img, 0, 0, cv.width, cv.height);
-        URL.revokeObjectURL(url);
-        cv.toBlob(function (b) { download(b, self.fileName('png')); }, 'image/png');
-      } catch (err) {
-        window.alert('PNG export failed: ' + err + '. Use the SVG export instead.');
-      }
-    };
-    img.onerror = function () { window.alert('PNG export is blocked by the browser. Use the SVG export instead.'); };
-    img.src = url;
   };
 
   // ------------------------------------------------------------------ start
