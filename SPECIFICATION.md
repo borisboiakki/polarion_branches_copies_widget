@@ -50,8 +50,8 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target. **Heading items are excluded** from counts by default (parameter: excluded types, default `heading`) | Should |
 | F9 | Click a node to open the document; click an edge to list the linking work items | Should |
 | F10 | Filters: space, document type, status, text | Should |
-| F10c | **Indirect (inherited) relations hidden by default** (transitive reduction, §7). A viewer toggle "show indirect relations" displays them as faint dashed lines | Must |
 | F10b | **Show all documents / only documents with relations**: default set in the widget parameters, and the viewer can switch it in the widget UI (no edit mode needed). A **Refresh** control re-runs the analysis | Must |
+| F10c | **Indirect (inherited) relations hidden by default** (transitive reduction, §7). A viewer toggle "show indirect relations" displays them as faint dashed lines | Must |
 | F11 | Layout: family tree (layered, sources on the left/top) by default; zoom, pan, fit-to-view | Should |
 | F12 | Export the current graph as **SVG and PNG** from the widget UI | Could (a plus) |
 | F13 | **PDF/print**: static rendering of the graph (no JS) plus a relations table, so standard Polarion PDF export works | Should |
