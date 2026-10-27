@@ -20,7 +20,9 @@ Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks
    match the surface you are touching (see its "How to Use This Guide" table):
    - Widget & parameters: §2 · Velocity: §3 · Lucene: §6 · SQL: §7 · REST: §8 · Java/SDK: §9
    - Checklist before submitting: §13
-2. `widgets/<widget>/SPECIFICATION.md` — requirements and open questions of the widget you touch. If a task conflicts
+2. `docs/ARCHITECTURE.md` — how the widgets are built (Velocity side, page model, shared client core, tests).
+   Keep it up to date when the structure, the page model or the shared hooks change.
+3. `widgets/<widget>/SPECIFICATION.md` — requirements and open questions of the widget you touch. If a task conflicts
    with it, ask; don't silently deviate.
 
 ## Golden rules (from the guide, restated for this project)
@@ -122,6 +124,7 @@ shared/vm/*.vm                 Velocity snippets inlined at BW_SHARED markers: s
                                project), documents (document collection)
 shared/resources/              xlsx.js (third-party xlsx-js-style, copied unchanged; loaded with #loadWidgetJs) + LICENSE
 tools/vtest/<w>/               Velocity 1.4 harness with mock Polarion objects + Chromium check (tools/test-widget.sh <w>)
+docs/ARCHITECTURE.md           architecture of the widgets (keep in line with the code)
 docs/<w>/                      install guide and previews
 tests/v0.1.x/                  spike of release 0.1.x: spike-tests.md (plan + findings), spike-widget/ (diagnostic widget
                                bwSpike/ + bwSpike.zip = upload package; rebuild the zip after edits). Kept for reference;

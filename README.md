@@ -24,6 +24,11 @@ open for both widgets: behaviour for viewers who cannot read some documents (see
 - Viewer toggles (relation kinds or roles, item counts, extra document fields), defaults set as widget parameters.
 - Velocity 1.4-safe templates, SQL scoped to one project, `isUnresolvable()` guard on every referenced object.
 
+## Architecture
+
+How the widgets work (server-side Velocity, page model, shared client core, static PDF view, tests) and where to
+change what: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Build and test
 
 ```
@@ -64,6 +69,7 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 | `shared/js/core.js` | Client core: layout, SVG drawing, toolbar parts, tooltip, zoom, table, SVG/Excel/CSV export |
 | `shared/vm/` | Velocity snippets inlined at build: CSS, common parameters, lists/project/`bwKey`, document collection |
 | `shared/resources/` | Third-party library for the Excel export: `xlsx.js` = `dist/xlsx.bundle.js` of [xlsx-js-style](https://github.com/gitbrent/xlsx-js-style) 1.2.0 (Apache-2.0, `LICENSE` next to it) |
+| `docs/ARCHITECTURE.md` | Architecture of the widgets and how to extend them |
 | `docs/<widget>/` | Install and configuration guide, previews |
 | `tools/build-widget.py`, `tools/test-widget.sh`, `tools/vcheck.sh` | Build, tests, Velocity 1.4 parse check |
 | `tools/vtest/<widget>/` | Velocity 1.4 harness with mock Polarion objects (`WidgetHarness.java`) and browser check (`browser-check.js`) |
