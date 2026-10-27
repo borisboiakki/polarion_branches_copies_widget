@@ -96,6 +96,8 @@ Verified through web search (2026-10-27):
   - `satisfies` links are stored on the downstream item (source) and target the customer specification item.
 - **Verified by the PO on 2512 with docCoverage 0.1.0**: upload (`docCoverage/resources/xlsx.js`), Excel export, document and
   role selectors (4 documents, 2 roles), coverage numbers, arrows/labels, fast rendering with many documents.
+- **Verified by the PO on 2512 with docBranches 0.3.0**: `$factory.enumeration("…", "workitem-link-role").values(["duplicates"])`
+  preselects the default roles in the selector.
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.

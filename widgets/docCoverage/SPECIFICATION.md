@@ -134,3 +134,4 @@ f. Viewer permissions (as docBranches §10.2 a) — still open.
 | 2026-10-27 | Widget 0.1.0 implemented: shared core + `graph.js` (coverage recomputed in the browser from the shown roles and documents, document picker, document details with uncovered items, table, Excel, SVG), static PDF view with coverage tables; harness `tools/vtest/docCoverage/` | `tools/test-widget.sh docCoverage` |
 | 2026-10-27 | PO test of 0.1.0 on 2512: upload, Excel, selectors with 2 roles, coverage 83 %, arrows and labels, speed OK. The "Link roles as text" parameter is removed (selector works); still 0.1.0 (not released) | PO |
 | 2026-10-27 | Author field removed (user feedback); role selector read with the shared macro `bwRoleIds`. Still 0.1.0 (not released) | PO |
+| 2026-10-27 | PO test of 0.1.0 (without author) on 2512: OK. Ready for release | PO |

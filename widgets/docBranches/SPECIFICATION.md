@@ -158,7 +158,7 @@ context (F15), non-LiveDoc documents.
       the Excel button must download an `.xlsx`. If it downloads a `.csv` and the status line says "Excel library not
       loaded", the directive did not work. Also check that the zip entry `docBranches/resources/xlsx.js` (29 chars) is
       accepted on upload.
-   j. (0.3.0) The link role selectors show their defaults (`duplicates`, `branched_from`, `derived_from`) when the widget is
+   j. **Verified on 2512 (PO, 0.3.0).** The link role selectors show their defaults (`duplicates`, `branched_from`, `derived_from`) when the widget is
       added: `$factory.enumeration(...).values([...])` as in guide §2.1, not yet used on 2512. If the defaults are missing,
       select the roles by hand and report it.
 
@@ -198,3 +198,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Repository restructured for a second widget (docCoverage): sources in `widgets/docBranches/`, client core in `shared/js/core.js`, Velocity snippets in `shared/vm/`, Excel library in `shared/resources/`. No functional change (render output, SVG, CSV and Excel identical on the mock set); widget 0.2.1. Release tags are now `docBranches-vN.N.N` | PO |
 | 2026-10-27 | Shared core changes for docCoverage, still in 0.2.1 (not released yet): line labels are kept clear of the target document box; `documents.vm` can restrict the documents and keeps their work item lists (unused by docBranches) | |
 | 2026-10-27 | Widget 0.3.0: link roles per kind chosen with `workitem-link-role` multi-selectors (shared macro `bwRoleIds`, as docCoverage) instead of comma-separated text; new parameter ids `copyLinkRoles`, `branchLinkRoles`, `derivedLinkRoles` (no backward compatibility, PO). The **author** document field is removed from both widgets (PO, user feedback) | PO |
+| 2026-10-27 | PO test of 0.3.0 on 2512: role selectors with their defaults, graph as before, no author field. Ready for release | PO |
