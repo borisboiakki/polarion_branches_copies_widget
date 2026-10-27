@@ -26,6 +26,7 @@ Widget id `docBranches`, version in `VERSION` (N.N.N; shown in the PDF header an
 | Spaces to include | empty (all) | Comma-separated space names, e.g. `Requirements, Design` |
 | Documents shown by default | Only documents with relations | Or *All documents*. Viewers can switch it in the widget |
 | Indirect relations by default | Hidden | Relations inherited through an intermediate copy (see below) |
+| Relation kinds shown by default | none = all | Copies, Branches, Derived. Viewers can toggle each kind in the widget |
 | Extra document fields shown by default | none | Type, status, author, created, updated, work item count. Viewers can toggle them |
 | Minimum linked work items for a relation | 1 | Relations with fewer linked items are dropped, unless document metadata says branch/derived |
 | Graph height in pixels | 600 | Height of the scrollable graph area |
@@ -47,7 +48,7 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 
 ## Using the widget
 
-- **Toolbar**: documents shown (all / only related), indirect relations, extra fields, highlight search,
+- **Toolbar**: documents shown (all / only related), indirect relations, relation kinds (copies / branches / derived), extra fields, highlight search,
   Fit / zoom, Table / Graph, SVG download, Refresh (reloads the page and re-runs the analysis).
 - **Click a document** to open it. **Hover a line** for counts and coverage; **click a line** for the
   list of linked work items (up to 30).

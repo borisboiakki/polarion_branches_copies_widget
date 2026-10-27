@@ -16,6 +16,7 @@
     derived: { color: 'rgb(26,127,55)', dash: '2,4', name: 'derived' },
     copy: { color: 'rgb(51,103,214)', dash: '', name: 'copy' }
   };
+  var KIND_LABEL = { branch: 'Branches', derived: 'Derived', copy: 'Copies' };
   var INDIRECT_COLOR = 'rgb(150,150,150)';
   var EXTRA_FIELDS = [
     ['type', 'Type'], ['status', 'Status'], ['author', 'Author'],
@@ -161,11 +162,42 @@
     return PAD * 2 + LINE_H * (3 + state.extras.length);
   }
 
+  function relFromData(s) {
+    var r = {};
+    var parts = (s || '').split(',');
+    for (var i = 0; i < parts.length; i++) {
+      if (KIND_STYLE[parts[i]]) { r[parts[i]] = true; }
+    }
+    if (!r.copy && !r.branch && !r.derived) { r = { copy: true, branch: true, derived: true }; }
+    return r;
+  }
+
+  // Edge restricted to the selected kinds (null when none of its kinds is selected).
+  function restrictEdge(e, rel) {
+    var kinds = {};
+    var meta = {};
+    var any = false;
+    for (var i = 0; i < KINDS.length; i++) {
+      var k = KINDS[i];
+      kinds[k] = rel[k] ? e.kinds[k] : 0;
+      meta[k] = rel[k] ? !!e.meta[k] : false;
+      if (kinds[k] > 0 || meta[k]) { any = true; }
+    }
+    if (!any) { return null; }
+    var r = {};
+    for (var p in e) { if (Object.prototype.hasOwnProperty.call(e, p)) { r[p] = e[p]; } }
+    r.kinds = kinds;
+    r.meta = meta;
+    return r;
+  }
+
   function visibleEdges(model, state) {
     var out = [];
     for (var i = 0; i < model.edges.length; i++) {
       var e = model.edges[i];
-      if (!e.indirect || state.indirect) { out.push(e); }
+      if (e.indirect && !state.indirect) { continue; }
+      var r = restrictEdge(e, state.rel);
+      if (r) { out.push(r); }
     }
     return out;
   }
@@ -289,6 +321,7 @@
     this.state = {
       mode: ds.mode === 'all' ? 'all' : 'related',
       indirect: ds.indirect === '1',
+      rel: relFromData(ds.rel),
       extras: (ds.extras || '').split(',').filter(function (x) { return x; }),
       filter: '',
       zoom: 1,
@@ -314,6 +347,14 @@
       self.state.indirect = on; self.render(true);
     });
     ind.title = 'Relations inherited through an intermediate copy (hidden by default)';
+
+    var kindsBox = el('span', { 'class': 'bw-fields' }, bar);
+    el('span', { 'class': 'bw-muted' }, kindsBox, 'Relations:');
+    KINDS.forEach(function (k) {
+      self.checkbox(kindsBox, KIND_LABEL[k], self.state.rel[k], function (on) {
+        self.state.rel[k] = on; self.render(true);
+      });
+    });
 
     var fields = el('span', { 'class': 'bw-fields' }, bar);
     el('span', { 'class': 'bw-muted' }, fields, 'Fields:');
@@ -395,7 +436,7 @@
     var hidden = this.model.edges.length - edges.length;
     var shown = this.lay.linked.length + this.lay.isolated.length;
     this.status.textContent = shown + ' of ' + this.model.nodes.length + ' documents, ' + edges.length + ' relations' +
-      (hidden > 0 ? ' (' + hidden + ' indirect hidden)' : '');
+      (hidden > 0 ? ' (' + hidden + ' hidden by the indirect / relation filters)' : '');
     this.viewBtn.textContent = st.view === 'graph' ? 'Table' : 'Graph';
     this.view.style.display = st.view === 'graph' ? '' : 'none';
     this.table.style.display = st.view === 'table' ? '' : 'none';

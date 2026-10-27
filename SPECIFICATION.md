@@ -183,3 +183,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Widget v0.1.0 implemented (`widget/src`, id `docBranches`): Velocity data collection + inlined JS graph, static PDF view. Tested with Velocity 1.4 on mocks and in Chromium; open checks §10.2 | `tools/test-widget.sh` |
 | 2026-10-27 | Widget 0.1.1: fixes the exception on documents with a deleted author (unresolvable user); all object references are guarded; harness mocks unresolvable objects | `tools/vtest/WidgetHarness.java` |
 | 2026-10-27 | PNG export removed (blocked by the browser on Polarion pages); SVG export kept. Open checks V5c/V6 closed. Widget 0.1.2 | PO |
+| 2026-10-27 | Relation kind filter (copies / branches / derived, default all): parameter "Relation kinds shown by default" + toolbar checkboxes; edges are restricted to the selected kinds (labels and counts too); also applied in the PDF view. Widget 0.2.0. The multi-value parameter read is unverified on 2512 (falls back to all) | PO |

@@ -114,6 +114,33 @@
   #set($extrasStr = "${extrasStr}${f}")
 #end
 
+#set($relList = [])
+#set($tmp = false)
+#set($tmp = $parameters.relationKinds.values)
+#set($tmp = $parameters.relationKinds.values())
+#if($tmp)
+  #foreach($v in $tmp)
+    #set($rid = "$v")
+    #set($rid = $v.id())
+    #set($ridS = "$rid")
+    #if($ridS.matches("copy|branch|derived") && !$relList.contains($ridS))
+      #set($void = $relList.add($ridS))
+    #end
+  #end
+#end
+#if($relList.size() == 0)
+  #set($void = $relList.add("copy"))
+  #set($void = $relList.add("branch"))
+  #set($void = $relList.add("derived"))
+#end
+#set($relStr = "")
+#foreach($f in $relList)
+  #if($relStr != "")
+    #set($relStr = "${relStr},")
+  #end
+  #set($relStr = "${relStr}${f}")
+#end
+
 ## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
 #set($bwInt = 0)
 #set($tmp = $bwUnset)
@@ -476,7 +503,22 @@
 #set($drawEdges = [])
 #set($linkedKeys = $objectFactory.newMap())
 #foreach($e in $kept)
-  #if(!$e.get("indirect") || $showIndirect)
+  #if(!$relList.contains("copy"))
+    #set($void = $e.get("copy").clear())
+  #end
+  #if(!$relList.contains("branch"))
+    #set($void = $e.get("branch").clear())
+    #set($void = $e.put("metaBranch", false))
+  #end
+  #if(!$relList.contains("derived"))
+    #set($void = $e.get("derived").clear())
+    #set($void = $e.put("metaDerived", false))
+  #end
+  #set($hasKind = false)
+  #if($e.get("copy").size() > 0 || $e.get("branch").size() > 0 || $e.get("derived").size() > 0 || $e.get("metaBranch") || $e.get("metaDerived"))
+    #set($hasKind = true)
+  #end
+  #if($hasKind && (!$e.get("indirect") || $showIndirect))
     #set($void = $drawEdges.add($e))
     #set($void = $linkedKeys.put($e.get("o"), true))
     #set($void = $linkedKeys.put($e.get("c"), true))
@@ -745,7 +787,7 @@
 #if($showIndirect)
 #set($indFlag = "1")
 #end
-<div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
+<div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-rel="$relStr" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
     <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>

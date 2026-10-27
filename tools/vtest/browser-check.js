@@ -16,6 +16,19 @@ const { chromium } = require('playwright');
   await p.waitForTimeout(200);
   console.log('status2:', await p.textContent('.bw-status'));
   await p.screenshot({ path: dir + '/shot-all-indirect.png', fullPage: true });
+  // relation kind filter: only branches
+  await p.click('label:has-text("Copies") input');
+  await p.click('label:has-text("Derived") input');
+  await p.waitForTimeout(200);
+  const stBranch = await p.textContent('.bw-status');
+  console.log('status branch only:', stBranch);
+  if (stBranch === (await p.evaluate(() => ''))) { throw new Error('unexpected'); }
+  const nLabels = (await p.$$('.bw-edge-label')).length;
+  console.log('edge labels with branches only:', nLabels);
+  if (nLabels < 1) { throw new Error('branch filter removed every relation'); }
+  await p.click('label:has-text("Copies") input');
+  await p.click('label:has-text("Derived") input');
+  await p.waitForTimeout(200);
   // click an edge label -> details
   const labels = await p.$$('.bw-edge-label');
   await labels[0].click();
