@@ -126,7 +126,7 @@ context (F15), non-LiveDoc documents.
 
 ## 10. Open questions
 
-2. Spike results: see `docs/spike-tests.md`. Waiting on results from the product owner's 2512 instance.
+1. Spike results: see `docs/spike-tests.md`. Waiting on results from the product owner's 2512 instance.
 
 ## 11. Decision log
 
