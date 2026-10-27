@@ -1,6 +1,6 @@
-# Build and test the widget on every push and pull request.
+# Build and test every widget on every push and pull request.
 # Runs tools/test-widget.sh (Velocity 1.4 render on mock Polarion data + Chromium check) and
-# verifies that the committed widget/dist matches the sources.
+# verifies that the committed widgets/*/dist match the sources.
 name: CI
 
 on:
@@ -42,21 +42,22 @@ jobs:
           npm install --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
 
-      - name: Build and test the widget
-        run: tools/test-widget.sh "$RUNNER_TEMP/widget-test"
+      - name: Build and test the widgets
+        run: tools/test-widget.sh all "$RUNNER_TEMP/widget-test"
 
-      - name: Check that widget/dist is up to date with widget/src
+      - name: Check that widgets/*/dist are up to date with the sources
         run: |
-          if ! git diff --exit-code -- widget/dist ':(exclude)widget/dist/docBranches.zip'; then
-            echo "::error::widget/dist differs from a fresh build. Run python3 tools/build-widget.py and commit widget/dist."
+          git add -N widgets
+          if ! git diff --exit-code -- 'widgets/*/dist' ':(exclude)widgets/*/dist/*.zip'; then
+            echo "::error::widgets/*/dist differ from a fresh build. Run python3 tools/build-widget.py and commit widgets/*/dist."
             exit 1
           fi
 
       - name: Upload widget package and screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: docBranches-ci-${{ github.sha }}
+          name: widgets-ci-${{ github.sha }}
           path: |
-            widget/dist/docBranches.zip
-            ${{ runner.temp }}/widget-test/*.png
-            ${{ runner.temp }}/widget-test/*.svg
+            widgets/*/dist/*.zip
+            ${{ runner.temp }}/widget-test/*/*.png
+            ${{ runner.temp }}/widget-test/*/*.svg

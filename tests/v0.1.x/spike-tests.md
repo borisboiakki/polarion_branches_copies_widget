@@ -1,6 +1,6 @@
 # Spike tests — run on the Polarion 2512 instance
 
-Goal: settle the technical risks in `SPECIFICATION.md` §9 (R1–R5) before building the widget.
+Goal: settle the technical risks in `widgets/docBranches/SPECIFICATION.md` §9 (R1–R5) before building the widget.
 Two parts:
 
 - **Part A**: no direct database access is needed. Use the DB schema docs on your server, `SQL:(...)` queries in the

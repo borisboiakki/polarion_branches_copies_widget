@@ -1,0 +1,29 @@
+## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
+## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
+<style>
+  .bw-root, .cw-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
+  .bw-toolbar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
+  .bw-ctl { font-size: 12px; padding: 2px 4px; }
+  .bw-search { width: 170px; }
+  .bw-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; }
+  .bw-fields { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  .bw-btns { display: inline-flex; gap: 4px; }
+  .bw-btn { font-size: 12px; padding: 2px 8px; cursor: pointer; border: 1px solid rgb(170,178,195); background: rgb(248,249,252); border-radius: 3px; }
+  .bw-btn:hover { background: rgb(232,237,247); }
+  .bw-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 2px 0 4px 0; }
+  .bw-leg { display: inline-flex; align-items: center; gap: 4px; }
+  .bw-muted { color: rgb(110,118,135); }
+  .bw-status { color: rgb(110,118,135); margin-bottom: 4px; }
+  .bw-view { overflow: auto; border: 1px solid rgb(215,220,230); background: rgb(255,255,255); }
+  .bw-svg { display: block; }
+  .bw-node, .bw-edge, .bw-edge-label { cursor: pointer; }
+  .bw-tip { position: absolute; z-index: 20; background: rgb(255,255,250); border: 1px solid rgb(170,170,170); padding: 4px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); pointer-events: none; max-width: 420px; }
+  .bw-tip-head { font-weight: 600; }
+  .bw-details { border: 1px solid rgb(215,220,230); background: rgb(250,251,253); padding: 6px 8px; margin-bottom: 6px; }
+  .bw-details-head { font-weight: 600; margin-bottom: 4px; }
+  .bw-items { margin: 4px 0 0 18px; padding: 0; max-height: 180px; overflow: auto; }
+  .bw-table { border-collapse: collapse; margin: 4px 0; }
+  .bw-table td, .bw-table th { border: 1px solid rgb(200,205,215); padding: 3px 6px; text-align: left; vertical-align: top; }
+  .bw-table th { background: rgb(238,241,246); }
+  .bw-error, .bw-warn { color: rgb(198,40,40); }
+</style>

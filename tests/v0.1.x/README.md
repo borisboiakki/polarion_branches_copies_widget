@@ -10,7 +10,7 @@ Later versions get their own folder (`tests/vN.N.x/`).
 | `spike-widget/bwSpike.zip` | Its upload package. Rebuild after editing the sources (folder `bwSpike/` at the zip root, Deflated) |
 
 Test data: project `VforIA` (documents `SRS_Test` and its copies/branches) and the larger project `EOLE_AI_MCP_TESTS`.
-Open checks for the released widget are tracked in `SPECIFICATION.md` section 10.
+Open checks for the released widget are tracked in `widgets/docBranches/SPECIFICATION.md` section 10.
 
 The raw result files sent from Polarion (schema PDF, Excel exports, REST JSON, widget PDFs and screenshots) were removed
 from the repository and from its git history on 2026-10-27. Only the findings in `spike-tests.md` are kept.
