@@ -47,8 +47,7 @@ Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks
 - Interactive graph = client-side SVG. PDF/print = static server-side SVG + table, no JS.
 - Default link roles: copy `duplicates`, branch `branched_from`, derived `derived_from`. All of them are parameters,
   chosen with `workitem-link-role` multi-selectors (read with the shared macro `bwOptionIds`), never typed. Excluded work item
-  types (default `heading`) use a `workitem-type` multi-selector read the same way (docBranches 0.3.1 / docCoverage 0.1.1,
-  not yet verified on 2512).
+  types (default `heading`) use a `workitem-type` multi-selector read the same way (verified on 2512).
 - Work the technical risks in SPEC §9 (spike) before building features on top of them.
 
 ## Research notes (verified vs. unverified)
@@ -102,14 +101,14 @@ Verified through web search (2026-10-27):
   role selectors (4 documents, 2 roles), coverage numbers, arrows/labels, fast rendering with many documents.
 - **Verified by the PO on 2512 with docBranches 0.3.0**: `$factory.enumeration("…", "workitem-link-role").values(["duplicates"])`
   preselects the default roles in the selector.
+- **Verified by the PO on 2512 with docBranches 0.3.1 / docCoverage 0.1.1**: `$factory.enumeration("…", "workitem-type")`
+  multi-selector with `.values(["heading"])` lists the project's types with Heading preselected (read with `bwOptionIds`).
+  Widget icon: an `icon.png` (608 x 405 PNG, as in a widget used by the PO; the Widget SDK guide documents none) at the
+  package root, next to `render.vm`, with no reference in other files, shows in the widget list.
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.
 - Whether the Widget SDK extension point is suitable for our needs vs. Velocity.
-- Widget icon: the Widget SDK guide documents none, but a widget used by the PO ships `icon.png` (608 x 405, RGBA, opaque
-  white background) next to `render.vm`, with no reference in other files. Both packages now ship `icon.png` the same way
-  (`widgets/<w>/src/icon.png`, drawn from `docs/<w>/icon.svg`; docBranches 0.3.1 / docCoverage 0.1.1); display in the
-  widget list not yet verified on 2512.
 
 Never present the unverified items as fact in code comments or docs.
 

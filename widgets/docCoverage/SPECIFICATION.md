@@ -118,7 +118,7 @@ c. ✅ (PO) Coverage on the spike set: customer spec 5/6 = 83 %, uncovered item 
 d. ✅ (PO screenshot) Arrows downstream → upstream, upstream on the left, role names and link counts on the lines.
 e. ✅ (PO) Fast rendering with many documents.
 f. Viewer permissions (as docBranches §10.2 a) — still open.
-g. 0.1.1: excluded types selector (`workitem-type`) lists the project's types, Heading preselected, coverage unchanged — to check.
+g. 0.1.1: excluded types selector (`workitem-type`) lists the project's types, Heading preselected, coverage unchanged — ✅ (PO, 2026-10-27).
 
 ## 10. Decision log
 
@@ -138,3 +138,4 @@ g. 0.1.1: excluded types selector (`workitem-type`) lists the project's types, H
 | 2026-10-27 | PO test of 0.1.0 (without author) on 2512: OK. Ready for release | PO |
 | 2026-10-27 | Widget 0.1.1: the excluded work item types are chosen with a `workitem-type` multi-selector (default Heading, none selected = all types counted) instead of comma-separated text; shared macro `bwRoleIds` renamed `bwOptionIds`. Patch release (PO). To check on 2512: selector lists the types with Heading preselected; counts unchanged with Heading | PO |
 | 2026-10-27 | Widget 0.1.1: `icon.png` (608 x 405, white background) at the package root, as in a widget used by the PO; no reference in other files. Display in the widget list to check on 2512 | PO |
+| 2026-10-27 | PO test of 0.1.1 on 2512: type selector (Heading preselected, counts as before) and widget icon OK. Ready for release | PO |
