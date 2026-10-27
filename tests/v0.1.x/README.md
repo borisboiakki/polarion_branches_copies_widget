@@ -13,5 +13,4 @@ Later versions get their own folder (`tests/vN.N.x/`).
 Test data: project `VforIA` (documents `SRS_Test` and its copies/branches) and the larger project `EOLE_AI_MCP_TESTS`.
 Open checks for the released widget are tracked in `SPECIFICATION.md` section 10.
 
-`results/R2_test_results.txt` contains the REST links of the test server. Replace the host name before publishing the
-repository outside the team.
+In `results/R2_test_results.txt` the host name of the test server is replaced by `MYHOST`.
