@@ -118,7 +118,10 @@ SQL:(SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_mo
 ```
 Report which of the two returns the items of `SRS_Test` (possibly both).
 
-### A3 — REST calls (document metadata and link direction)
+### A3 — REST calls (document metadata and link direction) — optional
+
+R1 done (see "Results so far"). R2 is **optional**: link direction is already settled by A2. The widget does not use REST.
+
 
 Use your REST token (Postman, curl or similar). The base URL is `https://MYHOST/polarion/rest/v1`.
 The space of the default folder is `_default`. URL-encode document names that contain spaces (`%20`).
@@ -191,13 +194,13 @@ If any test shows a Velocity error, copy the message from the widget, or from th
 | A2 Q3/Q4 | 2026-10-27 | ✅ **Document metadata confirmed.** `fk_uri_branchedfrom` is set on both branches: `SRS_Test_Branch_Test_C` (its 2 overwritten items + its own title heading VIA-521) **and `SRS_Test_F_nooverwrite`** (its own title heading VIA-536), so F *is* detectable through metadata. `fk_uri_derivedfrom` is set only on `SRS_Test_TestD_Derived` (6 items). The copies B and E carry **neither** field, so copies can be detected only through `duplicates` links. Note: a branch's own title heading is new and not linked; in copies and derived documents the heading is linked like the other items. Exports: `docs/A2_Q3_results.xlsx`, `docs/A2_Q4_results.xlsx` |
 | A2 Q5 | 2026-10-27 | ✅ `SELECT DISTINCT` and `GROUP BY … HAVING COUNT(*)` are both accepted by the tracker SQL. Both return the same 20 items = all link sources of the 3 roles (B 6, C 2, D 6, E 6). Exports: `docs/A2_Q5_*.xlsx` |
 | A2 Q6 | 2026-10-27 | ✅ `module.c_id` and `module.c_modulename` both hold the document name (`SRS_Test`); both queries return its 6 items. Exports: `docs/A2_Q6_*.xlsx` |
+| A3 R1 | 2026-10-27 | ⚠️ Partial, not needed. In the REST document **attributes**, no `branchedFrom`/`derivedFrom` appears for any of B, C, D, F. Only the derived document D has the extra attributes `derivedFromLinkRole` and `derivedFields`. The file lists attribute names only, so the `relationships` block (where `branchedFrom`/`derivedFrom` would appear as references) is not visible. Not blocking: the widget reads this metadata through SQL (A2 Q3/Q4). Results: `docs/R1_test_results.txt` |
 | V1 | 2026-10-27 | ✅ Runs. Polarion ALM 2512. `$widgetContext` = `RichPageWidgetRenderingContextImpl`, `$transaction` = `ReadOnlyTransactionImpl`, `$transaction.objects()` = `ProxyModelObjects`; `$trackerService`/`getDataService()` are proxies. `$date.systemTime` works. Reflection method listing is blocked (empty), as the guide says. In PDF export `isPdf` = true. `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
 
 ## Results template (copy into your answer)
 
 ```
-A3 R1 JSON (B, C, D, F):
-A3 R2 JSON (one item each in B, C, D):
+A3 R2 JSON (optional):
 V2 (counts, timings, working getters, field names, branchedFrom/derivedFrom values):
 V3a / V3b:
 V4 (VforIA + large project: SQL ms, scan ms, items, pairs):

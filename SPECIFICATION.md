@@ -152,3 +152,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Heading work items are excluded from link counts and coverage by default (parameter: excluded work item types, default `heading`) | PO |
 | 2026-10-27 | Line style for a pair with several kinds: precedence branch > derived > copy; label lists all kinds | PO |
 | 2026-10-27 | Spike A2 Q3–Q6: branch/derived metadata confirmed (incl. branch without overwrite), copies have no metadata, DISTINCT/GROUP BY accepted, `c_id` = `c_modulename` = document name. Part A2 complete | `docs/A2_*.xlsx` |
+| 2026-10-27 | Spike A3 R1: REST document attributes do not show branched/derived-from (only `derivedFromLinkRole`/`derivedFields` on the derived doc); relationships not inspected. Not needed: the widget uses SQL. R2 optional | `docs/R1_test_results.txt` |
