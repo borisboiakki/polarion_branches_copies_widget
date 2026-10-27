@@ -217,14 +217,22 @@
 #end
 
 ## Document key used everywhere: "space/name"
+## Referenced objects (document of a link, "branched from" source) can be unresolvable (deleted, no access).
+## Any access other than isUnresolvable() then throws, so they are only used when isUnresolvable() is false.
 #macro(bwKey $bwMod)
   #set($bwKeyOut = "")
-  #set($bwF = "")
-  #set($bwF = $bwMod.getModuleFolder())
-  #set($bwN = "")
-  #set($bwN = $bwMod.getId())
-  #if("$bwN" != "")
-    #set($bwKeyOut = "${bwF}/${bwN}")
+  #set($bwUr = "unknown")
+  #if($bwMod)
+    #set($bwUr = $bwMod.isUnresolvable())
+  #end
+  #if("$bwUr" == "false")
+    #set($bwF = "")
+    #set($bwF = $bwMod.getModuleFolder())
+    #set($bwN = "")
+    #set($bwN = $bwMod.getId())
+    #if("$bwN" != "")
+      #set($bwKeyOut = "${bwF}/${bwN}")
+    #end
   #end
 #end
 
@@ -277,12 +285,19 @@
       #set($dStatus = $dStatusObj.getId())
       #set($dStatus = $dStatusObj.getName())
     #end
+    ## The author can be a deleted user: unresolvable objects throw on any access, see bwKey.
     #set($dAuthor = "")
     #set($dAuthorObj = false)
     #set($dAuthorObj = $m.getAuthor())
+    #set($dAuthorUr = "unknown")
     #if($dAuthorObj)
+      #set($dAuthorUr = $dAuthorObj.isUnresolvable())
+    #end
+    #if("$dAuthorUr" == "false")
       #set($dAuthor = $dAuthorObj.getId())
       #set($dAuthor = $dAuthorObj.getName())
+    #elseif($dAuthorObj)
+      #set($dAuthor = "(unknown user)")
     #end
     #set($dCreated = "")
     #set($dDate = false)

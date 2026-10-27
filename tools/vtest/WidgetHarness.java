@@ -30,24 +30,37 @@ public class WidgetHarness {
         public String toString() { return id; }
     }
 
+    /** Unresolvable objects (deleted user, document without access) throw on any access except isUnresolvable(),
+     *  as seen on 2512: "uri: subterra:data-service:objects:/default/${User}t0025088". */
     public static class User {
-        private final String id, name;
-        public User(String id, String name) { this.id = id; this.name = name; }
-        public String getId() { return id; }
-        public String getName() { return name; }
+        private final String id, name; private final boolean unresolvable;
+        public User(String id, String name) { this(id, name, false); }
+        public User(String id, String name, boolean unresolvable) { this.id = id; this.name = name; this.unresolvable = unresolvable; }
+        public boolean isUnresolvable() { return unresolvable; }
+        private void check() {
+            if (unresolvable) { throw new RuntimeException("uri: subterra:data-service:objects:/default/" + "$" + "{User}" + id); }
+        }
+        public String getId() { check(); return id; }
+        public String getName() { check(); return name; }
     }
 
     public static class Module {
         final String folder, name, title;
         Module branchedFrom, derivedFrom;
+        User author = new User("TESTUSER", "Test User");
+        boolean unresolvable;
         final List<WorkItem> items = new ArrayList<WorkItem>();
         public Module(String folder, String name, String title) { this.folder = folder; this.name = name; this.title = title; }
-        public String getId() { return name; }
-        public String getModuleFolder() { return folder; }
-        public String getTitle() { return title; }
+        private void check() {
+            if (unresolvable) { throw new RuntimeException("uri: subterra:data-service:objects:/default/" + "$" + "{Module}" + folder + "#" + name); }
+        }
+        public boolean isUnresolvable() { return unresolvable; }
+        public String getId() { check(); return name; }
+        public String getModuleFolder() { check(); return folder; }
+        public String getTitle() { check(); return title; }
         public Opt getType() { return new Opt("systemReqSpecification", "System Requirement Specification"); }
         public Opt getStatus() { return new Opt("draft", "Draft"); }
-        public User getAuthor() { return new User("TESTUSER", "Test User"); }
+        public User getAuthor() { return author; }
         public Date getCreated() { return new Date(1793000000000L); }
         public Date getUpdated() { return new Date(1793090000000L); }
         public Object getValue(String field) {
@@ -73,12 +86,13 @@ public class WidgetHarness {
 
     public static class WorkItem {
         final String id, type; final Module module;
+        boolean unresolvable;
         final List<Link> links = new ArrayList<Link>();
         public WorkItem(String id, String type, Module module) { this.id = id; this.type = type; this.module = module; module.items.add(this); }
         public String getId() { return id; }
         public Opt getType() { return new Opt(type, type); }
         public Module getModule() { return module; }
-        public boolean isUnresolvable() { return false; }
+        public boolean isUnresolvable() { return unresolvable; }
         public List<Link> getLinkedWorkItemsStructsDirect() { return links; }
     }
 
@@ -145,6 +159,19 @@ public class WidgetHarness {
         // G: unrelated
         wi(537, "systemRequirement", g);
         wi(538, "systemRequirement", g);
+        // Unresolvable objects as seen on 2512 (spike on EOLE_AI_MCP_TESTS): a document whose author user was deleted,
+        // a branch whose source document cannot be resolved, a link to an unresolvable work item.
+        Module ghostAuthor = doc("Ghost_Author_Doc");
+        ghostAuthor.author = new User("t0025088", "gone", true);
+        WorkItem ga = wi(539, "systemRequirement", ghostAuthor);
+        Module orphan = doc("Orphan_Branch");
+        Module missing = new Module("Requirements", "Missing_Source", "Missing_Source");
+        missing.unresolvable = true;
+        orphan.branchedFrom = missing;
+        orphan.derivedFrom = missing;
+        WorkItem ghostItem = new WorkItem("VIA-999", "systemRequirement", g);
+        ghostItem.unresolvable = true;
+        ga.links.add(new Link("duplicates", ghostItem));
         for (WorkItem w : ITEMS.values()) { w.links.add(new Link("parent", w)); }
     }
 
@@ -296,6 +323,11 @@ public class WidgetHarness {
         w.close();
     }
 
+    static void check(boolean ok, String what) {
+        if (!ok) { System.err.println("CHECK FAILED: " + what); System.exit(1); }
+        System.out.println("check ok: " + what);
+    }
+
     public static void main(String[] args) throws Exception {
         buildTestSet();
         String widgetDir = args[0];
@@ -313,6 +345,12 @@ public class WidgetHarness {
         params.put("height", new Param(Integer.valueOf(560), null));
         String browser = render(widgetDir, params, false, outDir + "/velocity-browser.log");
         write(outDir + "/browser-fragment.html", browser);
+        check(browser.contains("data-id=\"Ghost_Author_Doc\"") && browser.contains("data-author=\"(unknown user)\""),
+            "document with a deleted author is listed with author (unknown user)");
+        check(!browser.contains("Missing_Source"), "unresolvable source documents are ignored");
+        check(!browser.contains("VIA-999"), "links to unresolvable work items are ignored");
+        check(browser.contains("data-o=\"Requirements/SRS_Test\" data-c=\"Requirements/SRS_Test_Branch_Test_C\""),
+            "normal relations are still found");
         int sqlBrowser = SQL_COUNT;
         String pdf = render(widgetDir, params, true, outDir + "/velocity-pdf.log");
         write(outDir + "/pdf-fragment.html", pdf);

@@ -125,6 +125,10 @@ test-data/                     anonymised sample structures for manual verificat
   Chromium screenshots) and commit `widget/dist/` with the sources. `branches-graph.js` must not contain `$`, `#`,
   backslashes or non-ASCII characters (the build enforces it; use `HASH`/`String.fromCharCode`).
 - Keep `tools/vtest/WidgetHarness.java` mocks in line with behaviour observed on 2512 (e.g. `singleValue()` is a String).
+- **Unresolvable objects (verified on 2512, bug in 0.1.0):** a referenced object (document author = deleted user,
+  `branchedFrom`/`derivedFrom` source, link target) can be unresolvable; every call except `isUnresolvable()` then throws
+  `uri: subterra:data-service:objects:/default/${User}...`. Check `isUnresolvable()` before using ANY referenced object
+  (see guide 3.1.8). The harness has mocks for this; add one for every new kind of reference.
 - **Versioning**: `VERSION` holds N.N.N (semver). Bump it in every change meant for a release (patch = fix, minor =
   feature, major = incompatible parameters/behaviour). Releases are GitHub releases tagged `vN.N.N`; the Release
   workflow attaches `docBranches-N.N.N.zip`. CI fails if `widget/dist` is not rebuilt after a source change.
