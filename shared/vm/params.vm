@@ -46,7 +46,7 @@
     #set($fid = "$v")
     #set($fid = $v.id())
     #set($fidS = "$fid")
-    #if($fidS.matches("type|status|author|created|updated|items") && !$extraList.contains($fidS))
+    #if($fidS.matches("type|status|created|updated|items") && !$extraList.contains($fidS))
       #set($void = $extraList.add($fidS))
     #end
   #end

@@ -16,8 +16,7 @@
   var HASH = String.fromCharCode(35);
   var INDIRECT_COLOR = 'rgb(150,150,150)';
   var EXTRA_FIELDS = [
-    ['type', 'Type'], ['status', 'Status'], ['author', 'Author'],
-    ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
+    ['type', 'Type'], ['status', 'Status'], ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
   ];
   var NODE_W = 240;
   var LINE_H = 15;
@@ -124,7 +123,7 @@
       var d = nEls[i].dataset;
       var n = {
         key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
-        type: d.type || '', status: d.status || '', author: d.author || '',
+        type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
         el: nEls[i]

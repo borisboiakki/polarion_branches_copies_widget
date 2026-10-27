@@ -90,7 +90,7 @@
     #set($fid = "$v")
     #set($fid = $v.id())
     #set($fidS = "$fid")
-    #if($fidS.matches("type|status|author|created|updated|items") && !$extraList.contains($fidS))
+    #if($fidS.matches("type|status|created|updated|items") && !$extraList.contains($fidS))
       #set($void = $extraList.add($fidS))
     #end
   #end
@@ -131,6 +131,21 @@
     #set($bwT = $bwPart.trim())
     #if($bwT.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwT))
       #set($void = $bwOut.add($bwT))
+    #end
+  #end
+#end
+
+## Link role ids from the values() of a workitem-link-role multi-selector (verified on 2512, docCoverage spike C2:
+## each value is a ProxyEnumOption, id() = role id). Identifiers only, as they go into SQL.
+#macro(bwRoleIds $bwVals $bwOut)
+  #if($bwVals)
+    #foreach($bwV in $bwVals)
+      #set($bwRid = "$bwV")
+      #set($bwRid = $bwV.id())
+      #set($bwRidS = "$bwRid")
+      #if($bwRidS.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwRidS))
+        #set($void = $bwOut.add($bwRidS))
+      #end
     #end
   #end
 #end
@@ -223,16 +238,7 @@
 #set($roleVals = false)
 #set($roleVals = $parameters.roles.values)
 #set($roleVals = $parameters.roles.values())
-#if($roleVals)
-  #foreach($v in $roleVals)
-    #set($rid = "$v")
-    #set($rid = $v.id())
-    #set($ridS = "$rid")
-    #if($ridS.matches("[A-Za-z0-9_.-]+") && !$roleAll.contains($ridS))
-      #set($void = $roleAll.add($ridS))
-    #end
-  #end
-#end
+#bwRoleIds($roleVals $roleAll)
 #set($roleIds = [])
 #foreach($r in $roleAll)
   #if($roleIds.size() < $maxRoles)
@@ -287,7 +293,7 @@
 ## ======================================================================= documents
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
-## status, author, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
 ## (space/name) to keep; empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
@@ -337,20 +343,6 @@
       #set($dStatus = $dStatusObj.getId())
       #set($dStatus = $dStatusObj.getName())
     #end
-    ## The author can be a deleted user: unresolvable objects throw on any access, see bwKey.
-    #set($dAuthor = "")
-    #set($dAuthorObj = false)
-    #set($dAuthorObj = $m.getAuthor())
-    #set($dAuthorUr = "unknown")
-    #if($dAuthorObj)
-      #set($dAuthorUr = $dAuthorObj.isUnresolvable())
-    #end
-    #if("$dAuthorUr" == "false")
-      #set($dAuthor = $dAuthorObj.getId())
-      #set($dAuthor = $dAuthorObj.getName())
-    #elseif($dAuthorObj)
-      #set($dAuthor = "(unknown user)")
-    #end
     #set($dCreated = "")
     #set($dDate = false)
     #set($dDate = $m.getCreated())
@@ -381,7 +373,6 @@
     #set($void = $d.put("space", "$dSpace"))
     #set($void = $d.put("type", "$dType"))
     #set($void = $d.put("status", "$dStatus"))
-    #set($void = $d.put("author", "$dAuthor"))
     #set($void = $d.put("created", "$dCreated"))
     #set($void = $d.put("updated", "$dUpdated"))
     #set($void = $d.put("items", $dItems))
@@ -728,8 +719,6 @@
         #set($fl = "Type")
       #elseif($f == "status")
         #set($fl = "Status")
-      #elseif($f == "author")
-        #set($fl = "Author")
       #elseif($f == "created")
         #set($fl = "Created")
       #elseif($f == "updated")
@@ -852,7 +841,7 @@
 #set($uncStr = "${uncStr}${u}")
 #end
 #end
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
 #end
 #foreach($k in $edgeKeys)
 #set($e = $edges.get($k))
@@ -920,8 +909,7 @@
   var HASH = String.fromCharCode(35);
   var INDIRECT_COLOR = 'rgb(150,150,150)';
   var EXTRA_FIELDS = [
-    ['type', 'Type'], ['status', 'Status'], ['author', 'Author'],
-    ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
+    ['type', 'Type'], ['status', 'Status'], ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
   ];
   var NODE_W = 240;
   var LINE_H = 15;
@@ -1028,7 +1016,7 @@
       var d = nEls[i].dataset;
       var n = {
         key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
-        type: d.type || '', status: d.status || '', author: d.author || '',
+        type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
         el: nEls[i]
@@ -1989,13 +1977,13 @@
       relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, c)) });
       relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, o)) });
     });
-    var docs = [['Space', 'Document', 'Title', 'Type', 'Status', 'Author', 'Created', 'Updated', 'Work items',
+    var docs = [['Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
       'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items']];
     var shown = this.shownDocs();
     shown.forEach(function (n) {
       var c = self.coverage(n);
       var p = c ? pct(c.covered, c.total) : null;
-      docs.push([n.space, n.id, n.title, n.type, n.status, n.author, n.created, n.updated, n.items < 0 ? '' : n.items,
+      docs.push([n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
         n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '']);
     });
     var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
@@ -2024,7 +2012,7 @@
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
         widths: [14, 28, 34, 24, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
-      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 28, 40, 14, 14, 20, 18, 18, 11, 9, 11, 11, 11] },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
       { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
     ]);

@@ -396,9 +396,9 @@ public class WidgetHarness {
         String widgetDir = args[0];
         String outDir = args[1];
         Map<String, Param> params = new HashMap<String, Param>();
-        params.put("copyRoles", new Param("duplicates", null));
-        params.put("branchRoles", new Param("branched_from", null));
-        params.put("derivedRoles", new Param("derived_from", null));
+        params.put("copyLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("duplicates")))));
+        params.put("branchLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("branched_from")))));
+        params.put("derivedLinkRoles", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("derived_from")))));
         params.put("excludedTypes", new Param("heading", null));
         params.put("spaces", new Param("", null));
         params.put("showMode", new Param(args.length > 2 ? args[2] : "related", null));
@@ -410,8 +410,9 @@ public class WidgetHarness {
         params.put("height", new Param(Integer.valueOf(560), null));
         String browser = render(widgetDir, params, false, outDir + "/velocity-browser.log");
         write(outDir + "/browser-fragment.html", browser);
-        check(browser.contains("data-id=\"Ghost_Author_Doc\"") && browser.contains("data-author=\"(unknown user)\""),
-            "document with a deleted author is listed with author (unknown user)");
+        check(browser.contains("data-id=\"Ghost_Author_Doc\"") && !browser.contains("unknown user") && !browser.contains("data-author"),
+            "document with a deleted author is listed (the author field was removed)");
+        check(browser.contains("data-kc=\"5\""), "link roles read from the selectors (copy relations found)");
         check(!browser.contains("Missing_Source"), "unresolvable source documents are ignored");
         check(!browser.contains("VIA-999"), "links to unresolvable work items are ignored");
         check(browser.contains("data-o=\"Requirements/SRS_Test\" data-c=\"Requirements/SRS_Test_Branch_Test_C\""),
@@ -419,6 +420,14 @@ public class WidgetHarness {
         int sqlBrowser = SQL_COUNT;
         String pdf = render(widgetDir, params, true, outDir + "/velocity-pdf.log");
         write(outDir + "/pdf-fragment.html", pdf);
+        // No copy role selected: no copy relation; no role at all: message.
+        params.put("copyLinkRoles", new Param(null, new ArrayList<Object>()));
+        String noCopy = render(widgetDir, params, false, outDir + "/velocity-nocopy.log");
+        check(!noCopy.contains("data-kc=\"5\"") && noCopy.contains("data-kb=\"2\""), "empty copy role selector: no copy relation, branches kept");
+        params.put("branchLinkRoles", new Param(null, new ArrayList<Object>()));
+        params.put("derivedLinkRoles", new Param(null, null));
+        String noRole = render(widgetDir, params, false, outDir + "/velocity-norole.log");
+        check(noRole.contains("select at least one link role"), "no link role selected: message");
         System.out.println("Rendered: browser " + browser.length() + " chars, pdf " + pdf.length() + " chars, SQL queries per render " + sqlBrowser);
     }
 }

@@ -10,6 +10,21 @@
   #end
 #end
 
+## Link role ids from the values() of a workitem-link-role multi-selector (verified on 2512, docCoverage spike C2:
+## each value is a ProxyEnumOption, id() = role id). Identifiers only, as they go into SQL.
+#macro(bwRoleIds $bwVals $bwOut)
+  #if($bwVals)
+    #foreach($bwV in $bwVals)
+      #set($bwRid = "$bwV")
+      #set($bwRid = $bwV.id())
+      #set($bwRidS = "$bwRid")
+      #if($bwRidS.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwRidS))
+        #set($void = $bwOut.add($bwRidS))
+      #end
+    #end
+  #end
+#end
+
 #set($excludedTypes = [])
 #bwIdList($excludedTypesStr $excludedTypes)
 

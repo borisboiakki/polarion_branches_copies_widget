@@ -19,16 +19,16 @@ Widget id `docBranches`, version in `widgets/docBranches/VERSION` (N.N.N; shown 
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| Copy link roles | `duplicates` | Link roles that mark a copy / LiveDoc reuse (comma separated) |
-| Branch link roles | `branched_from` | Link roles of overwritten items in a branch |
-| Derived link roles | `derived_from` | Link roles of items reused with derivation |
+| Copy link roles | `duplicates` | Link roles that mark a copy / LiveDoc reuse (selector of the project's link roles, several allowed) |
+| Branch link roles | `branched_from` | Link roles of overwritten items in a branch (selector) |
+| Derived link roles | `derived_from` | Link roles of items reused with derivation (selector) |
 | Work item types not counted | `heading` | Items of these types are ignored in links and counts |
 | Spaces to include | empty (all) | Comma-separated space names, e.g. `Requirements, Design` |
 | Documents shown by default | Only documents with relations | Or *All documents*. Viewers can switch it in the widget |
 | Indirect relations by default | Hidden | Relations inherited through an intermediate copy (see below) |
 | Relation kinds shown by default | none = all | Copies, Branches, Derived. Viewers can toggle each kind in the widget |
 | Linked item counts on the lines by default | Shown | Or *Hidden*: line labels show only the kinds (e.g. `copy` instead of `copy 5`). Viewers can toggle it |
-| Extra document fields shown by default | none | Type, status, author, created, updated, work item count. Viewers can toggle them |
+| Extra document fields shown by default | none | Type, status, created, updated, work item count. Viewers can toggle them |
 | Minimum linked work items for a relation | 1 | Relations with fewer linked items are dropped, unless document metadata says branch/derived |
 | Graph height in pixels | 600 | Height of the scrollable graph area |
 
@@ -64,5 +64,6 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 - Documents are read through the Open API data service. Permission filtering for viewers who
   cannot read some documents has not been checked yet (see SPEC §10).
 - There is no PNG export (browsers block it on Polarion pages). Use the SVG download, or the PDF export of the page.
-- A document whose author user was deleted shows the author as "(unknown user)". Branch or derived documents whose
-  source document cannot be read are ignored, and so are links to unreadable work items.
+- Branch or derived documents whose source document cannot be read are ignored, and so are links to unreadable work items.
+- 0.3.0 replaced the three text parameters for link roles by selectors (new parameter ids): widgets placed with an
+  earlier version must have their link roles selected again.

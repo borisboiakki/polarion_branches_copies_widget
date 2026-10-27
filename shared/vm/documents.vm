@@ -1,6 +1,6 @@
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
-## status, author, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
 ## (space/name) to keep; empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
@@ -50,20 +50,6 @@
       #set($dStatus = $dStatusObj.getId())
       #set($dStatus = $dStatusObj.getName())
     #end
-    ## The author can be a deleted user: unresolvable objects throw on any access, see bwKey.
-    #set($dAuthor = "")
-    #set($dAuthorObj = false)
-    #set($dAuthorObj = $m.getAuthor())
-    #set($dAuthorUr = "unknown")
-    #if($dAuthorObj)
-      #set($dAuthorUr = $dAuthorObj.isUnresolvable())
-    #end
-    #if("$dAuthorUr" == "false")
-      #set($dAuthor = $dAuthorObj.getId())
-      #set($dAuthor = $dAuthorObj.getName())
-    #elseif($dAuthorObj)
-      #set($dAuthor = "(unknown user)")
-    #end
     #set($dCreated = "")
     #set($dDate = false)
     #set($dDate = $m.getCreated())
@@ -94,7 +80,6 @@
     #set($void = $d.put("space", "$dSpace"))
     #set($void = $d.put("type", "$dType"))
     #set($void = $d.put("status", "$dStatus"))
-    #set($void = $d.put("author", "$dAuthor"))
     #set($void = $d.put("created", "$dCreated"))
     #set($void = $d.put("updated", "$dUpdated"))
     #set($void = $d.put("items", $dItems))

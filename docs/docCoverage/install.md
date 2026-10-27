@@ -24,7 +24,7 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
 | Spaces to include | empty (all) | Comma-separated space names (default space: `_default`) |
 | Documents shown by default | Only documents with relations | Or *All selected documents*. Viewers can switch it |
 | Link counts on the lines by default | Shown | Or *Hidden*. Viewers can toggle it |
-| Extra document fields shown by default | none | Type, status, author, created, updated, work item count. Viewers can toggle them |
+| Extra document fields shown by default | none | Type, status, created, updated, work item count. Viewers can toggle them |
 | Graph height in pixels | 600 | Height of the scrollable graph area |
 
 ## How coverage is computed

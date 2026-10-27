@@ -10,29 +10,16 @@
 ## BW_SHARED params.vm
 
 ## docBranches parameters
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.copyRoles.value)
-#set($tmp = $parameters.copyRoles.value())
-#set($copyRolesStr = "duplicates")
-#if("$tmp" != $bwUnset && "$tmp" != "")
-  #set($copyRolesStr = "$tmp")
-#end
-
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.branchRoles.value)
-#set($tmp = $parameters.branchRoles.value())
-#set($branchRolesStr = "branched_from")
-#if("$tmp" != $bwUnset && "$tmp" != "")
-  #set($branchRolesStr = "$tmp")
-#end
-
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.derivedRoles.value)
-#set($tmp = $parameters.derivedRoles.value())
-#set($derivedRolesStr = "derived_from")
-#if("$tmp" != $bwUnset && "$tmp" != "")
-  #set($derivedRolesStr = "$tmp")
-#end
+## Link roles per kind: workitem-link-role multi-selectors, read with bwRoleIds (common.vm).
+#set($copyRoleVals = false)
+#set($copyRoleVals = $parameters.copyLinkRoles.values)
+#set($copyRoleVals = $parameters.copyLinkRoles.values())
+#set($branchRoleVals = false)
+#set($branchRoleVals = $parameters.branchLinkRoles.values)
+#set($branchRoleVals = $parameters.branchLinkRoles.values())
+#set($derivedRoleVals = false)
+#set($derivedRoleVals = $parameters.derivedLinkRoles.values)
+#set($derivedRoleVals = $parameters.derivedLinkRoles.values())
 
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.showIndirect.singleValue)
@@ -86,11 +73,11 @@
 ## BW_SHARED common.vm
 
 #set($copyRoles = [])
-#bwIdList($copyRolesStr $copyRoles)
+#bwRoleIds($copyRoleVals $copyRoles)
 #set($branchRoles = [])
-#bwIdList($branchRolesStr $branchRoles)
+#bwRoleIds($branchRoleVals $branchRoles)
 #set($derivedRoles = [])
-#bwIdList($derivedRolesStr $derivedRoles)
+#bwRoleIds($derivedRoleVals $derivedRoles)
 
 ## role -> kind (first kind wins if a role is listed twice)
 #set($roleKind = $objectFactory.newMap())
@@ -121,7 +108,7 @@
 #if(!$projectOk)
   <div class="bw-warn">Document Branches and Copies: place this widget on a page of a project.</div>
 #elseif($roleKind.size() == 0)
-  <div class="bw-warn">Document Branches and Copies: no valid link role in the widget parameters.</div>
+  <div class="bw-warn">Document Branches and Copies: select at least one link role (copy, branch or derived) in the widget parameters.</div>
 #else
 
 ## ======================================================================= documents
@@ -469,8 +456,6 @@
         #set($fl = "Type")
       #elseif($f == "status")
         #set($fl = "Status")
-      #elseif($f == "author")
-        #set($fl = "Author")
       #elseif($f == "created")
         #set($fl = "Created")
       #elseif($f == "updated")
@@ -565,7 +550,7 @@
 <div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-rel="$relStr" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
 #end
 #foreach($e in $kept)
 #set($mbFlag = "0")

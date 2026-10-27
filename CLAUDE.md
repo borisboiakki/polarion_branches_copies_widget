@@ -43,7 +43,8 @@ Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks
 - Target **Polarion 2512**, stay compatible with **2606**: public Rendering API + documented SQL tables only.
 - Data: SQL scoped to one project (≈100 LiveDocs / 20k work items). Never loop over all work items in Velocity.
 - Interactive graph = client-side SVG. PDF/print = static server-side SVG + table, no JS.
-- Default link roles: copy `duplicates`, branch `branched_from`, derived `derived_from`. All of them are parameters.
+- Default link roles: copy `duplicates`, branch `branched_from`, derived `derived_from`. All of them are parameters,
+  chosen with `workitem-link-role` multi-selectors (read with the shared macro `bwRoleIds`), never typed.
 - Work the technical risks in SPEC §9 (spike) before building features on top of them.
 
 ## Research notes (verified vs. unverified)

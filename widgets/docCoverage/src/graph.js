@@ -333,13 +333,13 @@
       relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, c)) });
       relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, o)) });
     });
-    var docs = [['Space', 'Document', 'Title', 'Type', 'Status', 'Author', 'Created', 'Updated', 'Work items',
+    var docs = [['Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
       'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items']];
     var shown = this.shownDocs();
     shown.forEach(function (n) {
       var c = self.coverage(n);
       var p = c ? pct(c.covered, c.total) : null;
-      docs.push([n.space, n.id, n.title, n.type, n.status, n.author, n.created, n.updated, n.items < 0 ? '' : n.items,
+      docs.push([n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
         n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '']);
     });
     var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
@@ -368,7 +368,7 @@
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
         widths: [14, 28, 34, 24, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
-      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 28, 40, 14, 14, 20, 18, 18, 11, 9, 11, 11, 11] },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
       { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
     ]);

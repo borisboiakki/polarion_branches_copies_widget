@@ -3,7 +3,7 @@
 ## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
 ## Velocity 1.4 and writes widgets/docBranches/dist/docBranches.zip.
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
-#set($bwVersion = "0.2.1")
+#set($bwVersion = "0.3.0")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -83,7 +83,7 @@
     #set($fid = "$v")
     #set($fid = $v.id())
     #set($fidS = "$fid")
-    #if($fidS.matches("type|status|author|created|updated|items") && !$extraList.contains($fidS))
+    #if($fidS.matches("type|status|created|updated|items") && !$extraList.contains($fidS))
       #set($void = $extraList.add($fidS))
     #end
   #end
@@ -110,29 +110,16 @@
 #end
 
 ## docBranches parameters
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.copyRoles.value)
-#set($tmp = $parameters.copyRoles.value())
-#set($copyRolesStr = "duplicates")
-#if("$tmp" != $bwUnset && "$tmp" != "")
-  #set($copyRolesStr = "$tmp")
-#end
-
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.branchRoles.value)
-#set($tmp = $parameters.branchRoles.value())
-#set($branchRolesStr = "branched_from")
-#if("$tmp" != $bwUnset && "$tmp" != "")
-  #set($branchRolesStr = "$tmp")
-#end
-
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.derivedRoles.value)
-#set($tmp = $parameters.derivedRoles.value())
-#set($derivedRolesStr = "derived_from")
-#if("$tmp" != $bwUnset && "$tmp" != "")
-  #set($derivedRolesStr = "$tmp")
-#end
+## Link roles per kind: workitem-link-role multi-selectors, read with bwRoleIds (common.vm).
+#set($copyRoleVals = false)
+#set($copyRoleVals = $parameters.copyLinkRoles.values)
+#set($copyRoleVals = $parameters.copyLinkRoles.values())
+#set($branchRoleVals = false)
+#set($branchRoleVals = $parameters.branchLinkRoles.values)
+#set($branchRoleVals = $parameters.branchLinkRoles.values())
+#set($derivedRoleVals = false)
+#set($derivedRoleVals = $parameters.derivedLinkRoles.values)
+#set($derivedRoleVals = $parameters.derivedLinkRoles.values())
 
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.showIndirect.singleValue)
@@ -195,6 +182,21 @@
   #end
 #end
 
+## Link role ids from the values() of a workitem-link-role multi-selector (verified on 2512, docCoverage spike C2:
+## each value is a ProxyEnumOption, id() = role id). Identifiers only, as they go into SQL.
+#macro(bwRoleIds $bwVals $bwOut)
+  #if($bwVals)
+    #foreach($bwV in $bwVals)
+      #set($bwRid = "$bwV")
+      #set($bwRid = $bwV.id())
+      #set($bwRidS = "$bwRid")
+      #if($bwRidS.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwRidS))
+        #set($void = $bwOut.add($bwRidS))
+      #end
+    #end
+  #end
+#end
+
 #set($excludedTypes = [])
 #bwIdList($excludedTypesStr $excludedTypes)
 
@@ -249,11 +251,11 @@
 #end
 
 #set($copyRoles = [])
-#bwIdList($copyRolesStr $copyRoles)
+#bwRoleIds($copyRoleVals $copyRoles)
 #set($branchRoles = [])
-#bwIdList($branchRolesStr $branchRoles)
+#bwRoleIds($branchRoleVals $branchRoles)
 #set($derivedRoles = [])
-#bwIdList($derivedRolesStr $derivedRoles)
+#bwRoleIds($derivedRoleVals $derivedRoles)
 
 ## role -> kind (first kind wins if a role is listed twice)
 #set($roleKind = $objectFactory.newMap())
@@ -284,13 +286,13 @@
 #if(!$projectOk)
   <div class="bw-warn">Document Branches and Copies: place this widget on a page of a project.</div>
 #elseif($roleKind.size() == 0)
-  <div class="bw-warn">Document Branches and Copies: no valid link role in the widget parameters.</div>
+  <div class="bw-warn">Document Branches and Copies: select at least one link role (copy, branch or derived) in the widget parameters.</div>
 #else
 
 ## ======================================================================= documents
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
-## status, author, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
 ## (space/name) to keep; empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
@@ -340,20 +342,6 @@
       #set($dStatus = $dStatusObj.getId())
       #set($dStatus = $dStatusObj.getName())
     #end
-    ## The author can be a deleted user: unresolvable objects throw on any access, see bwKey.
-    #set($dAuthor = "")
-    #set($dAuthorObj = false)
-    #set($dAuthorObj = $m.getAuthor())
-    #set($dAuthorUr = "unknown")
-    #if($dAuthorObj)
-      #set($dAuthorUr = $dAuthorObj.isUnresolvable())
-    #end
-    #if("$dAuthorUr" == "false")
-      #set($dAuthor = $dAuthorObj.getId())
-      #set($dAuthor = $dAuthorObj.getName())
-    #elseif($dAuthorObj)
-      #set($dAuthor = "(unknown user)")
-    #end
     #set($dCreated = "")
     #set($dDate = false)
     #set($dDate = $m.getCreated())
@@ -384,7 +372,6 @@
     #set($void = $d.put("space", "$dSpace"))
     #set($void = $d.put("type", "$dType"))
     #set($void = $d.put("status", "$dStatus"))
-    #set($void = $d.put("author", "$dAuthor"))
     #set($void = $d.put("created", "$dCreated"))
     #set($void = $d.put("updated", "$dUpdated"))
     #set($void = $d.put("items", $dItems))
@@ -737,8 +724,6 @@
         #set($fl = "Type")
       #elseif($f == "status")
         #set($fl = "Status")
-      #elseif($f == "author")
-        #set($fl = "Author")
       #elseif($f == "created")
         #set($fl = "Created")
       #elseif($f == "updated")
@@ -833,7 +818,7 @@
 <div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-rel="$relStr" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
 #end
 #foreach($e in $kept)
 #set($mbFlag = "0")
@@ -883,8 +868,7 @@
   var HASH = String.fromCharCode(35);
   var INDIRECT_COLOR = 'rgb(150,150,150)';
   var EXTRA_FIELDS = [
-    ['type', 'Type'], ['status', 'Status'], ['author', 'Author'],
-    ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
+    ['type', 'Type'], ['status', 'Status'], ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
   ];
   var NODE_W = 240;
   var LINE_H = 15;
@@ -991,7 +975,7 @@
       var d = nEls[i].dataset;
       var n = {
         key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
-        type: d.type || '', status: d.status || '', author: d.author || '',
+        type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
         el: nEls[i]
@@ -1782,9 +1766,9 @@
   Widget.prototype.documentRows = function () {
     var deg = {};
     this.edges.forEach(function (e) { deg[e.o] = (deg[e.o] || 0) + 1; deg[e.c] = (deg[e.c] || 0) + 1; });
-    var rows = [['Space', 'Document', 'Title', 'Type', 'Status', 'Author', 'Created', 'Updated', 'Work items', 'Relations shown']];
+    var rows = [['Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items', 'Relations shown']];
     this.shownDocs().forEach(function (n) {
-      rows.push([n.space, n.id, n.title, n.type, n.status, n.author, n.created, n.updated,
+      rows.push([n.space, n.id, n.title, n.type, n.status, n.created, n.updated,
         n.items < 0 ? '' : n.items, deg[n.key] || 0]);
     });
     return rows;
@@ -1821,7 +1805,7 @@
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: this.relationRows(), links: relLinks,
         widths: [14, 28, 34, 22, 14, 28, 34, 10, 10, 10, 10, 10, 9, 11, 12, 12] },
-      { name: 'Documents', rows: this.documentRows(), links: docLinks, widths: [14, 28, 40, 14, 14, 20, 18, 18, 11, 11] },
+      { name: 'Documents', rows: this.documentRows(), links: docLinks, widths: [14, 28, 40, 14, 14, 18, 18, 11, 11] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 14, 14, 10] }
     ]);
   };

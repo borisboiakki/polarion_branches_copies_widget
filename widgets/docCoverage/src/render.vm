@@ -60,16 +60,7 @@
 #set($roleVals = false)
 #set($roleVals = $parameters.roles.values)
 #set($roleVals = $parameters.roles.values())
-#if($roleVals)
-  #foreach($v in $roleVals)
-    #set($rid = "$v")
-    #set($rid = $v.id())
-    #set($ridS = "$rid")
-    #if($ridS.matches("[A-Za-z0-9_.-]+") && !$roleAll.contains($ridS))
-      #set($void = $roleAll.add($ridS))
-    #end
-  #end
-#end
+#bwRoleIds($roleVals $roleAll)
 #set($roleIds = [])
 #foreach($r in $roleAll)
   #if($roleIds.size() < $maxRoles)
@@ -460,8 +451,6 @@
         #set($fl = "Type")
       #elseif($f == "status")
         #set($fl = "Status")
-      #elseif($f == "author")
-        #set($fl = "Author")
       #elseif($f == "created")
         #set($fl = "Created")
       #elseif($f == "updated")
@@ -584,7 +573,7 @@
 #set($uncStr = "${uncStr}${u}")
 #end
 #end
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
 #end
 #foreach($k in $edgeKeys)
 #set($e = $edges.get($k))

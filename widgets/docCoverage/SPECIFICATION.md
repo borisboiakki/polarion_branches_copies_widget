@@ -50,7 +50,7 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 | F8 | Details: click a line for the counters and the linked items (first 30); click a document for its coverage and uncovered items, with a link that opens the document | Must |
 | F9 | Table view; Excel export with sheets Relations, Documents (with coverage), Uncovered items, Linked items; SVG export; CSV fallback | Must |
 | F10 | PDF/print: static graph + coverage table (no JavaScript), as docBranches | Must |
-| F11 | Extra document fields (type, status, author, dates, item count) as in docBranches | Should |
+| F11 | Extra document fields (type, status, dates, item count) as in docBranches; author removed (PO, user feedback) | Should |
 | F12 | Documents shown: only documents with relations / all selected documents (default parameter, viewer toggle) | Should |
 | F13 | Links between items of the **same** document are ignored. Links to unresolvable items are ignored | Must |
 | F14 | Chains (customer spec ← system reqs ← software reqs) are shown as layers; **no transitive reduction** (each link is a real relation) | Must |
@@ -133,3 +133,4 @@ f. Viewer permissions (as docBranches §10.2 a) — still open.
 | 2026-10-27 | Arrows downstream → upstream (link direction), upstream on the left; uncovered list capped at 500 per document (full count shown); no performance concern for the large project | PO |
 | 2026-10-27 | Widget 0.1.0 implemented: shared core + `graph.js` (coverage recomputed in the browser from the shown roles and documents, document picker, document details with uncovered items, table, Excel, SVG), static PDF view with coverage tables; harness `tools/vtest/docCoverage/` | `tools/test-widget.sh docCoverage` |
 | 2026-10-27 | PO test of 0.1.0 on 2512: upload, Excel, selectors with 2 roles, coverage 83 %, arrows and labels, speed OK. The "Link roles as text" parameter is removed (selector works); still 0.1.0 (not released) | PO |
+| 2026-10-27 | Author field removed (user feedback); role selector read with the shared macro `bwRoleIds`. Still 0.1.0 (not released) | PO |
