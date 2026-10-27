@@ -86,9 +86,18 @@ spike/bwSpike/                 diagnostic test widget (spike/bwSpike.zip = uploa
 - Develop on the branch assigned for the session; commit small, descriptive commits; do not open PRs unless asked.
 - Update `SPECIFICATION.md` (open questions / decisions log) whenever a requirement is clarified.
 - No customer or project-specific data in the repo.
-- Velocity pitfall (seen on 2512): **no backslashes in Velocity string literals** (`"[a-z\-]"` causes a
-  `TokenMgrError` lexical error). Put `-` last in regex character classes instead. Keep `$`/`\` out of JS that sits
-  outside `#[[ ... ]]#` blocks.
+- **Velocity dialect (verified on the PO's 2512 instance):** Polarion's widget parser behaves like **Velocity 1.4**
+  (both errors seen on the instance reproduce exactly with velocity-1.4.jar). Therefore:
+  - no map literals `{}` → use `$objectFactory.newMap()`; list literals `[]` are fine
+  - no `#[[ ... ]]#` unparsed blocks, no `#break`, no `$foreach`/`$velocityCount`-style 1.7 features
+  - no method chains split across lines (`$factory.x()` newline `.y()`) → one statement per line.
+    Note: guide §2.1 shows multi-line chains, which fail on this instance
+  - no backslashes in Velocity string literals (`"[a-z\-]"` → lexical error); put `-` last in a regex class
+  - no `#directive` look-alikes in plain text/HTML/JS/CSS (e.g. writing `#include` in a sentence) → avoid `#`
+    in inline CSS/JS/SVG colours (use `rgb()`), and avoid `$` in inline JS
+  - arithmetic is reliable on Integer only (Long results, e.g. `$date.systemTime` differences, may not compute)
+- **Always run `tools/vcheck.sh` before committing a `.vm` change.** It parses every template with Velocity 1.4
+  (needs Java; it downloads the jars to `tools/.lib/` on first use).
 - After editing `spike/bwSpike/`, rebuild `spike/bwSpike.zip` (folder at zip root, Deflated).
 - Before finishing work, run through guide §13 validation checklist; say plainly what could not be tested
   (no Polarion instance is available in the sandbox).

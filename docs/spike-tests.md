@@ -165,6 +165,8 @@ may have no links at all, so it can only be detected through metadata (A3).
 
 ### Install
 
+The templates are parser-checked with Velocity 1.4 (`tools/vcheck.sh`), which matches the 2512 instance.
+
 1. Download `spike/bwSpike.zip` from this repository (or zip the `spike/bwSpike` folder yourself; the folder must be at the root of the zip).
 2. Go to **Administration → Documents and Pages → Velocity Widgets → Upload**. Use the scope of the **test project**.
 3. Create a LiveReport page in the test project. Add the widget **"Branches Widget - Spike Tests"** (category *Branches Widget*) several times, one per test.
