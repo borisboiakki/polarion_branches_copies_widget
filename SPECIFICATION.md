@@ -50,6 +50,7 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target. **Heading items are excluded** from counts by default (parameter: excluded types, default `heading`) | Should |
 | F9 | Click a node to open the document; click an edge to list the linking work items | Should |
 | F10 | Filters: space, document type, status, text | Should |
+| F10c | **Indirect (inherited) relations hidden by default** (transitive reduction, §7). A viewer toggle "show indirect relations" displays them as faint dashed lines | Must |
 | F10b | **Show all documents / only documents with relations**: default set in the widget parameters, and the viewer can switch it in the widget UI (no edit mode needed). A **Refresh** control re-runs the analysis | Must |
 | F11 | Layout: family tree (layered, sources on the left/top) by default; zoom, pan, fit-to-view | Should |
 | F12 | Export the current graph as **SVG and PNG** from the widget UI | Could (a plus) |
@@ -111,7 +112,7 @@ is in the configured role set R(kind).
   **no** metadata and is detected only through `duplicates` links.
 - **Inherited links (verified on 2512, spike R2.8)**: copying a copy keeps the links of the copied items. The items of
   E (copy of B, which is a copy of A) link with `duplicates` to B **and** to A. Raw counting therefore gives an extra
-  edge A → E. Rule (proposed, `[?]` PO): **transitive reduction**. Drop an edge S → T of kind k when there is a
+  edge A → E. Rule (**decided**): **transitive reduction**. Drop an edge S → T of kind k when there is a
   document M with S → M and M → T (same kind) and the S → T links are inherited through M. The direct parent is the
   closest source. A viewer toggle "show indirect relations" shows them again as faint dashed lines. Supporting signal:
   the inherited link keeps its older link revision (84994 vs 85000).
@@ -136,7 +137,6 @@ context (F15), non-LiveDoc documents.
 ## 10. Open questions
 
 1. Spike results: Part A done. Waiting on widget tests V2–V7 (`docs/spike-tests.md`).
-2. Inherited links (§7): hide indirect relations by default (transitive reduction) with a toggle to show them?
 
 ## 11. Decision log
 
@@ -161,3 +161,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Spike A2 Q3–Q6: branch/derived metadata confirmed (incl. branch without overwrite), copies have no metadata, DISTINCT/GROUP BY accepted, `c_id` = `c_modulename` = document name. Part A2 complete | `docs/A2_*.xlsx` |
 | 2026-10-27 | Spike A3 R1: REST document attributes do not show branched/derived-from (only `derivedFromLinkRole`/`derivedFields` on the derived doc); relationships not inspected. Not needed: the widget uses SQL. R2 optional | `docs/R1_test_results.txt` |
 | 2026-10-27 | Spike A3 R2: REST confirms roles/direction; copy of a copy keeps the inherited `duplicates` link to the original (E→A besides E→B). Part A complete | `docs/R2_test_results.txt` |
+| 2026-10-27 | Indirect relations from inherited links are hidden by default (transitive reduction), with a viewer toggle to show them | PO |
