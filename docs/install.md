@@ -26,6 +26,8 @@ Widget id `docBranches`, version in `VERSION` (N.N.N; shown in the PDF header an
 | Spaces to include | empty (all) | Comma-separated space names, e.g. `Requirements, Design` |
 | Documents shown by default | Only documents with relations | Or *All documents*. Viewers can switch it in the widget |
 | Indirect relations by default | Hidden | Relations inherited through an intermediate copy (see below) |
+| Relation kinds shown by default | none = all | Copies, Branches, Derived. Viewers can toggle each kind in the widget |
+| Linked item counts on the lines by default | Shown | Or *Hidden*: line labels show only the kinds (e.g. `copy` instead of `copy 5`). Viewers can toggle it |
 | Extra document fields shown by default | none | Type, status, author, created, updated, work item count. Viewers can toggle them |
 | Minimum linked work items for a relation | 1 | Relations with fewer linked items are dropped, unless document metadata says branch/derived |
 | Graph height in pixels | 600 | Height of the scrollable graph area |
@@ -47,13 +49,16 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 
 ## Using the widget
 
-- **Toolbar**: documents shown (all / only related), indirect relations, extra fields, highlight search,
-  Fit / zoom, Table / Graph, SVG download, Refresh (reloads the page and re-runs the analysis).
+- **Toolbar**: documents shown (all / only related), indirect relations, relation kinds (copies / branches / derived), item counts on the lines, extra fields, highlight search,
+  Fit / zoom, Table / Graph, SVG download, Excel download, Refresh (reloads the page and re-runs the analysis).
 - **Click a document** to open it. **Hover a line** for counts and coverage; **click a line** for the
   list of linked work items (up to 30).
+- **Excel**: a workbook with the shown relations (counts, metadata, coverage), the shown documents and the linked
+  work items (up to 30 per document pair), with links to Polarion. The toolbar filters apply. If the Excel library
+  could not be loaded, the button downloads the relations as CSV and the status line says so.
 - **PDF export / print**: the widget renders a static graph and a relations table (no JavaScript).
 
-## Known limitations (v0.1)
+## Known limitations
 
 - One project only; links to documents of other projects are ignored.
 - Documents are read through the Open API data service. Permission filtering for viewers who

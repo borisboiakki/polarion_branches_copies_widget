@@ -15,5 +15,9 @@ for f in browser pdf; do
   { printf '<!doctype html><html><head><meta charset="utf-8"><title>%s</title></head><body style="margin:16px;width:1180px">' "$f"
     cat "$out/$f-fragment.html"; echo '</body></html>'; } > "$out/$f.html"
 done
+# Polarion turns the directive into a script tag; emulate it (the Velocity 1.4 harness leaves it as text).
+mkdir -p "$out/resources" && cp "$root/widget/dist/docBranches/resources/xlsx.js" "$out/resources/"
+sed -i 's|#loadWidgetJs("resources/xlsx.js")|<script src="resources/xlsx.js"></script>|' "$out/browser.html"
+grep -q '<script src="resources/xlsx.js">' "$out/browser.html" || { echo "loadWidgetJs directive not found in the output"; exit 1; }
 node "$root/tools/vtest/browser-check.js" "$out"
 echo "Screenshots and exports in $out"
