@@ -87,14 +87,14 @@ spike/bwSpike/                 diagnostic test widget (spike/bwSpike.zip = uploa
 - Update `SPECIFICATION.md` (open questions / decisions log) whenever a requirement is clarified.
 - No customer or project-specific data in the repo.
 - **Velocity dialect (verified on the PO's 2512 instance):** Polarion's widget parser behaves like **Velocity 1.4**
-  (both errors seen on the instance reproduce exactly with velocity-1.4.jar). Therefore:
+  (both errors seen on the instance reproduce exactly with velocity-1.4.jar). Details in guide §3.1.9. Therefore:
   - no map literals `{}` → use `$objectFactory.newMap()`; list literals `[]` are fine
-  - no `#[[ ... ]]#` unparsed blocks, no `#break`, no `$foreach`/`$velocityCount`-style 1.7 features
+  - `#[[ ... ]]#`, `#break`, `$foreach` parse but do nothing (emitted as text) → don't rely on them
   - no method chains split across lines (`$factory.x()` newline `.y()`) → one statement per line.
     Note: guide §2.1 shows multi-line chains, which fail on this instance
   - no backslashes in Velocity string literals (`"[a-z\-]"` → lexical error); put `-` last in a regex class
-  - no `#directive` look-alikes in plain text/HTML/JS/CSS (e.g. writing `#include` in a sentence) → avoid `#`
-    in inline CSS/JS/SVG colours (use `rgb()`), and avoid `$` in inline JS
+  - no directive names in plain text/HTML/JS (e.g. writing `#include` in a sentence); hex colours are fine;
+    avoid `$` in inline JS
   - arithmetic is reliable on Integer only (Long results, e.g. `$date.systemTime` differences, may not compute)
 - **Always run `tools/vcheck.sh` before committing a `.vm` change.** It parses every template with Velocity 1.4
   (needs Java; it downloads the jars to `tools/.lib/` on first use).

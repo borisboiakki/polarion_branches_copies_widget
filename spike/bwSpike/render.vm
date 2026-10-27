@@ -55,7 +55,12 @@
 #set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
 
 ## Document key used to group: space/document-name
-#macro(bwsDocKey $mod)#set($bwsKey = "")#if($mod)#set($bwsKey = "$!mod.getModuleFolder()/$!mod.getId()")#end#end
+#macro(bwsDocKey $mod)
+  #set($bwsKey = "")
+  #if($mod)
+    #set($bwsKey = "$!mod.getModuleFolder()/$!mod.getId()")
+  #end
+#end
 
 <div class="bws">
 <h4>Branches Widget spike &mdash; test <code>$esc.html($test)</code> &mdash; project <code>$!esc.html($projectId)</code></h4>
@@ -82,8 +87,13 @@
     <tr><td>Current user</td><td>$!esc.html($securityService.getCurrentUser())</td></tr>
   </table>
   <p>Methods of ${esc.d}widgetContext containing url / resource / path / widget (empty if introspection is blocked):</p>
-  <pre>#foreach($mt in $widgetContext.getClass().getMethods())#if($mt.getName().toLowerCase().matches(".*(url|resource|path|widget).*"))$mt.getName()
-#end#end</pre>
+  <pre>
+  #foreach($mt in $widgetContext.getClass().getMethods())
+    #if($mt.getName().toLowerCase().matches(".*(url|resource|path|widget).*"))
+      $mt.getName()
+    #end
+  #end
+  </pre>
 
 ## ================================================================ V2 documents
 #elseif($test == "docs")
@@ -91,7 +101,9 @@
   #set($t0 = $date.systemTime)
   #set($rDocs = $transaction.objects().searchBySql($docSql))
   #set($rCount = 0)
-  #foreach($d in $rDocs)#set($rCount = $rCount + 1)#end
+  #foreach($d in $rDocs)
+    #set($rCount = $rCount + 1)
+  #end
   #set($t1 = $date.systemTime)
   #set($dt1 = $t1 - $t0)
   <p>Rendering API <code>${esc.d}transaction.objects().searchBySql</code>: class <code>$!rDocs.getClass().getName()</code>, <b>$rCount</b> documents, $!dt1 ms (start $t0, end $t1)</p>
@@ -100,7 +112,9 @@
   #set($n = 0)
   #foreach($d in $rDocs)
     #set($n = $n + 1)
-    #if($n <= 5)<li>$d.render().withLinks() <small>($!d.getClass().getName())</small></li>#end
+    #if($n <= 5)
+      <li>$d.render().withLinks() <small>($!d.getClass().getName())</small></li>
+    #end
   #end
   </ul>
 
@@ -110,7 +124,11 @@
   #set($dt1 = $t1 - $t0)
   <p>Open API <code>getDataService().sqlSearch</code>: class <code>$!oDocs.getClass().getName()</code>, <b>$!oDocs.size()</b> documents, $!dt1 ms (start $t0, end $t1)</p>
   #set($first = false)
-  #foreach($m in $oDocs)#if(!$first)#set($first = $m)#end#end
+  #foreach($m in $oDocs)
+    #if(!$first)
+      #set($first = $m)
+    #end
+  #end
   #if($first)
     <p>Prototype field names of the first document (empty if not accessible):</p>
     <pre>$!first.getPrototype().getKeyNames()</pre>
@@ -156,7 +174,9 @@
   #set($n = 0)
   #foreach($m in $res)
     #set($n = $n + 1)
-    #if($n <= $maxRows)<li>$!esc.html($m.getModuleFolder()) / $!esc.html($m.getId()) &mdash; $!esc.html($m.getTitle())</li>#end
+    #if($n <= $maxRows)
+      <li>$!esc.html($m.getModuleFolder()) / $!esc.html($m.getId()) &mdash; $!esc.html($m.getTitle())</li>
+    #end
   #end
   </ul>
 
@@ -221,7 +241,9 @@
     #set($n = 0)
     #foreach($k in $pairs.keySet())
       #set($n = $n + 1)
-      #if($n <= $maxRows)<tr><td>$esc.html($k)</td><td>$pairs.get($k)</td></tr>#end
+      #if($n <= $maxRows)
+        <tr><td>$esc.html($k)</td><td>$pairs.get($k)</td></tr>
+      #end
     #end
   </table>
 
