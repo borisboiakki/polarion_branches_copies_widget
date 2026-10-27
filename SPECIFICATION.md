@@ -150,6 +150,10 @@ context (F15), non-LiveDoc documents.
    d. `getType()/getStatus().getName()`, `getAuthor().getName()` and `$date.format` give readable values.
    e. Multi-value parameter "Extra document fields" is read correctly (`values()` type not yet observed on 2512).
    f. PNG export works in the browser (linked to open check 1 / spike V6).
+   g. (fixed in 0.1.1) A document whose author user was deleted made the widget fail with
+      `uri: subterra:data-service:objects:/default/${User}t0025088` (found by the PO on 2512). References to
+      unresolvable objects (author, branched/derived source, link target) are now checked with `isUnresolvable()`.
+      Still to confirm on the instance with the document of that user.
 
 ## 11. Decision log
 
@@ -178,3 +182,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Spike Part B (V1–V7) on `EOLE_AI_MCP_TESTS`: data approach (b) validated and fast; `#include`/`#parse` of resources fail → JS/CSS inlined; inline JS + SVG export work in the browser; static SVG renders in PDF. Transitive reduction made kind-agnostic. Pending: V5c/V6 browser screenshots | `docs/V*_*.pdf` |
 | 2026-10-27 | Start widget implementation (v0.1) before V5c/V6 browser results; tracked as open check §10.1 | PO |
 | 2026-10-27 | Widget v0.1.0 implemented (`widget/src`, id `docBranches`): Velocity data collection + inlined JS graph, static PDF view. Tested with Velocity 1.4 on mocks and in Chromium; open checks §10.2 | `tools/test-widget.sh` |
+| 2026-10-27 | Widget 0.1.1: fixes the exception on documents with a deleted author (unresolvable user); all object references are guarded; harness mocks unresolvable objects | `tools/vtest/WidgetHarness.java` |

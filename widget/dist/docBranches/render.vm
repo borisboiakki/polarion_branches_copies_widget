@@ -2,7 +2,7 @@
 ## Source: widget/src/render.vm. tools/build-widget.py inlines branches-graph.js at the BW_INLINE_JS marker,
 ## checks the result with Velocity 1.4 and writes widget/dist/docBranches.zip.
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
-#set($bwVersion = "0.1.0")
+#set($bwVersion = "0.1.1")
 <style>
   .bw-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
   .bw-toolbar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
@@ -217,14 +217,22 @@
 #end
 
 ## Document key used everywhere: "space/name"
+## Referenced objects (document of a link, "branched from" source) can be unresolvable (deleted, no access).
+## Any access other than isUnresolvable() then throws, so they are only used when isUnresolvable() is false.
 #macro(bwKey $bwMod)
   #set($bwKeyOut = "")
-  #set($bwF = "")
-  #set($bwF = $bwMod.getModuleFolder())
-  #set($bwN = "")
-  #set($bwN = $bwMod.getId())
-  #if("$bwN" != "")
-    #set($bwKeyOut = "${bwF}/${bwN}")
+  #set($bwUr = "unknown")
+  #if($bwMod)
+    #set($bwUr = $bwMod.isUnresolvable())
+  #end
+  #if("$bwUr" == "false")
+    #set($bwF = "")
+    #set($bwF = $bwMod.getModuleFolder())
+    #set($bwN = "")
+    #set($bwN = $bwMod.getId())
+    #if("$bwN" != "")
+      #set($bwKeyOut = "${bwF}/${bwN}")
+    #end
   #end
 #end
 
@@ -277,12 +285,19 @@
       #set($dStatus = $dStatusObj.getId())
       #set($dStatus = $dStatusObj.getName())
     #end
+    ## The author can be a deleted user: unresolvable objects throw on any access, see bwKey.
     #set($dAuthor = "")
     #set($dAuthorObj = false)
     #set($dAuthorObj = $m.getAuthor())
+    #set($dAuthorUr = "unknown")
     #if($dAuthorObj)
+      #set($dAuthorUr = $dAuthorObj.isUnresolvable())
+    #end
+    #if("$dAuthorUr" == "false")
       #set($dAuthor = $dAuthorObj.getId())
       #set($dAuthor = $dAuthorObj.getName())
+    #elseif($dAuthorObj)
+      #set($dAuthor = "(unknown user)")
     #end
     #set($dCreated = "")
     #set($dDate = false)

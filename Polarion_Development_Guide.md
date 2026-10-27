@@ -561,6 +561,14 @@ Always use the `([...])` array delimiters.
 #end
 ```
 
+> **Every referenced object needs this guard, not only linked work items** (verified on 2512, widget v0.1.0 on a project with
+> a deleted user): a document's author, `getValue("branchedFrom")` / `getValue("derivedFrom")`, work item links, assignees...
+> can point to an *unresolvable* object (deleted user, document without access). Any call other than `isUnresolvable()`
+> then throws, and the widget shows *"There was an exception (see server log for details) uri:
+> subterra:data-service:objects:/default/${User}t0025088"*. Velocity 1.4 has no try/catch, so check first:
+> `#set($u = $doc.getAuthor())` then `#set($ur = "unknown")`, `#set($ur = $u.isUnresolvable())`, and use `$u` only when
+> `"$ur" == "false"`. The explicit "unknown" default also keeps the code safe if the method does not exist.
+
 #### 3.1.9 Velocity 1.4 Dialect in Widgets
 
 > **Verified on a Polarion 2512 instance (2026-10-27)**: the Velocity parser used for uploaded widgets

@@ -59,3 +59,5 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 - Documents are read through the Open API data service. Permission filtering for viewers who
   cannot read some documents has not been checked yet (see SPEC §10).
 - The PNG export depends on the browser allowing SVG-to-canvas drawing (spike V6, pending).
+- A document whose author user was deleted shows the author as "(unknown user)". Branch or derived documents whose
+  source document cannot be read are ignored, and so are links to unreadable work items.
