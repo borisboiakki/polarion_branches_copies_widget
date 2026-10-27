@@ -10,4 +10,6 @@ before it is built (see `widgets/docCoverage/SPECIFICATION.md` §8).
 | `spike-widget/cvSpike.zip` | Its upload package. Rebuild after editing the sources (folder `cvSpike/` at the zip root, Deflated) |
 
 The widget is checked locally with Velocity 1.4 on the docBranches mock set (`tools/vtest/cvSpike/SpikeHarness.java`, see
-`spike-tests.md`). Raw results from Polarion (screenshots, PDFs) are not committed; only the findings are kept.
+`spike-tests.md`). Raw results from Polarion (screenshots, PDFs) are **not committed** (the repository is public; PDF exports carry the company
+template). Send them in the chat; only the findings are kept. Results pushed by mistake on 2026-10-27 were removed from the
+branch history.

@@ -22,8 +22,9 @@ link scan and the coverage computation on a large project.
 4. Then repeat **C3 and C4** on the **large project** (≈100 documents / 20k items) with real coverage documents,
    and once with **no document selected** (= all documents) to see the worst-case timing.
 
-Report a screenshot (or a copy of the tables) of each instance. Hide or replace anything confidential (document
-names can stay, they do not go into the repository unless you agree).
+Report a screenshot (or a copy of the tables) of each instance **in the chat**. Do **not** commit raw results (PDF,
+PNG, Excel) to the repository: it is public, and PDF exports carry the company template (logo, confidentiality footer).
+Only the findings below are kept.
 
 ## Tests
 
@@ -63,7 +64,7 @@ tell what the real objects are.
 
 | Test | Result on 2512 | Consequence for the widget |
 |---|---|---|
-| C1 | pending | |
-| C2 | pending | |
-| C3 | pending | |
-| C4 | pending | |
+| C1 | ✅ `values()` = `StrictListImpl` of `ProxyEnumOption`; text `ProxyEnumOption id:_default / Doc`, `id()` = `_default / Doc`. `getModelObject()` = `ProxyDocument`, `isUnresolvable()` false. `getReference()`: project and name OK, **`spaceId()` empty**. `getOldApi()` = `Module`: folder `_default`, id, title, URI `subterra:data-service:objects:/default/<project>${Module}{moduleFolder}_default#<doc>` | Key = `getOldApi().getModuleFolder()` + `/` + `getId()` (as cvSpike); default space is `_default`, same as `MODULE.C_MODULEFOLDER` |
+| C2 | ✅ value = `ProxyEnumOption` (`id:satisfies`), `id()` = `satisfies`, label read = `satisfies`. Project roles readable via `getTrackerProject().getWorkItemLinkRoleEnum().getAllOptions()` with id, name, opposite name (e.g. `satisfies`/`satisfies`/`is satisfied by`, `parent`/`has parent`/`is parent of`) | Role ids from `id()`; line label = role **name** (PO), fallback id |
+| C3 | ✅ 3 documents (customer spec + 2 system specs), role `satisfies`: 5 link-source items, 6 links, 0 unresolvable, 2 pairs, both with the **customer spec as target**: ← spec 1: 2 links / 2 source / 2 target items; ← spec 2: 4 links / 3 / 3. SQL 3–4 ms, scan ≤ 1 ms. Large project and "no document selected" not run | Direction confirmed: upstream = link target. Worst-case timing stays an open check of 0.1.0 (docBranches V4: 22 + 84 ms on 120 docs with the same approach) |
+| C4 | ✅ Customer spec: 6 counted items (heading excluded), 5 covered, **83 %**, 1 uncovered item listed; count SQL ≤ 1 ms | Coverage algorithm confirmed |

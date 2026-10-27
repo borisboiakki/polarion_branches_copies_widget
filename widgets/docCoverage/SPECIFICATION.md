@@ -1,7 +1,7 @@
 # Specification — Document Coverage widget (docCoverage)
 
-**Status:** v0.1 draft, 2026-10-27, written with the product owner (PO). Spike C1–C4 is pending on 2512
-(`tests/docCoverage-v0.1.x/spike-tests.md`). Items marked `[?]` are open or need verification on a Polarion instance.
+**Status:** v0.2, 2026-10-27, written with the product owner (PO). Spike C1–C4 done on 2512
+(`tests/docCoverage-v0.1.x/spike-tests.md`, §8); implementation of 0.1.0 can start. Items marked `[?]` are open or need verification on a Polarion instance.
 
 ## 1. Goal
 
@@ -28,10 +28,10 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 
 - **Link source / target**: Polarion stores a link on one work item (the source, `fk_uri_p_workitem`) pointing to
   another (the target, `fk_uri_workitem`). Verified for `duplicates`/`branched_from`/`derived_from` on 2512 (docBranches
-  spike A2); to be checked for the coverage roles (spike C3).
+  spike A2) and for `satisfies` (spike C3).
 - **Upstream document** = document of the link **targets** (e.g. the customer specification).
   **Downstream document** = document of the link **sources** (e.g. the system requirements that "satisfy").
-  `[?]` C3 confirms that coverage links (e.g. `satisfies`, `verifies`) are stored on the downstream item.
+  Verified by C3 for `satisfies`: the link is stored on the downstream item and targets the customer specification item.
 - **Counted items**: work items of a document, without the excluded types (default `heading`).
 
 ## 4. Functional requirements
@@ -69,24 +69,31 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 1. **Parameters**: documents (`$factory.enumeration("Documents", "@document")`, multi), roles
    (`$factory.enumeration("Link roles", "workitem-link-role")`, multi), roles as text (fallback), excluded types, spaces,
    documents shown, item counts, extra fields, height. Common ones come from `shared/vm/params.vm`.
-2. **Documents**: `shared/vm/documents.vm`, restricted to the selected document keys (space/name) resolved through
-   `getModelObject()` `[?]` C1.
+2. **Documents**: `shared/vm/documents.vm`, restricted to the selected document keys (space/name). Verified by C1: each
+   value of `$parameters.docs.values()` is a `ProxyEnumOption`; `getModelObject()` is a `ProxyDocument` (check
+   `isUnresolvable()`); its `getOldApi()` is the Open API `Module`, whose `getModuleFolder()` (`_default` for the default
+   space) and `getId()` give the key. `getReference().spaceId()` is empty: do not use it. The option `id()` reads
+   `_default / Name` (not used).
 3. **Links**: one SQL query returns the link-source items of the selected documents with a selected role whose target is
    in another selected document (join `struct_workitem_linkedworkitems`, `workitem` source/target, `module` source/target,
    filter on `c_role` and on module folder/name). Velocity scans each item's `getLinkedWorkItemsStructsDirect()` and
    groups per (upstream, downstream) pair: links per role, distinct downstream items, distinct upstream items.
 4. **Coverage**: per upstream document, its counted items (one SQL query, as the item count of docBranches) against
    the set of covered item ids over all downstream documents; uncovered ids capped in the page model (e.g. 500, full
-   count always shown) `[?]` cap.
-5. **Client**: categories = selected roles (colour/dash from a 5-style palette), node lines with coverage %, in-widget
+   count always shown).
+5. **Roles** (verified by C2): `$parameters.roles.values()` gives `ProxyEnumOption`s, `id()` = role id. Labels come from
+   `$trackerService.getTrackerProject(projectId).getWorkItemLinkRoleEnum().getAllOptions()` (`getId()`, `getName()`,
+   `getOppositeName()`); the line shows the role **name** (fallback: id).
+6. **Client**: categories = selected roles (colour/dash from a 5-style palette), node lines with coverage %, in-widget
    document selector (`state.hidden` in `layout()`), details/table/Excel specific to coverage.
 
 ## 7. Open questions
 
-1. Arrow direction: upstream → downstream (as docBranches: original → copy), upstream documents on the left.
-   Alternative: arrow in the link direction (downstream → upstream, "satisfies"). `[?]` PO
-2. Role labels: role id, role name, or opposite name ("satisfies" / "is satisfied by")? Default: role name `[?]` C2
-3. Cap of the uncovered items list in the page model (default 500 per document) `[?]`
+1. Arrow direction: upstream → downstream (as docBranches: original → copy), upstream documents on the left. C3 shows
+   the upstream document is the link target, so this is the default. Alternative: arrow in the link direction
+   (downstream → upstream, "satisfies"). `[?]` PO
+2. ~~Role labels~~ **Decided**: role name (PO, 2026-10-27).
+3. Cap of the uncovered items list in the page model (default 500 per document) `[?]` PO
 4. Should a document that is both upstream and downstream (middle of a chain) show its coverage %? Default: yes, for
    the links where it is the target.
 
@@ -94,10 +101,10 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 
 | Test | Question | Result |
 |---|---|---|
-| C1 | How are the selected documents of an `@document` multi-select read (`values()`, `getModelObject()`, space/name)? | pending |
-| C2 | How are the selected link roles read (id, name), and which roles does the project have (id, name, opposite name)? | pending |
-| C3 | Link direction of the coverage roles, link scan between the selected documents, timing on the large project | pending |
-| C4 | Counted items per upstream document, coverage % and uncovered items, timing | pending |
+| C1 | How are the selected documents of an `@document` multi-select read (`values()`, `getModelObject()`, space/name)? | ✅ `ProxyEnumOption` → `getModelObject()` `ProxyDocument` → `getOldApi()` `Module` (folder `_default`, id). `getReference().spaceId()` empty |
+| C2 | How are the selected link roles read (id, name), and which roles does the project have (id, name, opposite name)? | ✅ `id()` = role id; project roles readable with name and opposite name |
+| C3 | Link direction of the coverage roles, link scan between the selected documents, timing on the large project | ✅ `satisfies` stored on the downstream item, target = customer spec; SQL with source + target document filter works; 3–4 ms SQL, ≤ 1 ms scan (small set). Large project / all documents not measured `[?]` |
+| C4 | Counted items per upstream document, coverage % and uncovered items, timing | ✅ 6 counted items (heading excluded), 5 covered = 83 %, 1 uncovered listed; ≤ 1 ms |
 
 ## 9. Decision log
 
@@ -107,3 +114,6 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 | 2026-10-27 | Counters: link count per role, upstream coverage %, uncovered items list, downstream items with links | PO |
 | 2026-10-27 | v1 single project | PO |
 | 2026-10-27 | Repository restructured into `widgets/` + `shared/` (docBranches 0.2.1, no functional change) | PR #4 |
+| 2026-10-27 | Spike C1–C4 on 2512 (project with a customer specification and two system specifications, role `satisfies`): selectors readable, document key from `getOldApi()`, coverage links stored on the downstream item, coverage computed as expected, fast on the small set | PO tests |
+| 2026-10-27 | Line labels show the role **name** | PO |
+| 2026-10-27 | Raw spike results (PDF/PNG with company branding) removed from the branch and its history; only findings are kept | PO |

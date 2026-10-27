@@ -11,7 +11,7 @@ one build and one test setup:
 - **docCoverage** (`widgets/docCoverage/`, planned): for selected documents and 1–5 link roles, which document
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
-  (`tests/docCoverage-v0.1.x/`, waiting for the PO's results), (3) implementation reusing `shared/`.
+  (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (next).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
 
 ## Required reading before coding
@@ -86,6 +86,13 @@ Verified through web search (2026-10-27):
 - **Verified by the PO on 2512 with widget 0.2.0**: `#loadWidgetJs("resources/xlsx.js")` (Widget SDK directive) loads a script
   from the widget's `resources/` folder (Excel export works; zip entry `docBranches/resources/xlsx.js` accepted). Multi-value
   `customEnum` parameters are read with `values()` ("Relation kinds shown by default" works).
+- **Verified by the docCoverage spike C1–C4 on 2512** (`tests/docCoverage-v0.1.x/spike-tests.md`):
+  - `@document` multi-select: `values()` → `ProxyEnumOption`; `getModelObject()` → `ProxyDocument` (`isUnresolvable()`);
+    `getOldApi()` → Open API `Module` (`getModuleFolder()` = `_default` for the default space, `getId()`).
+    `getReference().spaceId()` is **empty**: take space/name from `getOldApi()`.
+  - `workitem-link-role` multi-select: `values()` → `ProxyEnumOption`, `id()` = role id. Project link roles with name and
+    opposite name: `$trackerService.getTrackerProject(id).getWorkItemLinkRoleEnum().getAllOptions()`.
+  - `satisfies` links are stored on the downstream item (source) and target the customer specification item.
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.
@@ -124,7 +131,9 @@ test-data/                     anonymised sample structures for manual verificat
   Each widget has its own root class (`bw-root` for docBranches) so that two widgets on one page never pick up
   each other's roots.
 - No customer or project-specific data in the repo. Exception agreed with the PO: the spike test set on the sandbox
-  project `VforIA` (`SRS_Test` and its copies/branches). Raw test results (PDF, Excel, JSON) are NOT committed; keep only the findings in the docs.
+  project `VforIA` (`SRS_Test` and its copies/branches). **Never commit raw test results** from the PO's instance (PDF,
+  PNG, Excel, JSON): the repository is public and PDF exports carry the company template (logo, confidentiality footer).
+  Keep only the findings in the docs. If raw results get pushed, ask the PO and remove them (including from the history).
 - **Velocity dialect (verified on the PO's 2512 instance):** Polarion's widget parser behaves like **Velocity 1.4**
   (both errors seen on the instance reproduce exactly with velocity-1.4.jar). Details in guide §3.1.9. Therefore:
   - no map literals `{}` → use `$objectFactory.newMap()`; list literals `[]` are fine
