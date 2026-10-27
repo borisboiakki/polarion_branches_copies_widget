@@ -106,7 +106,7 @@ is in the configured role set R(kind).
 - Direction (**verified on 2512, spike A2**): for all three roles the copy/branch/derived item is the **link source** and
   the original item is the **link target**. So the edge is drawn original (link target's document) → copy (link source's document).
 - Document metadata (`branched from` / `derived from`) creates an edge even without links. If both sources exist and disagree, show a warning marker.
-- One pair may have several kinds. Draw **one line per pair** labelled with all of its kinds. Style follows the strongest kind (branch > derived > copy `[?]`).
+- One pair may have several kinds. Draw **one line per pair** labelled with all of its kinds. Style follows the strongest kind: **branch > derived > copy** (decided). The label always lists every kind.
 
 ## 8. Out of scope (v1)
 
@@ -126,7 +126,6 @@ context (F15), non-LiveDoc documents.
 
 ## 10. Open questions
 
-1. Precedence when a pair has several kinds (styling): branch > derived > copy?
 2. Spike results: see `docs/spike-tests.md`. Waiting on results from the product owner's 2512 instance.
 
 ## 11. Decision log
@@ -148,3 +147,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Spike test set: project `VforIA`, original `SRS_Test` with copies/branches B–G | `docs/spike-tests.md` §0 |
 | 2026-10-27 | Spike A2 Q1/Q2: link direction verified (copy/branch/derived item → original item) for `duplicates`, `branched_from`, `derived_from`; branch links exist only for overwritten items | `docs/A2_*.xlsx` |
 | 2026-10-27 | Heading work items are excluded from link counts and coverage by default (parameter: excluded work item types, default `heading`) | PO |
+| 2026-10-27 | Line style for a pair with several kinds: precedence branch > derived > copy; label lists all kinds | PO |
