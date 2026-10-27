@@ -47,7 +47,7 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F5 | Link roles per kind are widget parameters with the §3 defaults | Must |
 | F6 | Threshold parameter: minimum linked items (absolute and/or %) before an edge is drawn | Should |
 | F7 | Use document-level metadata (§3) when present and flag disagreement with link-based inference | Should |
-| F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target | Should |
+| F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target. **Heading items are excluded** from counts by default (parameter: excluded types, default `heading`) | Should |
 | F9 | Click a node to open the document; click an edge to list the linking work items | Should |
 | F10 | Filters: space, document type, status, text | Should |
 | F10b | **Show all documents / only documents with relations**: default set in the widget parameters, and the viewer can switch it in the widget UI (no edit mode needed). A **Refresh** control re-runs the analysis | Must |
@@ -128,9 +128,6 @@ context (F15), non-LiveDoc documents.
 
 1. Precedence when a pair has several kinds (styling): branch > derived > copy?
 2. Spike results: see `docs/spike-tests.md`. Waiting on results from the product owner's 2512 instance.
-3. Coverage counts (F8): should document title/heading items be counted? Spike A2 shows they are linked like any
-   other item (e.g. 6 linked items in a document with 5 requirements and 1 title heading). Proposal: exclude the
-   `heading` type by default, via a parameter.
 
 ## 11. Decision log
 
@@ -150,3 +147,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Spike A1: MODULE branching/derivation columns confirmed in the 2512 schema; V1 passed | `docs/A1_FullDBSchema.pdf`, `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
 | 2026-10-27 | Spike test set: project `VforIA`, original `SRS_Test` with copies/branches B–G | `docs/spike-tests.md` §0 |
 | 2026-10-27 | Spike A2 Q1/Q2: link direction verified (copy/branch/derived item → original item) for `duplicates`, `branched_from`, `derived_from`; branch links exist only for overwritten items | `docs/A2_*.xlsx` |
+| 2026-10-27 | Heading work items are excluded from link counts and coverage by default (parameter: excluded work item types, default `heading`) | PO |
