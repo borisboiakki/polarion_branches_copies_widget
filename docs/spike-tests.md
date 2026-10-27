@@ -136,14 +136,64 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
 Looking for relationships or attributes such as `branchedFrom`, `derivedFrom`, `derivedFromLinkRole`, `variant`.
 Please paste the JSON responses. Remove anything confidential first; only the structure and IDs matter.
 
-**R2 — links of one item in `SRS_Test_Reuse_TestB`, one overwritten item in `SRS_Test_Branch_Test_C` and one in
-`SRS_Test_TestD_Derived`** (replace `ITEMID` with the item ID, e.g. `VFIA-123`)
+**R2 — links stored on each test work item** (ready to copy; replace only `BASE_URL` and `TOKEN`)
+
+- `BASE_URL` = your REST root, e.g. `https://myhost/polarion/rest/v1` (no trailing slash)
+- `TOKEN` = your personal access token
+
+Each command is on one line, so it works in bash, PowerShell (`curl.exe`) and cmd. In Postman, use the URL part
+with the two headers. A response lists the links **stored on that item**. Each link `id` has the form
+`VforIA/<this item>/<role>/VforIA/<target item>`, which gives the role and the direction directly.
+
+Expected targets are guessed from the item titles ("Work Item 1" → "Work Item 1" in the source document).
+What matters is the **role** and the **target document**.
+
+| # | Item | Document | What it is | Expected links stored on it |
+|---|---|---|---|---|
+| R2.1 | `VIA-516` | B `SRS_Test_Reuse_TestB` | Work Item 1 (copy) | `duplicates` → `VIA-509` (A, Work Item 1) |
+| R2.2 | `VIA-515` | B `SRS_Test_Reuse_TestB` | title heading (copy) | `duplicates` → `VIA-514` (A, heading) |
+| R2.3 | `VIA-522` | C `SRS_Test_Branch_Test_C` | Work Item 1, overwritten | `branched_from` → `VIA-509` (A) |
+| R2.4 | `VIA-523` | C `SRS_Test_Branch_Test_C` | Work Item 2, overwritten | `branched_from` → `VIA-512` (A) |
+| R2.5 | `VIA-521` | C `SRS_Test_Branch_Test_C` | title heading (branch) | none of the 3 roles |
+| R2.6 | `VIA-525` | D `SRS_Test_TestD_Derived` | Work Item 1 (derived) | `derived_from` → `VIA-509` (A) |
+| R2.7 | `VIA-524` | D `SRS_Test_TestD_Derived` | title heading (derived) | `derived_from` → `VIA-514` (A, heading) |
+| R2.8 | `VIA-531` | E `SRS_Test_Copy_of_B_TestE` | Work Item 1 (copy of copy) | `duplicates` → `VIA-516` (B, not A) |
+| R2.9 | `VIA-536` | F `SRS_Test_F_nooverwrite` | title heading (branch, no overwrite) | none of the 3 roles |
+| R2.10 | `VIA-509` | A `SRS_Test` | Work Item 1 (original) | none of the 3 roles: the links are stored on the copies. If REST also returns back-links here, note it |
 
 ```
-curl -s -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
-  "https://MYHOST/polarion/rest/v1/projects/VforIA/workitems/ITEMID/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-516/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
 ```
-This shows the role and the direction of each link, as seen from that item.
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-515/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-522/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-523/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-521/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-525/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-524/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-531/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-536/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+```
+curl -s -H "Authorization: Bearer TOKEN" -H "Accept: application/json" "BASE_URL/projects/VforIA/workitems/VIA-509/linkedworkitems?fields%5Blinkedworkitems%5D=@all"
+```
+
+Please save the 10 responses in one file (e.g. `docs/R2_test_results.txt`), each preceded by its number (R2.1 … R2.10).
+Paste the **complete** JSON (including `id`, `attributes` and `relationships`), not only the attribute names.
 
 ## Part B — `bwSpike` test widget in Polarion
 
@@ -200,7 +250,7 @@ If any test shows a Velocity error, copy the message from the widget, or from th
 ## Results template (copy into your answer)
 
 ```
-A3 R2 JSON (optional):
+A3 R2 (optional): full JSON of R2.1–R2.10 in docs/R2_test_results.txt
 V2 (counts, timings, working getters, field names, branchedFrom/derivedFrom values):
 V3a / V3b:
 V4 (VforIA + large project: SQL ms, scan ms, items, pairs):
