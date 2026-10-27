@@ -341,6 +341,7 @@ public class WidgetHarness {
         params.put("showMode", new Param(args.length > 2 ? args[2] : "related", null));
         params.put("showIndirect", new Param("hide", null));
         params.put("extraFields", new Param(null, new ArrayList<Object>(Arrays.asList("items", "status"))));
+        params.put("lineCounts", new Param("show", null));
         params.put("relationKinds", new Param(null, new ArrayList<Object>()));
         params.put("threshold", new Param(Integer.valueOf(1), null));
         params.put("height", new Param(Integer.valueOf(560), null));

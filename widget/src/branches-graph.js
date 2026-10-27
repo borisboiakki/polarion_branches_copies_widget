@@ -146,11 +146,12 @@
     return 'copy';
   }
 
-  function kindsLabel(e) {
+  // noCounts: kind names only (line labels when the viewer hides the linked item counts).
+  function kindsLabel(e, noCounts) {
     var parts = [];
     for (var i = 0; i < KINDS.length; i++) {
       var k = KINDS[i];
-      if (e.kinds[k] > 0) { parts.push(KIND_STYLE[k].name + ' ' + e.kinds[k]); }
+      if (e.kinds[k] > 0) { parts.push(KIND_STYLE[k].name + (noCounts ? '' : ' ' + e.kinds[k])); }
       else if (e.meta[k]) { parts.push(KIND_STYLE[k].name); }
     }
     return parts.join(' + ');
@@ -323,6 +324,7 @@
       mode: ds.mode === 'all' ? 'all' : 'related',
       indirect: ds.indirect === '1',
       rel: relFromData(ds.rel),
+      counts: ds.counts !== '0',
       extras: (ds.extras || '').split(',').filter(function (x) { return x; }),
       filter: '',
       zoom: 1,
@@ -356,6 +358,11 @@
         self.state.rel[k] = on; self.render(true);
       });
     });
+
+    var cnt = this.checkbox(bar, 'Item counts', this.state.counts, function (on) {
+      self.state.counts = on; self.render(false);
+    });
+    cnt.title = 'Show the number of linked work items on the lines';
 
     var fields = el('span', { 'class': 'bw-fields' }, bar);
     el('span', { 'class': 'bw-muted' }, fields, 'Fields:');
@@ -496,7 +503,7 @@
       var lt = 0.8;
       var mx = bez(x1, c1x, c2x, x2, lt);
       var my = bez(y1, c1y, c2y, y2, lt) - 3;
-      var label = kindsLabel(e) + (e.indirect ? ' (indirect)' : '');
+      var label = kindsLabel(e, !self.state.counts) + (e.indirect ? ' (indirect)' : '');
       var lg = svg('g', { 'class': 'bw-edge-label' }, gLabels);
       var bg = svg('rect', { fill: 'rgb(255,255,255)', opacity: 0.9, rx: 3 }, lg);
       var t = svg('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-family': FONT, 'font-size': 11, fill: color }, lg, label);

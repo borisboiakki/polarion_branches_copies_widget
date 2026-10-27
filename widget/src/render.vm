@@ -92,6 +92,14 @@
   #set($showIndirect = true)
 #end
 
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.lineCounts.singleValue)
+#set($tmp = $parameters.lineCounts.singleValue())
+#set($showCounts = true)
+#if("$tmp" == "hide")
+  #set($showCounts = false)
+#end
+
 #set($extraList = [])
 #set($tmp = false)
 #set($tmp = $parameters.extraFields.values)
@@ -642,9 +650,17 @@
     #set($dash = "4,4")
     #set($sw = "1")
   #end
+  #set($nbS = "")
+  #set($ndS = "")
+  #set($ncS = "")
+  #if($showCounts)
+    #set($nbS = " $kb")
+    #set($ndS = " $kd")
+    #set($ncS = " $kc")
+  #end
   #set($label = "")
   #if($kb > 0)
-    #set($label = "branch $kb")
+    #set($label = "branch${nbS}")
   #elseif($e.get("metaBranch"))
     #set($label = "branch")
   #end
@@ -653,7 +669,7 @@
       #set($label = "${label} + ")
     #end
     #if($kd > 0)
-      #set($label = "${label}derived $kd")
+      #set($label = "${label}derived${ndS}")
     #else
       #set($label = "${label}derived")
     #end
@@ -662,7 +678,7 @@
     #if($label != "")
       #set($label = "${label} + ")
     #end
-    #set($label = "${label}copy $kc")
+    #set($label = "${label}copy${ncS}")
   #end
   #if($e.get("indirect"))
     #set($label = "${label} (indirect)")
@@ -783,11 +799,15 @@
 #end
 </div>
 #else
+#set($countsFlag = "1")
+#if(!$showCounts)
+#set($countsFlag = "0")
+#end
 #set($indFlag = "0")
 #if($showIndirect)
 #set($indFlag = "1")
 #end
-<div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-rel="$relStr" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
+<div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-rel="$relStr" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
     <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-author="$esc.html($d.get('author'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>

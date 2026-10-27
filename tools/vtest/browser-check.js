@@ -29,6 +29,14 @@ const { chromium } = require('playwright');
   await p.click('label:has-text("Copies") input');
   await p.click('label:has-text("Derived") input');
   await p.waitForTimeout(200);
+  // hide the linked item counts on the lines
+  await p.click('label:has-text("Item counts") input');
+  await p.waitForTimeout(200);
+  const noCount = await p.$$eval('.bw-edge-label', els => els.map(e => e.textContent));
+  console.log('labels without counts:', JSON.stringify(noCount));
+  if (noCount.some(t => /[0-9]/.test(t))) { throw new Error('item counts still shown on the lines'); }
+  await p.click('label:has-text("Item counts") input');
+  await p.waitForTimeout(200);
   // click an edge label -> details
   const labels = await p.$$('.bw-edge-label');
   await labels[0].click();
