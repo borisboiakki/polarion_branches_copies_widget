@@ -124,6 +124,7 @@ shared/vm/*.vm                 Velocity snippets inlined at BW_SHARED markers: s
                                project), documents (document collection)
 shared/resources/              xlsx.js (third-party xlsx-js-style, copied unchanged; loaded with #loadWidgetJs) + LICENSE
 tools/vtest/<w>/               Velocity 1.4 harness with mock Polarion objects + Chromium check (tools/test-widget.sh <w>)
+docs/USER_MANUAL.md            user manual of both widgets (update it when parameters or the toolbar change)
 docs/ARCHITECTURE.md           architecture of the widgets (keep in line with the code)
 docs/<w>/                      install guide and previews
 tests/v0.1.x/                  spike of release 0.1.x: spike-tests.md (plan + findings), spike-widget/ (diagnostic widget
