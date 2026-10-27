@@ -13,4 +13,6 @@ Later versions get their own folder (`tests/vN.N.x/`).
 Test data: project `VforIA` (documents `SRS_Test` and its copies/branches) and the larger project `EOLE_AI_MCP_TESTS`.
 Open checks for the released widget are tracked in `SPECIFICATION.md` section 10.
 
-In `results/R2_test_results.txt` the host name of the test server is replaced by `MYHOST`.
+The host name of the test server was replaced by `MYHOST` in `results/R2_test_results.txt` and in the hidden
+hyperlinks of the `A2_*.xlsx` exports (cell data unchanged, so those links no longer open Polarion).
+It is still present in the git history before this change.
