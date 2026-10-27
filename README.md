@@ -3,7 +3,7 @@
 A Siemens Polarion **LiveReport widget** that shows the documents of a project and how they relate to
 each other — which documents are **branches** of which, and which are **copies** (reuse) of which.
 
-> Status: **specification v0.2.** Approach decided (Velocity widget, Polarion 2512, compatible with 2606). Technical spike next. See [`SPECIFICATION.md`](SPECIFICATION.md).
+> Status: **specification v0.2.** Approach decided (Velocity widget, Polarion 2512, compatible with 2606). Technical spike in progress (`docs/spike-tests.md`). See [`SPECIFICATION.md`](SPECIFICATION.md).
 > No implementation yet.
 
 ## Why
@@ -32,6 +32,8 @@ Relations are **deduced from work item links** between documents' work items (pl
 | File | Purpose |
 |---|---|
 | `SPECIFICATION.md` | Draft requirements and open questions |
+| `docs/spike-tests.md` | SQL and widget tests to run on a Polarion 2512 instance |
+| `spike/bwSpike/`, `spike/bwSpike.zip` | Diagnostic test widget (upload package) |
 | `CLAUDE.md` | Instructions for Claude Code working in this repo |
 | `Polarion_Development_Guide.md` | Polarion development best practices (baseline: Polarion 2512) |
 

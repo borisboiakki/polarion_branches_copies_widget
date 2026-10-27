@@ -1,6 +1,6 @@
 # Specification — Polarion Branches Widget
 
-**Status:** DRAFT v0.2 — refined with the product owner on 2026-10-27. Items marked `[?]` are still open
+**Status:** DRAFT v0.3 — refined with the product owner on 2026-10-27. Items marked `[?]` are still open
 or need verification on a real Polarion instance.
 
 ## 1. Goal
@@ -39,8 +39,9 @@ in their standard configuration, so these are the defaults. They can still be ch
 
 | ID | Requirement | Priority |
 |---|---|---|
-| F1 | List the project's LiveDocs (optionally filtered by space/type/status) as graph nodes: title, space, type, status, item count | Must |
-| F2 | Draw one directed edge per related document pair, **source → copy/branch/derived** | Must |
+| F1 | List the project's LiveDocs as graph nodes. Default node fields: **document ID, title, space** | Must |
+| F1b | Additional node fields selectable by the user: type, status, author, created, updated, work item count. Default selection set in the widget parameters. The viewer can toggle them in the widget UI without editing the parameters | Should |
+| F2 | Draw **one line per related document pair**, directed **source → copy/branch/derived**, labelled with the kind(s) of the relation (e.g. `derived`, `branch`, `copy`, or `branch + derived`) | Must |
 | F3 | Distinguish the kinds Copy / Branch / Derived with line style **and** colour, plus a legend | Must |
 | F4 | Deduce edges by aggregating work item links (roles from §3) between items of two documents | Must |
 | F5 | Link roles per kind are widget parameters with the §3 defaults | Must |
@@ -48,7 +49,8 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F7 | Use document-level metadata (§3) when present and flag disagreement with link-based inference | Should |
 | F8 | Edge detail (tooltip/panel): number of linked items, coverage % of source and target | Should |
 | F9 | Click a node to open the document; click an edge to list the linking work items | Should |
-| F10 | Filters: space, document type, status, text, "only documents with relations" | Should |
+| F10 | Filters: space, document type, status, text | Should |
+| F10b | **Show all documents / only documents with relations**: default set in the widget parameters, and the viewer can switch it in the widget UI (no edit mode needed). A **Refresh** control re-runs the analysis | Must |
 | F11 | Layout: family tree (layered, sources on the left/top) by default; zoom, pan, fit-to-view | Should |
 | F12 | Export the current graph as **SVG and PNG** from the widget UI | Could (a plus) |
 | F13 | **PDF/print**: static rendering of the graph (no JS) plus a relations table, so standard Polarion PDF export works | Should |
@@ -87,7 +89,7 @@ Data flow:
 3. **Link-based relations**: SQL over `STRUCT_WORKITEM_LINKEDWORKITEMS` joined to `REL_MODULE_WORKITEM` on both
    ends, filtered by role and project, giving (source document, target document, role, count). See the risk in §9.
 4. Build the node/edge model in Velocity. Emit it as escaped JSON for the JS renderer.
-5. **Interactive mode**: JS lays out and renders inline SVG. Export SVG via serialisation and PNG via canvas.
+5. **Interactive mode**: JS lays out and renders inline SVG. The widget always ships the full model (all documents and all extra fields, ≤100 nodes), so the "all / only related" switch and the extra-field toggles act on the client instantly. Refresh reloads the widget data. Export SVG via serialisation and PNG via canvas.
 6. **PDF/print mode** (`$widgetContext.target().isPdf()/isPrint()`): no JS. Velocity computes a simple layered
    layout (relations are mostly forests) and emits static inline SVG + the relations table, with inline CSS only.
 
@@ -103,7 +105,7 @@ is in the configured role set R(kind).
 - Edge S → T of kind k if n ≥ threshold (absolute) and/or n / |W(T)| ≥ threshold (%).
 - Direction: the copy/branch item (in T) is the **link source** pointing to the original (in S) `[?]` — to verify per role on a test instance.
 - Document metadata (`branched from` / `derived from`) creates an edge even without links. If both sources exist and disagree, show a warning marker.
-- One pair may have several kinds. Show one edge per kind (or a combined edge with badges `[?]`).
+- One pair may have several kinds. Draw **one line per pair** labelled with all of its kinds. Style follows the strongest kind (branch > derived > copy `[?]`).
 
 ## 8. Out of scope (v1)
 
@@ -123,10 +125,8 @@ context (F15), non-LiveDoc documents.
 
 ## 10. Open questions
 
-1. Which document fields should be shown on nodes (title, space, type, status, author, updated)?
-2. Should the default view show all documents, or only those with at least one relation?
-3. Edge labelling: one edge per kind, or one combined edge with kind badges?
-4. Is a test 2512 instance (with sample copied/branched/derived documents) available for the spike?
+1. Precedence when a pair has several kinds (styling): branch > derived > copy?
+2. Spike results: see `docs/spike-tests.md`. Waiting on results from the product owner's 2512 instance.
 
 ## 11. Decision log
 
@@ -138,3 +138,7 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | v1 = single project; sizing 100 docs / 20k items; cross-project later | PO |
 | 2026-10-27 | Visual graph in widget; PDF via standard export + image export as a plus | PO |
 | 2026-10-27 | Technology: Velocity widget with bundled JS/CSS resources | PO, settles §6 |
+| 2026-10-27 | Node fields: ID, title, space by default; extra fields selectable (parameter + UI toggle) | PO |
+| 2026-10-27 | "All / only related" switch: parameter default + runtime UI switch with Refresh | PO |
+| 2026-10-27 | One line per document pair, labelled with kind(s) | PO |
+| 2026-10-27 | Spike tests (SQL + test widget) handed to PO for execution on 2512 | `docs/spike-tests.md` |

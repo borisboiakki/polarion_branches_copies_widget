@@ -1,0 +1,1 @@
+PARSE-OK: this text comes from resources/spike.vm, project = $esc.html($projectId)

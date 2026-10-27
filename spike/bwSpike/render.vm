@@ -1,0 +1,323 @@
+## Branches Widget - spike tests. Read-only diagnostics, one test per widget instance.
+## See docs/spike-tests.md for what each test checks and what to report.
+<style>
+  .bws { font-family: Arial, sans-serif; font-size: 12px; }
+  .bws h4 { margin: 4px 0 8px 0; }
+  .bws table { border-collapse: collapse; margin: 6px 0; }
+  .bws td, .bws th { border: 1px solid #bbb; padding: 2px 6px; text-align: left; vertical-align: top; }
+  .bws th { background: #eee; }
+  .bws .ok { color: #1a7f37; font-weight: bold; }
+  .bws .ko { color: #c62828; font-weight: bold; }
+  .bws pre { background: #f6f6f6; padding: 4px; white-space: pre-wrap; }
+</style>
+
+## ---------------------------------------------------------------- parameters
+#set($test = "env")
+#if($parameters.test && $parameters.test.singleValue)
+  #set($test = $parameters.test.singleValue.id)
+#end
+#set($maxRows = 50)
+#if($parameters.maxRows && $parameters.maxRows.value)
+  #set($maxRows = $parameters.maxRows.value)
+#end
+#set($maxItems = 20000)
+#if($parameters.maxItems && $parameters.maxItems.value)
+  #set($maxItems = $parameters.maxItems.value)
+#end
+
+#set($projectId = $page.getReference().projectId())
+#set($projectIdOk = false)
+#if($projectId && $projectId.matches("[A-Za-z0-9_.\-]+"))
+  #set($projectIdOk = true)
+#end
+
+## Link roles: keep only safe identifiers, build the SQL IN list
+#set($roleSet = [])
+#set($roleSql = "")
+#set($rolesValue = "duplicates,branched_from,derived_from")
+#if($parameters.roles && $parameters.roles.value)
+  #set($rolesValue = $parameters.roles.value)
+#end
+#foreach($r in $rolesValue.split(","))
+  #set($rt = $r.trim())
+  #if($rt.matches("[A-Za-z0-9_]+"))
+    #set($void = $roleSet.add($rt))
+    #if($roleSql != "")
+      #set($roleSql = "${roleSql},")
+    #end
+    #set($roleSql = "${roleSql}'${rt}'")
+  #end
+#end
+
+## Common SQL: links with a configured role whose two ends are contained in two different documents
+## ws/ms = link source item and its document, wt/mt = link target item and its document
+#set($linkBase = "FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri")
+#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
+
+## Document key used to group: space/document-name
+#macro(bwsDocKey $mod)#set($bwsKey = "")#if($mod)#set($bwsKey = "$!mod.getModuleFolder()/$!mod.getId()")#end#end
+
+<div class="bws">
+<h4>Branches Widget spike &mdash; test <code>$esc.html($test)</code> &mdash; project <code>$!esc.html($projectId)</code></h4>
+
+#if(!$projectIdOk)
+  <p class="ko">Project id could not be resolved or contains unexpected characters. Place the widget on a project page.</p>
+#elseif($roleSet.size() == 0)
+  <p class="ko">No valid link role in the "Link roles" parameter.</p>
+
+## ================================================================ V1 env
+#elseif($test == "env")
+  <table>
+    <tr><th>Item</th><th>Value</th></tr>
+    <tr><td>Project id</td><td>$esc.html($projectId)</td></tr>
+    <tr><td>Roles used</td><td>$esc.html($roleSql)</td></tr>
+    <tr><td>target isEditor / isPdf / isPrint</td><td>$!widgetContext.target().isEditor() / $!widgetContext.target().isPdf() / $!widgetContext.target().isPrint()</td></tr>
+    <tr><td>${esc.d}widgetContext class</td><td>$!widgetContext.getClass().getName()</td></tr>
+    <tr><td>${esc.d}transaction class</td><td>$!transaction.getClass().getName()</td></tr>
+    <tr><td>${esc.d}transaction.objects() class</td><td>$!transaction.objects().getClass().getName()</td></tr>
+    <tr><td>${esc.d}trackerService class</td><td>$!trackerService.getClass().getName()</td></tr>
+    <tr><td>${esc.d}trackerService.getDataService() class</td><td>$!trackerService.getDataService().getClass().getName()</td></tr>
+    <tr><td>${esc.d}date.systemTime</td><td>$!date.systemTime</td></tr>
+    <tr><td>Project location</td><td>$!projectService.getProject($projectId).getLocation().getLocationPath()</td></tr>
+    <tr><td>Current user</td><td>$!esc.html($securityService.getCurrentUser())</td></tr>
+  </table>
+  <p>Methods of ${esc.d}widgetContext containing url / resource / path / widget (empty if introspection is blocked):</p>
+  <pre>#foreach($mt in $widgetContext.getClass().getMethods())#if($mt.getName().toLowerCase().matches(".*(url|resource|path|widget).*"))$mt.getName()
+#end#end</pre>
+
+## ================================================================ V2 documents
+#elseif($test == "docs")
+  <pre>$esc.html($docSql)</pre>
+  #set($t0 = $date.systemTime)
+  #set($rDocs = $transaction.objects().searchBySql($docSql))
+  #set($rCount = 0)
+  #foreach($d in $rDocs)#set($rCount = $rCount + 1)#end
+  #set($t1 = $date.systemTime)
+  #set($dt1 = $t1 - $t0)
+  <p>Rendering API <code>${esc.d}transaction.objects().searchBySql</code>: class <code>$!rDocs.getClass().getName()</code>, <b>$rCount</b> documents, $dt1 ms</p>
+  <p>First documents (rendered):</p>
+  <ul>
+  #set($n = 0)
+  #foreach($d in $rDocs)
+    #set($n = $n + 1)
+    #if($n <= 5)<li>$d.render().withLinks() <small>($!d.getClass().getName())</small></li>#end
+  #end
+  </ul>
+
+  #set($t0 = $date.systemTime)
+  #set($oDocs = $trackerService.getDataService().sqlSearch($docSql))
+  #set($t1 = $date.systemTime)
+  #set($dt1 = $t1 - $t0)
+  <p>Open API <code>getDataService().sqlSearch</code>: class <code>$!oDocs.getClass().getName()</code>, <b>$!oDocs.size()</b> documents, $dt1 ms</p>
+  #set($first = false)
+  #foreach($m in $oDocs)#if(!$first)#set($first = $m)#end#end
+  #if($first)
+    <p>Prototype field names of the first document (empty if not accessible):</p>
+    <pre>$!first.getPrototype().getKeyNames()</pre>
+  #end
+  <table>
+    <tr><th>#</th><th>getId</th><th>getModuleFolder</th><th>getTitle</th><th>type</th><th>status</th><th>author</th><th>created</th><th>updated</th><th>getValue("branchedFrom")</th><th>getValue("derivedFrom")</th><th>getValue("derivedFromLinkRole")</th></tr>
+    #set($n = 0)
+    #foreach($m in $oDocs)
+      #set($n = $n + 1)
+      #if($n <= $maxRows)
+      <tr>
+        <td>$n</td>
+        <td>$!esc.html($m.getId())</td>
+        <td>$!esc.html($m.getModuleFolder())</td>
+        <td>$!esc.html($m.getTitle())</td>
+        <td>$!esc.html($m.getType().getId())</td>
+        <td>$!esc.html($m.getStatus().getId())</td>
+        <td>$!esc.html($m.getAuthor().getId())</td>
+        <td>$!m.getCreated()</td>
+        <td>$!m.getUpdated()</td>
+        <td>$!esc.html($m.getValue("branchedFrom"))</td>
+        <td>$!esc.html($m.getValue("derivedFrom"))</td>
+        <td>$!esc.html($m.getValue("derivedFromLinkRole"))</td>
+      </tr>
+      #end
+    #end
+  </table>
+
+## ================================================================ V3 SQL features
+#elseif($test == "sqlDistinct" || $test == "sqlGroup")
+  #if($test == "sqlDistinct")
+    #set($sql = "SELECT DISTINCT ms.c_uri ${linkBase}")
+  #else
+    #set($sql = "SELECT ms.c_uri ${linkBase} GROUP BY ms.c_uri HAVING COUNT(DISTINCT ws.c_uri) >= 1")
+  #end
+  <pre>$esc.html($sql)</pre>
+  #set($t0 = $date.systemTime)
+  #set($res = $trackerService.getDataService().sqlSearch($sql))
+  #set($t1 = $date.systemTime)
+  #set($dt1 = $t1 - $t0)
+  <p>Accepted: <span class="ok">yes</span> &mdash; <b>$!res.size()</b> documents that contain link sources ($dt1 ms)</p>
+  <ul>
+  #set($n = 0)
+  #foreach($m in $res)
+    #set($n = $n + 1)
+    #if($n <= $maxRows)<li>$!esc.html($m.getModuleFolder()) / $!esc.html($m.getId()) &mdash; $!esc.html($m.getTitle())</li>#end
+  #end
+  </ul>
+
+## ================================================================ V4 link scan
+#elseif($test == "scan")
+  #set($sql = "SELECT DISTINCT ws.c_uri ${linkBase}")
+  <pre>$esc.html($sql)</pre>
+  #set($t0 = $date.systemTime)
+  #set($items = $trackerService.getDataService().sqlSearch($sql))
+  #set($t1 = $date.systemTime)
+  #set($dt1 = $t1 - $t0)
+  #set($pairs = {})
+  #set($scanned = 0)
+  #set($linksUsed = 0)
+  #foreach($wi in $items)
+    #if($scanned < $maxItems)
+      #set($scanned = $scanned + 1)
+      #set($srcMod = false)
+      #set($srcMod = $wi.getModule())
+      #bwsDocKey($srcMod)
+      #set($srcKey = $bwsKey)
+      #foreach($ls in $wi.getLinkedWorkItemsStructsDirect())
+        #set($role = "")
+        #set($role = $ls.getLinkRole().getId())
+        #if($roleSet.contains($role))
+          #set($tgt = false)
+          #set($tgt = $ls.getLinkedItem())
+          #if($tgt && !$tgt.isUnresolvable())
+            #set($tgtMod = false)
+            #set($tgtMod = $tgt.getModule())
+            #bwsDocKey($tgtMod)
+            #if($srcKey != "" && $bwsKey != "" && $srcKey != $bwsKey)
+              #set($linksUsed = $linksUsed + 1)
+              #set($key = "${srcKey} | ${role} | ${bwsKey}")
+              #set($cnt = 0)
+              #if($pairs.containsKey($key))
+                #set($cnt = $pairs.get($key))
+              #end
+              #set($cnt = $cnt + 1)
+              #set($void = $pairs.put($key, $cnt))
+            #end
+          #end
+        #end
+      #end
+    #end
+  #end
+  #set($t2 = $date.systemTime)
+  #set($dt2 = $t2 - $t1)
+  <table>
+    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>Link-source work items returned by SQL</td><td>$!items.size()</td></tr>
+    <tr><td>Work items scanned (limit $maxItems)</td><td>$scanned</td></tr>
+    <tr><td>Cross-document links counted</td><td>$linksUsed</td></tr>
+    <tr><td>Document pairs (per role)</td><td>$pairs.size()</td></tr>
+    <tr><td>SQL time</td><td>$dt1 ms</td></tr>
+    <tr><td>Scan time</td><td>$dt2 ms</td></tr>
+  </table>
+  <table>
+    <tr><th>Link source document | role | link target document</th><th>Linked source items</th></tr>
+    #set($n = 0)
+    #foreach($k in $pairs.keySet())
+      #set($n = $n + 1)
+      #if($n <= $maxRows)<tr><td>$esc.html($k)</td><td>$pairs.get($k)</td></tr>#end
+    #end
+  </table>
+
+## ================================================================ V5 resources
+#elseif($test == "resInclude")
+  <p>If you see INCLUDE-OK below, <code>#include</code> resolves widget resources:</p>
+  <pre>#include("resources/spike.txt")</pre>
+#elseif($test == "resParse")
+  <p>If you see PARSE-OK below, <code>#parse</code> resolves widget resources:</p>
+  <pre>#parse("resources/spike.vm")</pre>
+#elseif($test == "resUrl")
+  #set($projLoc = "")
+  #set($projLoc = $projectService.getProject($projectId).getLocation().getLocationPath())
+  <p>The browser tries to fetch <code>resources/spike.js</code> from candidate URLs. Report which ones answer 200.</p>
+  <div class="bws-res" data-projloc="$!esc.html($projLoc)">running...</div>
+  <script>#[[
+  (function () {
+    var boxes = document.querySelectorAll('.bws-res');
+    var box = boxes[boxes.length - 1];
+    var loc = (box.getAttribute('data-projloc') || '').replace(/^\/+|\/+$/g, '');
+    var rel = '.polarion/pages/widgets/bwSpike/resources/spike.js';
+    var urls = ['/repo/' + rel, '/polarion/repo/' + rel];
+    if (loc) { urls.push('/repo/' + loc + '/' + rel); urls.push('/polarion/repo/' + loc + '/' + rel); }
+    box.innerHTML = '';
+    urls.forEach(function (u) {
+      var line = document.createElement('div');
+      line.textContent = u + ' ... ';
+      box.appendChild(line);
+      fetch(u, { credentials: 'same-origin' })
+        .then(function (r) { line.textContent = u + ' -> HTTP ' + r.status; })
+        .catch(function (e) { line.textContent = u + ' -> error ' + e; });
+    });
+  })();
+  ]]#</script>
+
+## ================================================================ V6 JavaScript
+#elseif($test == "js")
+  <div class="bws-js" style="padding:4px;border:1px dashed #999;">JS NOT executed (inline scripts blocked?)</div>
+  <script>#[[
+  (function () {
+    var boxes = document.querySelectorAll('.bws-js');
+    var box = boxes[boxes.length - 1];
+    var out = [];
+    function log(ok, msg) { out.push('<div class="' + (ok ? 'ok' : 'ko') + '">' + (ok ? 'OK ' : 'FAIL ') + msg + '</div>'); box.innerHTML = out.join(''); }
+    log(true, 'inline script executed; userAgent = ' + navigator.userAgent.replace(/</g, '&lt;'));
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('xmlns', ns); svg.setAttribute('width', '240'); svg.setAttribute('height', '80');
+    svg.innerHTML = '<rect x="5" y="20" width="80" height="40" rx="6" fill="#dbe9ff" stroke="#3367d6"/>' +
+      '<text x="45" y="45" text-anchor="middle" font-size="12" font-family="Arial">Doc A</text>' +
+      '<line x1="85" y1="40" x2="150" y2="40" stroke="#c62828" stroke-dasharray="5,3" stroke-width="2"/>' +
+      '<rect x="150" y="20" width="80" height="40" rx="6" fill="#ffe8d6" stroke="#c25e00"/>' +
+      '<text x="190" y="45" text-anchor="middle" font-size="12" font-family="Arial">Doc B</text>';
+    var holder = document.createElement('div');
+    holder.appendChild(svg);
+    box.parentNode.insertBefore(holder, box.nextSibling);
+    log(!!svg.getBBox, 'inline SVG rendered');
+    try {
+      var xml = new XMLSerializer().serializeToString(svg);
+      var svgUrl = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
+      var a1 = document.createElement('a'); a1.href = svgUrl; a1.download = 'bw-spike.svg'; a1.textContent = 'Download SVG';
+      holder.appendChild(a1);
+      log(true, 'SVG serialised, blob URL created');
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var c = document.createElement('canvas'); c.width = 480; c.height = 160;
+          var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 480, 160);
+          ctx.drawImage(img, 0, 0, 480, 160);
+          var png = c.toDataURL('image/png');
+          var a2 = document.createElement('a'); a2.href = png; a2.download = 'bw-spike.png'; a2.textContent = 'Download PNG';
+          a2.style.marginLeft = '12px'; holder.appendChild(a2);
+          log(true, 'PNG generated via canvas (' + png.length + ' chars)');
+        } catch (e) { log(false, 'PNG canvas export: ' + e); }
+      };
+      img.onerror = function () { log(false, 'SVG blob could not be loaded as image (CSP blocks blob:?)'); };
+      img.src = svgUrl;
+    } catch (e) { log(false, 'SVG export: ' + e); }
+    log(typeof fetch === 'function', 'fetch API available');
+  })();
+  ]]#</script>
+
+## ================================================================ V7 PDF
+#elseif($test == "pdf")
+  <p>isPdf = <b>$!widgetContext.target().isPdf()</b>, isPrint = <b>$!widgetContext.target().isPrint()</b>, isEditor = <b>$!widgetContext.target().isEditor()</b></p>
+  <p>Static server-side SVG (must appear in the PDF export):</p>
+  <svg xmlns="http://www.w3.org/2000/svg" width="360" height="90" viewBox="0 0 360 90">
+    <rect x="5" y="25" width="100" height="40" rx="6" fill="#dbe9ff" stroke="#3367d6"/>
+    <text x="55" y="50" text-anchor="middle" font-size="12" font-family="Arial">Doc A</text>
+    <line x1="105" y1="45" x2="250" y2="45" stroke="#c62828" stroke-dasharray="6,3" stroke-width="2"/>
+    <polygon points="250,40 258,45 250,50" fill="#c62828"/>
+    <text x="178" y="38" text-anchor="middle" font-size="10" font-family="Arial" fill="#c62828">branch + derived</text>
+    <rect x="258" y="25" width="100" height="40" rx="6" fill="#ffe8d6" stroke="#c25e00"/>
+    <text x="308" y="50" text-anchor="middle" font-size="12" font-family="Arial">Doc B</text>
+  </svg>
+  <p>Fallback HTML boxes (in case SVG is not exported):</p>
+  <table><tr><td style="background:#dbe9ff;">Doc A</td><td style="border:none;">&#8594; branch + derived &#8594;</td><td style="background:#ffe8d6;">Doc B</td></tr></table>
+#else
+  <p class="ko">Unknown test "$esc.html($test)".</p>
+#end
+</div>

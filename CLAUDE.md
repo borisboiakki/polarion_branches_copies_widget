@@ -76,8 +76,9 @@ README.md                      project overview
 SPECIFICATION.md               requirements (draft)
 Polarion_Development_Guide.md  Polarion best practices (reference, do not edit casually)
 widget/                        widget sources (Velocity: parameters.vm, render.vm, assets)
-docs/                          design notes, decisions, screenshots
+docs/                          design notes, decisions, spike tests (docs/spike-tests.md)
 test-data/                     anonymised sample structures for manual verification
+spike/bwSpike/                 diagnostic test widget (spike/bwSpike.zip = upload package; rebuild after edits)
 ```
 
 ## Working conventions
