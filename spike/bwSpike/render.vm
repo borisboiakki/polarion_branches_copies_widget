@@ -12,18 +12,31 @@
 </style>
 
 ## ---------------------------------------------------------------- parameters
+## Parameter accessors differ between API flavours (property vs method). A #set whose value is
+## null keeps the previous value in Velocity 1.4, so each form is tried in turn and the last
+## non-null result wins.
 #set($test = "env")
-#if($parameters.test && $parameters.test.singleValue)
-  #set($test = $parameters.test.singleValue.id)
+#set($testOpt = false)
+#set($testOpt = $parameters.test.singleValue)
+#set($testOpt = $parameters.test.singleValue())
+#set($testId = "")
+#if($testOpt)
+  #set($testId = $testOpt.id)
+  #set($testId = $testOpt.getId())
+  #set($testId = $testOpt.id())
+#end
+#if($testId && $testId != "")
+  #set($test = "$testId")
 #end
 #set($maxRows = 50)
-#if($parameters.maxRows && $parameters.maxRows.value)
-  #set($maxRows = $parameters.maxRows.value)
-#end
+#set($maxRows = $parameters.maxRows.value)
+#set($maxRows = $parameters.maxRows.value())
 #set($maxItems = 20000)
-#if($parameters.maxItems && $parameters.maxItems.value)
-  #set($maxItems = $parameters.maxItems.value)
-#end
+#set($maxItems = $parameters.maxItems.value)
+#set($maxItems = $parameters.maxItems.value())
+#set($rolesParamValue = "")
+#set($rolesParamValue = $parameters.roles.value)
+#set($rolesParamValue = $parameters.roles.value())
 
 #set($projectId = $page.getReference().projectId())
 #set($projectIdOk = false)
@@ -35,8 +48,8 @@
 #set($roleSet = [])
 #set($roleSql = "")
 #set($rolesValue = "duplicates,branched_from,derived_from")
-#if($parameters.roles && $parameters.roles.value)
-  #set($rolesValue = $parameters.roles.value)
+#if($rolesParamValue && "$rolesParamValue" != "")
+  #set($rolesValue = "$rolesParamValue")
 #end
 #foreach($r in $rolesValue.split(","))
   #set($rt = $r.trim())
@@ -76,6 +89,8 @@
     <tr><th>Item</th><th>Value</th></tr>
     <tr><td>Project id</td><td>$esc.html($projectId)</td></tr>
     <tr><td>Roles used</td><td>$esc.html($roleSql)</td></tr>
+    <tr><td>Parameter "Test to run" as read</td><td>option: $!esc.html($testOpt) / id: $!esc.html($testId) / class: $!testOpt.getClass().getName()</td></tr>
+    <tr><td>Max rows / max items as read</td><td>$!maxRows / $!maxItems</td></tr>
     <tr><td>target isEditor / isPdf / isPrint</td><td>$!widgetContext.target().isEditor() / $!widgetContext.target().isPdf() / $!widgetContext.target().isPrint()</td></tr>
     <tr><td>${esc.d}widgetContext class</td><td>$!widgetContext.getClass().getName()</td></tr>
     <tr><td>${esc.d}transaction class</td><td>$!transaction.getClass().getName()</td></tr>
