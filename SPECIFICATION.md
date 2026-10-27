@@ -103,7 +103,8 @@ is in the configured role set R(kind).
 
 - For each ordered pair (S, T) and kind k: n = |{ w ∈ W(T) : w has a link with role ∈ R(k) to some item in W(S) }|.
 - Edge S → T of kind k if n ≥ threshold (absolute) and/or n / |W(T)| ≥ threshold (%).
-- Direction: the copy/branch item (in T) is the **link source** pointing to the original (in S) `[?]` — to verify per role on a test instance.
+- Direction (**verified on 2512, spike A2**): for all three roles the copy/branch/derived item is the **link source** and
+  the original item is the **link target**. So the edge is drawn original (link target's document) → copy (link source's document).
 - Document metadata (`branched from` / `derived from`) creates an edge even without links. If both sources exist and disagree, show a warning marker.
 - One pair may have several kinds. Draw **one line per pair** labelled with all of its kinds. Style follows the strongest kind (branch > derived > copy `[?]`).
 
@@ -119,7 +120,7 @@ context (F15), non-LiveDoc documents.
 | R1 | `$transaction.objects.searchBySql` resolves **objects** (by `C_URI`), so it cannot return aggregate rows (doc pair + count) | Spike. Options: (a) one SQL per document returning related `MODULE` URIs, with counts via count queries (≤100 × kinds), (b) SQL returning link-source work item URIs then grouping in Velocity by `getModule`, (c) a DB API available to widgets returning raw rows |
 | R2 ✅ (2512) | Exact `MODULE` column names (`FK_URI_BRANCHEDFROM`, `FK_URI_DERIVEDFROM`, `C_DERIVEDFROMLINKROLE`) found in the published DB schema docs, not checked on 2512/2606 | Check the SDK DB schema docs on the target server, tracker `SQL:` queries and REST document resources (spike A1–A3) |
 | R3 | Exact Velocity syntax to load widget `resources/` JS/CSS (SDK macro) | Check Widget SDK PDF on the target server. Fallback: inline the JS in `render.vm` |
-| R4 | Link direction for `duplicates` / `branched_from` / `derived_from` | Inspect `STRUCT_WORKITEM_LINKEDWORKITEMS` on sample documents |
+| R4 ✅ (2512) | Link direction for `duplicates` / `branched_from` / `derived_from` | Inspect `STRUCT_WORKITEM_LINKEDWORKITEMS` on sample documents |
 | R5 | SQL firewall (`invalidCommands`) may block `GROUP BY`/`COUNT`/`DISTINCT` variants | Test queries on the target server |
 | R6 | 2606 changes unknown | Re-test the widget on 2606 once available |
 
@@ -127,6 +128,9 @@ context (F15), non-LiveDoc documents.
 
 1. Precedence when a pair has several kinds (styling): branch > derived > copy?
 2. Spike results: see `docs/spike-tests.md`. Waiting on results from the product owner's 2512 instance.
+3. Coverage counts (F8): should document title/heading items be counted? Spike A2 shows they are linked like any
+   other item (e.g. 6 linked items in a document with 5 requirements and 1 title heading). Proposal: exclude the
+   `heading` type by default, via a parameter.
 
 ## 11. Decision log
 
@@ -145,3 +149,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | No direct DB access for the PO: spike uses tracker `SQL:(...)` queries, the test widget and REST calls instead | PO |
 | 2026-10-27 | Spike A1: MODULE branching/derivation columns confirmed in the 2512 schema; V1 passed | `docs/A1_FullDBSchema.pdf`, `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
 | 2026-10-27 | Spike test set: project `VforIA`, original `SRS_Test` with copies/branches B–G | `docs/spike-tests.md` §0 |
+| 2026-10-27 | Spike A2 Q1/Q2: link direction verified (copy/branch/derived item → original item) for `duplicates`, `branched_from`, `derived_from`; branch links exist only for overwritten items | `docs/A2_*.xlsx` |

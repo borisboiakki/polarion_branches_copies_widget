@@ -187,12 +187,12 @@ If any test shows a Velocity error, copy the message from the widget, or from th
 | Test | Date | Result |
 |---|---|---|
 | A1 | 2026-10-27 | ✅ Columns confirmed (see A1 above). `docs/A1_FullDBSchema.pdf` |
+| A2 Q1/Q2 | 2026-10-27 | ✅ **Exactly as expected: links point from the copy/branch/derived item (link source) to the original (link target).** Cross-document joins on `struct_workitem_linkedworkitems` + `workitem.fk_uri_module` are accepted by the tracker. Counts: `duplicates`: B 6 → A 6, E 6 → B 6; `branched_from`: C 2 (only the overwritten items VIA-522/523) → A (VIA-509/512); `derived_from`: D 6 → A 6. F and G appear nowhere. Each document's title/heading item (e.g. VIA-514 "SRS_Test") is linked too. Exports: `docs/A2_Q1_results_*.xlsx`, `docs/A2_Q2_results_*.xlsx` |
 | V1 | 2026-10-27 | ✅ Runs. Polarion ALM 2512. `$widgetContext` = `RichPageWidgetRenderingContextImpl`, `$transaction` = `ReadOnlyTransactionImpl`, `$transaction.objects()` = `ProxyModelObjects`; `$trackerService`/`getDataService()` are proxies. `$date.systemTime` works. Reflection method listing is blocked (empty), as the guide says. In PDF export `isPdf` = true. `docs/SpikeTest_Results_Widget_27-10-1116.pdf` |
 
 ## Results template (copy into your answer)
 
 ```
-A2 Q1/Q2 documents + item counts per role (duplicates, branched_from, derived_from):
 A2 Q3 / Q4 documents:
 A2 Q5 DISTINCT / GROUP BY accepted?:
 A2 Q6 c_id / c_modulename:

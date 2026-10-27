@@ -2251,6 +2251,8 @@ Roles observed in the Siemens standard configuration (reported by a project owne
 | Branch, work item overwritten in the branch | `branched_from` |
 | Reuse with the derivation option | `derived_from` |
 
+**Direction (verified on 2512)**: for all three roles the link is stored on the copy/branch/derived item (`STRUCT_WORKITEM_LINKEDWORKITEMS.FK_URI_P_WORKITEM`, link source) and points to the original item (`FK_URI_WORKITEM`). A branch links only its *overwritten* items; a branch with nothing overwritten has no such links and is visible only through the document's "branched from" metadata.
+
 Copied documents are linked to their source through a "branched from" document field, and copied work items through a "branched from" link (Siemens, Polarion 2016 compare/merge and 2310 bulk branching announcements). Never hard-code these IDs: read them from `workitem-link-role-enum.xml` or expose them as widget parameters.
 
 ### 10.5 Form Layout (Work Item Editor)

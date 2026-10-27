@@ -60,6 +60,9 @@ Verified through web search (2026-10-27):
 - **Verified on the PO's 2512 schema docs (`docs/A1_FullDBSchema.pdf`)**: `MODULE.FK_URI_BRANCHEDFROM`,
   `MODULE.FK_URI_DERIVEDFROM`, `MODULE.C_DERIVEDFROMLINKROLE`, `MODULE.C_MODULEFOLDER`, `MODULE.C_MODULENAME`,
   `WORKITEM.FK_URI_MODULE`; table `STRUCT_WORKITEM_LINKEDWORKITEMSDERIVED` also exists.
+- **Verified by spike A2 on 2512**: links with roles `duplicates`, `branched_from`, `derived_from` go from the
+  copy/branch/derived item (`fk_uri_p_workitem`, link source) to the original item (`fk_uri_workitem`, target).
+  A branch only links its overwritten items; a branch with nothing overwritten has no links (metadata only).
 - **Verified by spike V1 on 2512**: widget context classes, `$date.systemTime`, `isPdf()` true in PDF export,
   reflection method listing blocked.
 
