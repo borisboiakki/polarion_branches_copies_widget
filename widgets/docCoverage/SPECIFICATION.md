@@ -98,6 +98,15 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 4. Should a document that is both upstream and downstream (middle of a chain) show its coverage %? Default: yes, for
    the links where it is the target.
 
+### Future improvement: Spaces selector (logged 2026-10-28, PO)
+
+"Spaces to include" stays a text parameter (comma separated). A selector, as for link roles and types, is not available
+out of the box: Polarion 2512 has no dynamic `@space` enumeration (guide §10.2). Possible approach: a `customEnum` built
+in `parameters.vm` from the spaces of the current project's documents (`sqlSearch` on `module` + `getModuleFolder()`),
+read with `bwOptionIds`. To verify first with a mini spike: whether `parameters.vm` can query Polarion (`$trackerService`,
+`$page`). The list would cover the current project only (like `@document`), so a text field for the spaces of the other
+projects would stay.
+
 ## 8. Spike (C1–C4) — see `tests/docCoverage-v0.1.x/spike-tests.md`
 
 | Test | Question | Result |
@@ -182,3 +191,4 @@ i. ✅ (PO, 2026-10-28: everything works as expected) 0.3.0 collection context (
 | 2026-10-28 | 0.3.0 decisions: add the parameter "Collection" (used when the page has no context, e.g. Polarion PDF export); include upstream collections; mark documents without a pinned revision "HEAD" | PO |
 | 2026-10-28 | Widget 0.3.0: collection context (F17). Parameters "Collection context" and "Collection"; shared `documents.vm` reads the collection documents (and their items in one query) when `$colRef` is set; links from the collection tables; client links open in the collection; `(HEAD)` mark and Excel revision column. docBranches 0.4.2 = shared code only (no functional change). Open check §9 i | Implementation |
 | 2026-10-28 | PO test of 0.3.0 on 2512: collection context works as expected. Ready for release | PO |
+| 2026-10-28 | "Spaces to include" stays a text parameter; a spaces selector is logged as a future improvement (no `@space` enumeration in 2512) | PO |
