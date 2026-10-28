@@ -51,11 +51,41 @@ API call does not hide the others.
 | **K6 Explicit collection** | K2 outside the collection with the parameter **Collection** | "Collection reference from: **collection parameter**" and the same documents as K2 inside |
 | **K7 PDF** | K1 in the PDF export of the page in the collection | Is the context still found (PDF: true)? |
 | **K8 Custom SQL** | Runs the text of the parameter "Custom SQL" in the collection (default: the K2 query) | Used only if K3/K4 fail, to try other joins (e.g. with `project`, `col_project`); report what works |
+| **K9 Page location** | Page reference, Open API page (`getUri()`, `getLocation()`, space, name), widget context: where a page of a collection is stored | Run it in the browser view, in the PDF export and on a page outside the collection. Does the location contain the collection id? |
 
 Times are printed as start/end stamps in milliseconds (subtract them, or report them as they are).
 
+## Round 2 (after round 1, 2026-10-28)
+
+Round 1 confirmed the API, but HEAD and the collection held the same content (equal counts everywhere), so it did not
+show that the widget reads the **pinned revision** rather than HEAD. And the PDF export has no collection context (K7).
+
+1. Upload the new `spike-widget/ccSpike.zip` (adds K9).
+2. **Change HEAD** of the two documents of the collection, without updating the revisions the collection pins:
+   - upstream document: add one requirement (not a heading);
+   - downstream document: remove one of the two `refines` links (e.g. VIA-560 → VIA-554) and add a `refines` link from
+     a not yet linked item to another upstream item.
+3. Add a **third document** outside the collection whose items `refine` the upstream document.
+4. Re-run K2, K3a, K3b and K4 on the page in the collection (browser view). Expected:
+   - K2 "work items": `getContainedWorkItems()` 7, HEAD SQL 8; K3a / K3b "items in collection" 6, "items HEAD" 7;
+   - K4: the two links of the pinned revision (VIA-560 → VIA-554, VIA-561 → VIA-552), not the new one, and nothing from
+     the third document.
+   For comparison, put docCoverage 0.2.1 on a normal page with the same documents and role: it shows HEAD.
+5. Run **K9** on the page in the collection (browser view **and** PDF export) and on a page outside the collection.
+6. Optional: if your instance allows it, add a document of **another project** to the collection and re-run K2/K4; open
+   the page from an older revision / baseline of the collection and re-run K1 (is a revision shown in the reference?).
+
 ## Findings
+
+Round 1, 2026-10-28, project `VforIA`, collection id 3 with 2 documents (upstream system requirements, downstream
+software requirements), role `refines`. Raw results sent in the chat, not committed.
 
 | Test | Date | Result |
 |---|---|---|
-| — | — | Not run yet |
+| K1 | 2026-10-28 | ✅ Browser view of the page in the collection: `$transaction.context()` = `ServerUiContext`, `contextCollection()` = `BaselineCollectionReference` (`projectId()` = VforIA, `id()` = 3, `revision()` empty). `reference.get($transaction)` → `ProxyBaselineCollection`, `fields().name().get()` = collection name, `getOldApi()` → Open API `BaselineCollection` (`getId()`, `getName()`, `getProjectId()`; `getRevision()` empty; `isFrozen()` does not exist, `isClosed()` false). `getElements()` → `BaselineCollectionElement`, `getRevision()` = pinned revision, `getObjectWithRevision()` = `Module` at that revision. No upstream collections |
+| K2 | 2026-10-28 | ✅ `searchBySql("select c_uri, c_col_rev from col_module").collection(ref)` → `ProxyModelObjectsSqlSearch` of `ProxyDocument`, exactly the 2 collection documents (≈11 ms). `getOldApi()` → `Module` at the pinned revision (`getRevision()` = `getDataRevision()` = element revision; text `…%85266`). `getReference().revision()` empty. Link with `openLinksInCollectionContext`: `/polarion/#/project/<p>/collection/<id>/wiki/<space>/<document>`; without: `…/#/project/<p>/wiki/<space>/<document>?revision=<rev>` (both with the "fixed revision" icon). Relative href in the browser, absolute in PDF |
+| K3 | 2026-10-28 | ✅ Both queries (`col_workitem` by `fk_uri_module`, and `col_rel_module_workitem`) work and give the same counts (6 and 3, headings excluded), 2–3 ms per document. Items come at the document's revision (`getOldApi().getRevision()`). Item link: `/polarion/#/project/<p>/collection/<id>/workitem?id=<id>`. Not shown yet: a difference with HEAD (HEAD = collection here) → round 2 |
+| K4 | 2026-10-28 | ✅ `col_struct_workitem_linkedworkitems` joined with `col_workitem` / `col_module` accepted; 2 sources, 2 targets, 1 pair with 2 links (≈9 ms in all). `getOldApi()` of a collection item gives `getLinkedWorkItemsStructsDirect()`; link `getRevision()` empty. Not shown yet: links of the pinned revision vs. HEAD, documents outside the collection → round 2 |
+| K6 | 2026-10-28 | ✅ Outside the collection, the parameter "Collection" (`@collection`, `ProxyEnumOption` id = collection id) → `getModelObject().getReference()` gives the same reference; K1/K2 identical to the context |
+| K7 | 2026-10-28 | ❌ **PDF export: `contextCollection()` is null** (same class `ServerUiContext`), also for the page in the collection; only the "Collection" parameter worked there. To find another way: K9 (round 2); otherwise the PDF of a collection report needs the "Collection" parameter |
+| K8 | 2026-10-28 | ✅ Custom SQL in the collection works (default query) |

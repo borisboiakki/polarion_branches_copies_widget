@@ -194,6 +194,8 @@ public class CollectionSpikeHarness {
         WidgetHarness.check(!h.contains("SRS_Test_Copy_of_B_TestE"), "links: documents outside the collection ignored");
         h = run(dir, out, "sql", true, false);
         WidgetHarness.check(h.contains("<b>3</b> row(s)"), "sql: custom SQL");
+        h = run(dir, out, "page", false, false);
+        WidgetHarness.check(h.contains("reference projectId() / spaceId() / name() / id()</td><td>VforIA /"), "page: page location shown without a collection");
         WidgetHarness.TRANSACTION = null;
     }
 }

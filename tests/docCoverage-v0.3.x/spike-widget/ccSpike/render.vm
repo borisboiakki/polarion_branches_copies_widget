@@ -275,6 +275,57 @@
     collection in the parameter "Collection" to run the other tests outside a collection (K6).</p>
   #end
 
+## ================================================================ K9 page location
+## The PDF export has no collection context (K7, 2026-10-28): look for the collection in the page location.
+#elseif($test == "page")
+  #set($pRef = false)
+  #set($pRef = $page.getReference())
+  #set($pRefP = "")
+  #set($pRefS = "")
+  #set($pRefN = "")
+  #set($pRefI = "")
+  #set($pRefC = "")
+  #if($pRef)
+    #set($pRefP = $pRef.projectId())
+    #set($pRefS = $pRef.spaceId())
+    #set($pRefN = $pRef.name())
+    #set($pRefI = $pRef.id())
+    #set($pRefC = $pRef.getClass().getName())
+  #end
+  #set($pOld = false)
+  #set($pOld = $page.getOldApi())
+  #set($pOldCls = "")
+  #set($pOldUri = "")
+  #set($pOldName = "")
+  #set($pOldSpace = "")
+  #set($pOldLoc = "")
+  #if($pOld)
+    #set($pOldCls = $pOld.getClass().getName())
+    #set($pOldUri = $pOld.getUri())
+    #set($pOldName = $pOld.getPageName())
+    #set($pOldSpace = $pOld.getSpaceId())
+    #set($pOldLoc = $pOld.getLocation())
+  #end
+  #set($wcPage = false)
+  #set($wcPage = $widgetContext.page())
+  #set($wcPage = $widgetContext.getPage())
+  #set($wcDoc = false)
+  #set($wcDoc = $widgetContext.getDisplayedObject())
+  <table>
+    <tr><th>Item</th><th>Value</th></tr>
+    <tr><td>page class / as text</td><td>$!esc.html($page.getClass().getName()) / $!esc.html("$page")</td></tr>
+    <tr><td>page reference class / as text</td><td>$!esc.html($pRefC) / $!esc.html("$pRef")</td></tr>
+    <tr><td>reference projectId() / spaceId() / name() / id()</td><td>$!esc.html("$pRefP") / $!esc.html("$pRefS") / $!esc.html("$pRefN") / $!esc.html("$pRefI")</td></tr>
+    <tr><td>page getOldApi() class / as text</td><td>$!esc.html($pOldCls) / $!esc.html("$pOld")</td></tr>
+    <tr><td>getUri() / getLocation()</td><td>$!esc.html("$pOldUri") / $!esc.html("$pOldLoc")</td></tr>
+    <tr><td>getSpaceId() / getPageName()</td><td>$!esc.html("$pOldSpace") / $!esc.html("$pOldName")</td></tr>
+    <tr><td>widgetContext class</td><td>$!esc.html($widgetContext.getClass().getName())</td></tr>
+    <tr><td>widgetContext page() / getDisplayedObject()</td><td>$!esc.html("$wcPage") / $!esc.html("$wcDoc")</td></tr>
+    <tr><td>context: contextCollection()</td><td>$!esc.html("$ctxRef")</td></tr>
+  </table>
+  <p>Run this test in the browser view and in the PDF export of the page in the collection, and on a page outside the
+  collection. Does the page location contain the collection id?</p>
+
 #elseif(!$colRef)
   <p class="ko">No collection: open the page in a collection, or select one in the parameter "Collection".</p>
 

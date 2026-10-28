@@ -111,11 +111,12 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 
 | Test | Question | Result |
 |---|---|---|
-| K1 | Is `$transaction.context().contextCollection()` set in a page opened in a collection (null outside, PDF too)? Collection name and revision for the scope line | Not run |
-| K2 | Does `searchBySql("select c_uri, c_col_rev from col_module").collection(ref)` return the collection documents at their revision (`getOldApi()`)? Link format with `openLinksInCollectionContext` | Not run |
-| K3 | Which collection query gives the items of a document at its pinned revision (`col_workitem` by `fk_uri_module`, or `col_rel_module_workitem`)? Timing | Not run |
-| K4 | Does `col_struct_workitem_linkedworkitems` give the links of the pinned revision, and does `getOldApi().getLinkedWorkItemsStructsDirect()` of a collection item return the links of that revision? | Not run |
-| K6–K8 | Explicit collection reference (parameter), PDF export, custom SQL | Not run |
+| K1 | Is `$transaction.context().contextCollection()` set in a page opened in a collection (null outside, PDF too)? Collection name and revision for the scope line | ✅ Browser view: `BaselineCollectionReference` (project, id); name via `get($transaction).fields().name().get()` or `getOldApi().getName()`; elements with pinned revisions. Null outside |
+| K2 | Does `searchBySql("select c_uri, c_col_rev from col_module").collection(ref)` return the collection documents at their revision (`getOldApi()`)? Link format with `openLinksInCollectionContext` | ✅ Yes, `Module` at the pinned revision; link `#/project/<p>/collection/<id>/wiki/<space>/<doc>` |
+| K3 | Which collection query gives the items of a document at its pinned revision (`col_workitem` by `fk_uri_module`, or `col_rel_module_workitem`)? Timing | ✅ Both work, same counts, 2–3 ms; item link `#/project/<p>/collection/<id>/workitem?id=<id>`. Difference with HEAD to show (round 2) |
+| K4 | Does `col_struct_workitem_linkedworkitems` give the links of the pinned revision, and does `getOldApi().getLinkedWorkItemsStructsDirect()` of a collection item return the links of that revision? | ✅ Query and link reading work (≈9 ms). Pinned revision vs. HEAD and documents outside the collection to show (round 2) |
+| K6–K8 | Explicit collection reference (parameter), PDF export, custom SQL | K6 ✅ `@collection` parameter gives the same reference. **K7 ❌ no context in the PDF export** (only the parameter works). K8 ✅ |
+| K9 | Where is a page of a collection stored (can the PDF export find its collection)? | Round 2 |
 
 ## 9. Open checks for 0.1.0 on 2512
 
@@ -163,3 +164,4 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
 | 2026-10-28 | Widget 0.2.1: text parameter "Documents of other projects" (`project/space/document`, comma separated), since the `@document` selector cannot list other projects (PO: keep the capability even if less comfortable). Shared `documents.vm` gets `docOther` (docBranches 0.4.1, no functional change). To check on 2512 | PO |
 | 2026-10-28 | PO test of 0.2.1 on 2512: "Documents of other projects" works with a valid project/space/document, the not-found warning is shown. Ready for release | PO |
 | 2026-10-28 | Collection context (F17) requested for docCoverage first (docBranches may follow). The collection replaces the Projects / Documents parameters; a parameter can ignore the context (default: use it); spike K1–K8 before the implementation (0.3.0) | PO |
+| 2026-10-28 | Spike round 1 on 2512 (collection with 2 documents, role `refines`): context, collection SQL, items, links and collection links work; the PDF export has **no** collection context (K7). Round 2: HEAD changed after pinning, a document outside the collection, K9 page location | PO tests |
