@@ -78,14 +78,25 @@
     return p.substring(0, p.lastIndexOf('/') + 1);
   }
 
-  // Documents and work items open in their own project (node.project, from the page model).
-  function docUrl(node) {
-    return basePath() + HASH + '/project/' + encodeURIComponent(node.project) + '/wiki/' +
-      encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
+  // Documents and work items open in their own project (node.project, from the page model). In a collection (col =
+  // "collection project/collection id", root data-col) they open in the collection context, at the collection revision:
+  // .../project/P/collection/ID/... for the collection's project, .../project/P/collection/CP//ID/... for another
+  // project (formats rendered by Polarion 2512, docCoverage spike K2/K3).
+  function projectPath(project, col) {
+    var p = basePath() + HASH + '/project/' + encodeURIComponent(project);
+    if (!col) { return p; }
+    var i = col.lastIndexOf('/');
+    var cp = col.substring(0, i);
+    var cid = encodeURIComponent(col.substring(i + 1));
+    return p + '/collection/' + (cp === project ? cid : encodeURIComponent(cp) + '//' + cid);
   }
 
-  function itemUrl(project, id) {
-    return basePath() + HASH + '/project/' + encodeURIComponent(project) + '/workitem?id=' + encodeURIComponent(id);
+  function docUrl(node) {
+    return projectPath(node.project, node.col) + '/wiki/' + encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
+  }
+
+  function itemUrl(project, id, col) {
+    return projectPath(project, col) + '/workitem?id=' + encodeURIComponent(id);
   }
 
   function absUrl(u) {
@@ -124,6 +135,7 @@
       var d = nEls[i].dataset;
       var n = {
         key: d.k, project: d.p || root.dataset.project || '', id: d.id || '', title: d.title || d.id || '', space: d.space || '',
+        col: root.dataset.col || '', rev: d.rev || '',
         type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
@@ -476,7 +488,7 @@
     var lines = [
       { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
       { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
-      { text: this.multi ? n.project + ' / ' + n.space : n.space, weight: 400, color: 'rgb(110,118,135)' }
+      { text: (this.multi ? n.project + ' / ' + n.space : n.space) + (n.rev === 'HEAD' ? '  (HEAD)' : ''), weight: 400, color: 'rgb(110,118,135)' }
     ];
     this.state.extras.forEach(function (f) {
       var v = n[f];
@@ -592,9 +604,10 @@
 
   Base.hideTip = function () { this.tip.style.display = 'none'; };
 
-  // "space / name", prefixed with the project when several projects are in scope.
+  // "space / name", prefixed with the project when several projects are in scope; "(HEAD)" for a document of a
+  // collection without a pinned revision.
   Base.docLabel = function (n) {
-    return (this.multi ? n.project + ' / ' : '') + n.space + ' / ' + n.id;
+    return (this.multi ? n.project + ' / ' : '') + n.space + ' / ' + n.id + (n.rev === 'HEAD' ? ' (HEAD)' : '');
   };
 
   // Opens the details box with a header "origin -> target" and a Close button; returns the box.
@@ -617,16 +630,16 @@
   // of its document.
   Base.sampleList = function (box, e, title) {
     var self = this;
-    var pc = this.model.byKey[e.c].project;
-    var po = this.model.byKey[e.o].project;
+    var nc = this.model.byKey[e.c];
+    var no = this.model.byKey[e.o];
     if (!e.samples.length) { return; }
     el('div', { 'class': 'bw-muted' }, box, title);
     var ul = el('ul', { 'class': 'bw-items' }, box);
     e.samples.forEach(function (s) {
       var li = el('li', null, ul);
-      el('a', { href: itemUrl(pc, s.c), target: '_top' }, li, s.c);
+      el('a', { href: itemUrl(nc.project, s.c, nc.col), target: '_top' }, li, s.c);
       el('span', null, li, ' ' + ARROW + ' ');
-      el('a', { href: itemUrl(po, s.o), target: '_top' }, li, s.o);
+      el('a', { href: itemUrl(no.project, s.o, no.col), target: '_top' }, li, s.o);
       var cat = catById(self.cats, s.k);
       el('span', { 'class': 'bw-muted' }, li, ' (' + (cat ? cat.name : s.k) + ')');
     });

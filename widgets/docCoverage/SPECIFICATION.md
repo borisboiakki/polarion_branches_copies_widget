@@ -56,7 +56,7 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 | F14 | Chains (customer spec ← system reqs ← software reqs) are shown as layers; **no transitive reduction** (each link is a real relation) | Must |
 | F15 | Work item type filter for upstream items counted for coverage (e.g. only `customerRequirement`) | Could |
 | F16 | **Projects** parameter (`@project` multi-selector, 0.2.0), as docBranches F16: documents of the selected projects (none = current project); links between documents of two selected projects count. The `@document` selector lists the current project only, so the document selection limits the current project; the other selected projects keep all their documents (PO). Warning when documents are selected but the current project is not in scope. 0.2.1: text parameter **Documents of other projects** (`project/space/document`, comma separated, `project/document` = default space) limits the documents of the other selected projects; entries of the current project are added to the selection; bad / unselected / not found entries are reported (PO) | Should (done) |
-| F17 | **Collection context** (0.3.0): when the LiveReport is opened in a **collection**, the documents analysed are the documents of the collection at the revision the collection pins (items, links and coverage of that revision). The Projects, Documents and Documents-of-other-projects parameters are then ignored; the Spaces filter and the excluded types still apply. A parameter "Collection context" (use / ignore, default use) switches it off. A parameter **Collection** (`@collection`) is used when the page has no collection context: Polarion PDF export (which has none, spike K7/K9) or a report outside the collection pinned to it. **Upstream collections** are included (as Polarion's collection SQL does), each document at its pinned revision. A document added without a pinned revision is read at HEAD and **marked "HEAD"** (box, table, Excel revision column). The scope line shows the collection. Outside a collection: unchanged (PO, 2026-10-28). Spike K1–K9 done (`tests/docCoverage-v0.3.x/`) | Should |
+| F17 | **Collection context** (0.3.0): when the LiveReport is opened in a **collection**, the documents analysed are the documents of the collection at the revision the collection pins (items, links and coverage of that revision). The Projects, Documents and Documents-of-other-projects parameters are then ignored; the Spaces filter and the excluded types still apply. A parameter "Collection context" (use / ignore, default use) switches it off. A parameter **Collection** (`@collection`) is used when the page has no collection context: Polarion PDF export (which has none, spike K7/K9) or a report outside the collection pinned to it. **Upstream collections** are included (as Polarion's collection SQL does), each document at its pinned revision. A document added without a pinned revision is read at HEAD and **marked "HEAD"** (box, table, Excel revision column). The scope line shows the collection. Outside a collection: unchanged (PO, 2026-10-28). Spike K1–K9 done (`tests/docCoverage-v0.3.x/`) | Should (0.3.0 done, to test) |
 
 ## 5. Non-functional requirements
 
@@ -140,6 +140,17 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
    the coverage of an upstream document of the current project, and the document selection still limits the current
    project.
 
+i. 0.3.0 collection context (F17), to check on 2512 with the spike collection (2 pinned documents, upstream collection,
+   document of another project without revision):
+   - page opened in the collection: scope line "Collection: … (with upstream: …)", only the collection documents (also
+     those of the upstream collection), counts of the pinned revisions (same as K3/K4: e.g. 6 items, 2 `refines` links),
+     the other-project document marked (HEAD); the Projects / Documents parameters reported as not used;
+   - links of boxes, tables, details and Excel open in the collection, including the other-project document (format
+     `…/collection/<collection project>//<id>/…`, seen for items only in the spike);
+   - Polarion PDF export with the parameter "Collection" set: same numbers; without it: current documents;
+   - "Collection context" = Ignore: current documents; the same page outside the collection: unchanged (0.2.1 behaviour);
+   - rendering time with a large collection; a collection opened at an older revision or baseline.
+
 ## 10. Decision log
 
 | Date | Decision | Source |
@@ -169,3 +180,4 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
 | 2026-10-28 | Spike round 3: links read at the pinned revision; documents outside the collection ignored; the page location has no collection id (K9). **Spike concluded**: 0.3.0 can be built. Proposal to confirm: besides "Collection context" (use / ignore), a "Collection" parameter (`@collection`) used when the page has no context, needed for the Polarion PDF export | PO tests |
 | 2026-10-28 | Extra spike round: documents of **upstream collections** are included by the collection SQL (at their pinned revisions); a document of another project added without a pinned revision comes at HEAD; links of other-project items carry the collection project (`#/project/<p>/collection/<collection project>//<id>/…`). Design for 0.3.0: one collection query for all items, grouped by document in Velocity (no space/name mix-up between projects); document and item links taken from Polarion rendering where possible | PO tests |
 | 2026-10-28 | 0.3.0 decisions: add the parameter "Collection" (used when the page has no context, e.g. Polarion PDF export); include upstream collections; mark documents without a pinned revision "HEAD" | PO |
+| 2026-10-28 | Widget 0.3.0: collection context (F17). Parameters "Collection context" and "Collection"; shared `documents.vm` reads the collection documents (and their items in one query) when `$colRef` is set; links from the collection tables; client links open in the collection; `(HEAD)` mark and Excel revision column. docBranches 0.4.2 = shared code only (no functional change). Open check §9 i | Implementation |

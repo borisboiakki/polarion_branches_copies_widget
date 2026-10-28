@@ -1,6 +1,8 @@
 $parameters.put("projects", $factory.enumeration("Projects (none = current project)", "@project").allowNoValue(true).allowMultipleValues(true).build())
 $parameters.put("docs", $factory.enumeration("Documents of the current project (none = all documents)", "@document").allowNoValue(true).allowMultipleValues(true).build())
 $parameters.put("otherDocs", $factory.string("Documents of other projects (project/space/document, comma separated, empty = all)").value("").build())
+$parameters.put("collectionMode", $factory.customEnum("Collection context").addEnumItem("use", "Use: documents of the collection at its revisions").addEnumItem("ignore", "Ignore: current documents (HEAD)").allowNoValue(false).allowMultipleValues(false).singleValue("use").build())
+$parameters.put("collection", $factory.enumeration("Collection (used when the page is not opened in a collection, e.g. PDF export)", "@collection").allowNoValue(true).allowMultipleValues(true).build())
 $parameters.put("roles", $factory.enumeration("Link roles (1 to 5)", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).build())
 $parameters.put("excludedTypes", $factory.enumeration("Work item types not counted", "workitem-type").allowNoValue(true).allowMultipleValues(true).values(["heading"]).build())
 $parameters.put("spaces", $factory.string("Spaces to include (comma separated, empty = all)").value("").build())

@@ -94,8 +94,8 @@ public class CoverageHarness {
         WidgetHarness.check(br.contains("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/_default/SysReq_B\" data-r=\"satisfies:3;verifies:0\""), "SysReq_B -> CustomerSpec: 3 links (unresolvable target ignored)");
         WidgetHarness.check(br.contains("data-o=\"VforIA/_default/SysReq_A\" data-c=\"VforIA/_default/SwReq_C\""), "chain SwReq_C -> SysReq_A found");
         WidgetHarness.check(!br.contains("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/Specs/CustomerSpec\""), "links inside one document ignored");
-        WidgetHarness.check(br.contains("data-items=\"6\" data-up=\"1\" data-cov=\"4\" data-unc-n=\"2\" data-unc=\"VIA-5 VIA-6\""), "CustomerSpec coverage 4/6, uncovered VIA-5 VIA-6");
-        WidgetHarness.check(br.contains("data-items=\"4\" data-up=\"1\" data-cov=\"2\""), "SysReq_A coverage 2/4");
+        WidgetHarness.check(br.contains("data-items=\"6\" data-rev=\"\" data-up=\"1\" data-cov=\"4\" data-unc-n=\"2\" data-unc=\"VIA-5 VIA-6\""), "CustomerSpec coverage 4/6, uncovered VIA-5 VIA-6");
+        WidgetHarness.check(br.contains("data-items=\"4\" data-rev=\"\" data-up=\"1\" data-cov=\"2\""), "SysReq_A coverage 2/4");
 
         String pdf = WidgetHarness.render(dir, params(docs, roles), true, out + "/velocity-pdf.log");
         WidgetHarness.write(out + "/pdf-fragment.html", pdf);
@@ -153,6 +153,76 @@ public class CoverageHarness {
         WidgetHarness.check(lost.contains("1 selected document(s) could not be read."), "unreadable selected document reported");
         String none = WidgetHarness.render(dir, params(docs, list()), false, out + "/velocity-none.log");
         WidgetHarness.check(none.contains("select at least one link role"), "no role: message");
+        collectionChecks(dir, out, docs, roles);
         System.out.println("Rendered: browser " + br.length() + " chars, pdf " + pdf.length() + " chars");
+    }
+
+    /**
+     * Collection "Release 1" (VforIA/7), upstream collection "Base":
+     *   CustomerSpec @100  VIA-1..5 + heading VIA-7 (VIA-6 only in HEAD)
+     *   SysReq_A @101      VIA-11 satisfies 1, 12 satisfies 2, 13 satisfies 5 (HEAD: 13 satisfies 2), 14 verifies 3
+     *   SysReq_B @90       (upstream collection) VIA-21 satisfies 3; VIA-22, VIA-23 without links
+     *   VforIB SysReq_Z    no pinned revision (HEAD): VIB-5 satisfies VIA-5
+     * SwReq_C and Other are not in the collection. Expected: CustomerSpec 4/5 covered, uncovered VIA-4.
+     */
+    static void collectionChecks(String dir, String out, List<Object> docs, List<Object> roles) throws Exception {
+        CollectionMocks.Collection col = new CollectionMocks.Collection("VforIA", "7", "Release 1");
+        CollectionMocks.Collection base = new CollectionMocks.Collection("VforIA", "2", "Base");
+        col.upstream.add(base);
+        CollectionMocks.RevModule specR = new CollectionMocks.RevModule("VforIA", "Specs", "CustomerSpec", "100");
+        CollectionMocks.RevModule aR = new CollectionMocks.RevModule("VforIA", "_default", "SysReq_A", "101");
+        CollectionMocks.RevModule bR = new CollectionMocks.RevModule("VforIA", "_default", "SysReq_B", "90");
+        WidgetHarness.Module z = new WidgetHarness.Module("_default", "SysReq_Z", "SysReq Z");
+        z.project = "VforIB";
+        Map<Integer, WidgetHarness.WorkItem> r = new HashMap<Integer, WidgetHarness.WorkItem>();
+        for (int i = 1; i <= 5; i++) { r.put(i, new WidgetHarness.WorkItem("VIA-" + i, "customerRequirement", specR)); }
+        r.put(7, new WidgetHarness.WorkItem("VIA-7", "heading", specR));
+        for (int i = 11; i <= 14; i++) { r.put(i, new WidgetHarness.WorkItem("VIA-" + i, "systemRequirement", aR)); }
+        for (int i = 21; i <= 23; i++) { r.put(i, new WidgetHarness.WorkItem("VIA-" + i, "systemRequirement", bR)); }
+        r.get(11).links.add(new WidgetHarness.Link("satisfies", r.get(1)));
+        r.get(12).links.add(new WidgetHarness.Link("satisfies", r.get(2)));
+        r.get(13).links.add(new WidgetHarness.Link("satisfies", r.get(5)));
+        r.get(13).links.add(new WidgetHarness.Link("satisfies", r.get(7)));
+        r.get(14).links.add(new WidgetHarness.Link("verifies", r.get(3)));
+        r.get(21).links.add(new WidgetHarness.Link("satisfies", r.get(3)));
+        new WidgetHarness.WorkItem("VIB-5", "systemRequirement", z).links.add(new WidgetHarness.Link("satisfies", r.get(5)));
+        col.docs.add(specR);
+        col.docs.add(aR);
+        col.docs.add(z);
+        base.docs.add(bR);
+
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
+        String cb = WidgetHarness.render(dir, params(docs, roles), false, out + "/velocity-collection.log");
+        WidgetHarness.write(out + "/collection-fragment.html", cb);
+        WidgetHarness.check(cb.contains("data-col=\"VforIA/7\"") && cb.contains(">Collection: Release 1 (with upstream: Base)<"),
+            "collection: context read, collection and upstream on the scope line");
+        WidgetHarness.check(cb.contains("data-k=\"VforIA/Specs/CustomerSpec\" data-p=\"VforIA\"") && cb.contains("data-items=\"5\" data-rev=\"100\" data-up=\"1\" data-cov=\"4\" data-unc-n=\"1\" data-unc=\"VIA-4\""),
+            "collection: CustomerSpec at its revision (5 items), coverage 4/5, uncovered VIA-4");
+        java.util.regex.Matcher ae = java.util.regex.Pattern.compile("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/_default/SysReq_A\" data-r=\"satisfies:3;verifies:1\" data-u=\"satisfies:([^;]*);").matcher(cb);
+        WidgetHarness.check(ae.find() && ae.group(1).contains("VIA-5") && !ae.group(1).contains("VIA-7"),
+            "collection: links of the pinned revision (VIA-13 satisfies VIA-5), heading target ignored");
+        WidgetHarness.check(cb.contains("data-c=\"VforIA/_default/SysReq_B\" data-r=\"satisfies:1;verifies:0\"") && cb.contains("data-rev=\"90\""),
+            "collection: document of the upstream collection included");
+        WidgetHarness.check(cb.contains("data-c=\"VforIB/_default/SysReq_Z\" data-r=\"satisfies:1;verifies:0\"") && cb.contains("data-rev=\"HEAD\"")
+            && cb.contains("data-projects=\"VforIA,VforIB\""), "collection: document of another project without revision = HEAD");
+        WidgetHarness.check(!cb.contains("SwReq_C") && !cb.contains("_default/Other"), "collection: documents outside the collection ignored");
+        WidgetHarness.check(cb.contains("In a collection the Projects and Documents parameters are not used."), "collection: selection parameters reported as unused");
+
+        // PDF export: no context, the parameter "Collection" gives the collection.
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(null);
+        Map<String, WidgetHarness.Param> pp = params(list(), roles);
+        pp.put("collection", new WidgetHarness.Param(null, list(new CollectionMocks.ColOpt(col))));
+        String cp = WidgetHarness.render(dir, pp, true, out + "/velocity-collectionpdf.log");
+        WidgetHarness.check(cp.contains("Collection: Release 1 (with upstream: Base) &mdash;") && cp.contains("Coverage: 80% (4/5)")
+            && cp.contains("<td>VforIB / _default / SysReq_Z (HEAD)</td>") && cp.contains("_default  (HEAD)"),
+            "collection PDF: collection from the parameter, coverage 4/5, HEAD document marked");
+        // Mode "ignore": current documents even in a collection.
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
+        Map<String, WidgetHarness.Param> ig = params(docs, roles);
+        ig.put("collectionMode", new WidgetHarness.Param("ignore", null));
+        String ign = WidgetHarness.render(dir, ig, false, out + "/velocity-collectionignore.log");
+        WidgetHarness.check(ign.contains("data-col=\"\"") && ign.contains("data-items=\"6\" data-rev=\"\" data-up=\"1\" data-cov=\"4\" data-unc-n=\"2\""),
+            "collection context ignored: current documents (HEAD)");
+        WidgetHarness.TRANSACTION = null;
     }
 }
