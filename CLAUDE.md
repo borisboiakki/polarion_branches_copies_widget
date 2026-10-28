@@ -116,6 +116,9 @@ Verified through web search (2026-10-27):
   current project only, so docCoverage's document selection limits the current project only.
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
+- Collection context (docCoverage F17, spike K1–K8 in `tests/docCoverage-v0.3.x/`): `$transaction.context().contextCollection()`
+  (null outside a collection), `$transaction.objects().searchBySql(sql).collection($ref)` on `col_*` tables (`c_uri, c_col_rev`),
+  `openLinksInCollectionContext($ref)` — from guide §2.8, the SDK collection SQL examples and the 2506 release notes.
 - That the `MODULE` columns above exist unchanged in 2606.
 - Whether the Widget SDK extension point is suitable for our needs vs. Velocity.
 
@@ -171,8 +174,10 @@ test-data/                     anonymised sample structures for manual verificat
   - arithmetic is reliable on Integer only (verified: Long differences such as `$date.systemTime` ones do not compute)
 - **Always run `tools/vcheck.sh` before committing a `.vm` change.** It parses every template with Velocity 1.4
   (needs Java; it downloads the jars to `tools/.lib/` on first use).
-- After editing `tests/v0.1.x/spike-widget/bwSpike/` or `tests/docCoverage-v0.1.x/spike-widget/cvSpike/`, rebuild its zip
-  (folder at zip root, Deflated). `tools/vtest/cvSpike/SpikeHarness.java` smoke-tests cvSpike on the docBranches mocks.
+- After editing `tests/v0.1.x/spike-widget/bwSpike/`, `tests/docCoverage-v0.1.x/spike-widget/cvSpike/` or
+  `tests/docCoverage-v0.3.x/spike-widget/ccSpike/`, rebuild its zip (folder at zip root, Deflated).
+  `tools/vtest/cvSpike/SpikeHarness.java` and `tools/vtest/ccSpike/CollectionSpikeHarness.java` smoke-test them on the
+  docBranches mocks (the ccSpike collection mocks are set through `WidgetHarness.TRANSACTION`).
 - **Widget workflow**: edit `widgets/<w>/src/` or `shared/`, then run `tools/test-widget.sh all` (build + Velocity 1.4
   render on mocks + Chromium checks) and commit `widgets/*/dist/` with the sources. `core.js` and `graph.js` must not contain `$`, `#`,
   backslashes or non-ASCII characters (the build enforces it; use `HASH`/`String.fromCharCode`).

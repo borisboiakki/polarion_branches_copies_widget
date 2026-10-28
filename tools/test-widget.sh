@@ -39,7 +39,7 @@ for w in "${widgets[@]}"; do
   node "$root/tools/vtest/$w/browser-check.js" "$out"
   echo "Screenshots and exports in $out"
 done
-# Spike widget of docCoverage: Velocity 1.4 smoke test on the docBranches mocks.
+# Spike widgets of docCoverage (cvSpike, ccSpike): Velocity 1.4 smoke tests on the docBranches mocks.
 if [ "$which" = all ]; then
   echo "=== cvSpike"
   out="$base/cvSpike"
@@ -47,4 +47,10 @@ if [ "$which" = all ]; then
   "$root/tools/vcheck.sh" "$root/tests/docCoverage-v0.1.x/spike-widget/cvSpike/"*.vm
   javac -nowarn -cp "$cp" -d "$out/cls" "$root/tools/vtest/docBranches/WidgetHarness.java" "$root/tools/vtest/cvSpike/SpikeHarness.java" 2>&1 | grep -v '^Picked up\|^Note:' || true
   java -cp "$out/cls:$cp" SpikeHarness "$root/tests/docCoverage-v0.1.x/spike-widget/cvSpike" "$out" 2>&1 | grep -v '^Picked up'
+  echo "=== ccSpike"
+  out="$base/ccSpike"
+  mkdir -p "$out/cls"
+  "$root/tools/vcheck.sh" "$root/tests/docCoverage-v0.3.x/spike-widget/ccSpike/"*.vm
+  javac -nowarn -cp "$cp" -d "$out/cls" "$root/tools/vtest/docBranches/WidgetHarness.java" "$root/tools/vtest/ccSpike/CollectionSpikeHarness.java" 2>&1 | grep -v '^Picked up\|^Note:' || true
+  java -cp "$out/cls:$cp" CollectionSpikeHarness "$root/tests/docCoverage-v0.3.x/spike-widget/ccSpike" "$out" 2>&1 | grep -v '^Picked up'
 fi

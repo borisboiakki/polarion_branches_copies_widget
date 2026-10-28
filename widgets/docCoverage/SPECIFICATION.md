@@ -56,6 +56,7 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 | F14 | Chains (customer spec ← system reqs ← software reqs) are shown as layers; **no transitive reduction** (each link is a real relation) | Must |
 | F15 | Work item type filter for upstream items counted for coverage (e.g. only `customerRequirement`) | Could |
 | F16 | **Projects** parameter (`@project` multi-selector, 0.2.0), as docBranches F16: documents of the selected projects (none = current project); links between documents of two selected projects count. The `@document` selector lists the current project only, so the document selection limits the current project; the other selected projects keep all their documents (PO). Warning when documents are selected but the current project is not in scope. 0.2.1: text parameter **Documents of other projects** (`project/space/document`, comma separated, `project/document` = default space) limits the documents of the other selected projects; entries of the current project are added to the selection; bad / unselected / not found entries are reported (PO) | Should (done) |
+| F17 | **Collection context** (0.3.0): when the LiveReport is opened in a **collection**, the documents analysed are the documents of the collection at the revision the collection pins (items, links and coverage of that revision). The Projects, Documents and Documents-of-other-projects parameters are then ignored; the Spaces filter and the excluded types still apply. A parameter "Collection context" (use / ignore, default use) switches it off. The scope line shows the collection. Outside a collection: unchanged (PO, 2026-10-28). Spike K1–K8 first (`tests/docCoverage-v0.3.x/`) | Should |
 
 ## 5. Non-functional requirements
 
@@ -106,6 +107,16 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 | C3 | Link direction of the coverage roles, link scan between the selected documents, timing on the large project | ✅ `satisfies` stored on the downstream item, target = customer spec; SQL with source + target document filter works; 3–4 ms SQL, ≤ 1 ms scan (small set). Large project not measured; PO: no performance concern |
 | C4 | Counted items per upstream document, coverage % and uncovered items, timing | ✅ 6 counted items (heading excluded), 5 covered = 83 %, 1 uncovered listed; ≤ 1 ms |
 
+## 8b. Spike K1–K8 (collection context) — see `tests/docCoverage-v0.3.x/spike-tests.md`
+
+| Test | Question | Result |
+|---|---|---|
+| K1 | Is `$transaction.context().contextCollection()` set in a page opened in a collection (null outside, PDF too)? Collection name and revision for the scope line | Not run |
+| K2 | Does `searchBySql("select c_uri, c_col_rev from col_module").collection(ref)` return the collection documents at their revision (`getOldApi()`)? Link format with `openLinksInCollectionContext` | Not run |
+| K3 | Which collection query gives the items of a document at its pinned revision (`col_workitem` by `fk_uri_module`, or `col_rel_module_workitem`)? Timing | Not run |
+| K4 | Does `col_struct_workitem_linkedworkitems` give the links of the pinned revision, and does `getOldApi().getLinkedWorkItemsStructsDirect()` of a collection item return the links of that revision? | Not run |
+| K6–K8 | Explicit collection reference (parameter), PDF export, custom SQL | Not run |
+
 ## 9. Open checks for 0.1.0 on 2512
 
 Only verifiable on the instance (the harness uses mocks):
@@ -151,3 +162,4 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
 | 2026-10-28 | PO test of 0.2.0 on 2512: project selector and multi-project data OK, rendering time good. The document selector lists the current project only (Polarion `@document` limitation, guide §10.2; expected, F16) | PO |
 | 2026-10-28 | Widget 0.2.1: text parameter "Documents of other projects" (`project/space/document`, comma separated), since the `@document` selector cannot list other projects (PO: keep the capability even if less comfortable). Shared `documents.vm` gets `docOther` (docBranches 0.4.1, no functional change). To check on 2512 | PO |
 | 2026-10-28 | PO test of 0.2.1 on 2512: "Documents of other projects" works with a valid project/space/document, the not-found warning is shown. Ready for release | PO |
+| 2026-10-28 | Collection context (F17) requested for docCoverage first (docBranches may follow). The collection replaces the Projects / Documents parameters; a parameter can ignore the context (default: use it); spike K1–K8 before the implementation (0.3.0) | PO |

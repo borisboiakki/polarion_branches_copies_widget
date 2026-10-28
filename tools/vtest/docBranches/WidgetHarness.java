@@ -99,6 +99,7 @@ public class WidgetHarness {
         public Opt getType() { return new Opt(type, type); }
         public Module getModule() { return module; }
         public boolean isUnresolvable() { return unresolvable; }
+        public String getProjectId() { return module.project; }
         public List<Link> getLinkedWorkItemsStructsDirect() { return links; }
     }
 
@@ -387,6 +388,9 @@ public class WidgetHarness {
 
     // ------------------------------------------------------------------ run
 
+    /** Rendering API transaction mock, set by harnesses that need it (tools/vtest/ccSpike). */
+    static Object TRANSACTION = null;
+
     static String render(String widgetDir, Map<String, Param> params, boolean pdf, String logFile) throws Exception {
         VelocityEngine ve = new VelocityEngine();
         ve.setProperty("file.resource.loader.path", widgetDir);
@@ -400,6 +404,7 @@ public class WidgetHarness {
         ctx.put("objectFactory", new ObjectFactory());
         ctx.put("esc", new Esc());
         ctx.put("date", new DateTool());
+        if (TRANSACTION != null) { ctx.put("transaction", TRANSACTION); }
         Template t = ve.getTemplate("render.vm", "UTF-8");
         StringWriter w = new StringWriter();
         t.merge(ctx, w);
