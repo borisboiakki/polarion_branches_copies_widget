@@ -50,7 +50,9 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
   item counts, extra fields, highlight, Fit / zoom, Table / Graph, SVG, Excel, Refresh.
 - **Click a document** for its coverage and the uncovered items (with a link to open the document).
   **Hover / click a line** for the links per role, the downstream items with links and the upstream items covered.
-- **Excel**: sheets Relations, Documents (with coverage), Uncovered items, Linked items (up to 30 per pair).
+- **Traceability matrix (Excel)** (0.4.0, button in the details of a document or a line): each work item with its
+  title, its linked items with their titles and the kind of link, "uncovered" / "not linked" when none (see the user manual).
+- **Excel**: sheets Relations, Documents (with coverage), Uncovered items, Linked items (all links of the shown lines).
 - **PDF export / print**: static graph, relations table and coverage table (no JavaScript).
 
 ## Known limitations (0.1.0)
@@ -58,4 +60,5 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
 - Projects: the current project by default, or the selected projects. Links to documents of projects that are not selected are ignored.
 - Documents are read through the Open API data service; permission filtering for viewers who cannot read some
   documents has not been checked (same open check as docBranches).
-- The linked item lists in the details and Excel are limited to 30 per document pair.
+- The linked item list in the details shows the first 30 links per document pair. The page model holds at most
+  20 000 links and 20 000 work items with titles per page (Excel, traceability matrix); a warning is shown above.

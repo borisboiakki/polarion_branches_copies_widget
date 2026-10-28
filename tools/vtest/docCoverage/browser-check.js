@@ -8,6 +8,29 @@ function expect(ok, what) {
   console.log('check ok: ' + what);
 }
 
+// Sheets of a downloaded workbook, read with the page's XLSX library: [{ name, rows }].
+async function readBook(p, path) {
+  const b64 = fs.readFileSync(path).toString('base64');
+  return p.evaluate(data => {
+    const wb = window.XLSX.read(data, { type: 'base64' });
+    return wb.SheetNames.map(n => ({ name: n, rows: window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' }) }));
+  }, b64);
+}
+
+async function clickDoc(p, name) {
+  await p.evaluate(key => {
+    const a = Array.from(document.querySelectorAll('.bw-node')).find(n => n.querySelector('title').textContent.indexOf('/ ' + key + ' ') >= 0);
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }, name);
+  await p.waitForTimeout(100);
+}
+
+async function matrix(p, dir, file) {
+  const [d] = await Promise.all([p.waitForEvent('download'), p.click('.bw-details button:has-text("Traceability matrix")')]);
+  await d.saveAs(dir + '/' + file);
+  return { name: d.suggestedFilename(), sheets: await readBook(p, dir + '/' + file) };
+}
+
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1220, height: 900 } });
@@ -52,6 +75,48 @@ function expect(ok, what) {
   const det = await p.textContent('.bw-details');
   console.log('details:', det.slice(0, 200));
   expect(det.indexOf('2 uncovered items') >= 0 && det.indexOf('VIA-5') >= 0 && det.indexOf('VIA-6') >= 0, 'document details list the uncovered items');
+
+  // Traceability matrix of an upstream document: one row per link, incoming links with the opposite name.
+  const m1 = await matrix(p, dir, 'matrix-spec.xlsx');
+  const r1 = m1.sheets[0].rows;
+  console.log('matrix CustomerSpec:', JSON.stringify(r1));
+  expect(m1.name === 'traceability-CustomerSpec.xlsx' && r1[0].join('|') === 'Work item|Title|Linked item|Linked item title|Link|Linked document',
+    'document matrix: file name and columns');
+  expect(r1.length === 10 && r1.filter(r => r[0] === 'VIA-1').length === 2 && r1.filter(r => r[0] === 'VIA-3').length === 2,
+    'document matrix: one row per link, items repeated');
+  expect(r1.some(r => r.join('|') === 'VIA-3|Title VIA-3|VIA-14|Title VIA-14|is verified by|_default / SysReq_A'),
+    'document matrix: linked item, title, opposite role name and document');
+  expect(r1.some(r => r[0] === 'VIA-5' && r[2] === 'uncovered' && r[3] === '') && r1.some(r => r[0] === 'VIA-6' && r[2] === 'uncovered'),
+    'document matrix: uncovered items marked');
+  // A document that is only downstream: outgoing links with the role name, "not linked" for items without a link.
+  await clickDoc(p, 'SysReq_B');
+  const r2 = (await matrix(p, dir, 'matrix-b.xlsx')).sheets[0].rows;
+  expect(r2.some(r => r.join('|') === 'VIA-22|Title VIA-22|VIA-4|Title VIA-4|satisfies|Specs / CustomerSpec') && r2.some(r => r[0] === 'VIA-23' && r[2] === 'not linked'),
+    'downstream document matrix: role name, not linked');
+  // Relation SysReq_A -> CustomerSpec: upstream coverage and downstream links.
+  await p.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('.bw-edge-label')).find(g => g.textContent === 'satisfies 3 + verifies 1');
+    l.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  });
+  await p.waitForTimeout(100);
+  const m3 = await matrix(p, dir, 'matrix-edge.xlsx');
+  console.log('matrix relation:', JSON.stringify(m3.sheets));
+  const up = m3.sheets[0].rows;
+  const down = m3.sheets[1].rows;
+  expect(m3.name === 'traceability-SysReq_A-CustomerSpec.xlsx' && m3.sheets.map(s => s.name).join('|') === 'Upstream coverage|Downstream links',
+    'relation matrix: two sheets');
+  expect(up.length === 8 && up.filter(r => r[0] === 'VIA-2').length === 2 && up.some(r => r[0] === 'VIA-4' && r[2] === 'uncovered')
+    && !up.some(r => r[2] === 'VIA-21'), 'relation matrix: upstream items, links of this downstream document only, uncovered');
+  expect(down.length === 5 && down.some(r => r.join('|') === 'VIA-14|Title VIA-14|VIA-3|Title VIA-3|verifies'), 'relation matrix: downstream items and their links');
+  // Hidden role: the matrix follows the role filter.
+  await p.click('label:has-text("verifies") input');
+  await p.waitForTimeout(150);
+  await clickDoc(p, 'CustomerSpec');
+  const r4 = (await matrix(p, dir, 'matrix-filter.xlsx')).sheets[0].rows;
+  expect(!r4.some(r => r[4] === 'is verified by') && r4.filter(r => r[0] === 'VIA-3').length === 1, 'matrix follows the role filter');
+  await p.click('label:has-text("verifies") input');
+  await p.waitForTimeout(150);
+  await clickDoc(p, 'CustomerSpec');
 
   // Role filter: only "verifies" -> CustomerSpec covered by VIA-3 only (1/6).
   await p.click('label:has-text("satisfies") input');

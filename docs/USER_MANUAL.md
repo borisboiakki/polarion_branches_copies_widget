@@ -165,6 +165,30 @@ lines then appear as uncovered.
   - *Branches and Copies*: opens the document.
   - *Coverage*: shows its coverage and the list of **uncovered items**, with a link that opens the document.
 
+### Traceability matrix (Coverage)
+
+The details box of a document or a line has a **Traceability matrix (Excel)** button. It downloads the matrix of the
+work items, built from what the graph shows (roles ticked in the toolbar, documents shown, excluded types left out):
+
+| Column | Content |
+|---|---|
+| Work item | Id of a work item of the document (link to Polarion) |
+| Title | Its title |
+| Linked item | Id of a linked work item (link to Polarion); **uncovered** when an item of an upstream document has no link, **not linked** when the document is only downstream |
+| Linked item title | Its title |
+| Link | Role name for a link the item makes (e.g. *refines*), opposite name for a link pointing to it (e.g. *is refined by*) |
+| Linked document | Document of the linked item (document matrix only) |
+
+An item with several links is repeated on several lines. Items are sorted by id.
+
+- **Document**: one sheet with the links of its items to all the shown documents, in both directions.
+- **Line** (downstream → upstream): sheet *Upstream coverage* with every upstream item and its links from this
+  downstream document (*uncovered* when none), and sheet *Downstream links* with every downstream item and its links
+  to the upstream document (*not linked* when none).
+
+In a collection, ids and titles are those of the collection revision. Very large pages are capped (20 000 links and
+20 000 work items per page); the status line then says that the matrix is truncated.
+
 ### Excel export
 
 The workbook follows the current toolbar choices, and every item and document has a link back to Polarion.
@@ -172,7 +196,7 @@ The workbook follows the current toolbar choices, and every item and document ha
 | Widget | Sheets |
 |---|---|
 | Branches and Copies | Relations, Documents, Linked items (up to 30 per document pair) |
-| Coverage | Relations, Documents (with coverage and the collection revision), Uncovered items (up to 500 per document), Linked items (up to 30 per pair) |
+| Coverage | Relations, Documents (with coverage and the collection revision), Uncovered items (up to 500 per document), Linked items (all links of the shown lines) |
 
 If the browser blocks the Excel library, the button downloads the relations as a CSV file instead, and the status line
 says so.

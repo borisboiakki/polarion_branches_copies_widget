@@ -16,11 +16,12 @@
 ## ======================================================================= parameters
 ## BW_SHARED params.vm
 
-## docCoverage limits: uncovered items kept per document in the page model (full count always shown), linked item samples per pair,
-## link roles used.
+## docCoverage limits: uncovered items kept per document in the page model (full count always shown), link roles used,
+## link pairs and work items (id and title) written to the page model for the lists and the traceability matrix (whole page).
 #set($uncCap = 500)
-#set($sampleCap = 30)
 #set($maxRoles = 5)
+#set($pairCap = 20000)
+#set($itemCap = 20000)
 
 ## ======================================================================= lists
 ## BW_SHARED common.vm
@@ -235,10 +236,12 @@
   #end
 #end
 #set($rolesDropped = $roleAll.size() - $roleIds.size())
-## Role names from the project's link role enumeration (spike C2); the id when not found.
+## Role names and opposite names from the project's link role enumeration (spike C2); the id when not found.
 #set($roleName = $objectFactory.newMap())
+#set($roleOpp = $objectFactory.newMap())
 #foreach($r in $roleIds)
   #set($void = $roleName.put($r, $r))
+  #set($void = $roleOpp.put($r, $r))
 #end
 #if($projectOk && $roleIds.size() > 0)
   #set($tp = false)
@@ -257,6 +260,12 @@
         #set($oName = $o.getName())
         #if("$oName" != "")
           #set($void = $roleName.put($oIdS, "$oName"))
+          #set($void = $roleOpp.put($oIdS, "$oName"))
+        #end
+        #set($oOpp = "")
+        #set($oOpp = $o.getOppositeName())
+        #if("$oOpp" != "")
+          #set($void = $roleOpp.put($oIdS, "$oOpp"))
         #end
       #end
     #end
@@ -340,6 +349,8 @@
 #end
 #set($edges = $objectFactory.newMap())
 #set($edgeKeys = [])
+## Link pairs written to the page model (all pairs up to pairCap for the whole page).
+#set($pairN = 0)
 ## upstream key -> map of covered item ids (all roles, all downstream documents)
 #set($coveredAll = $objectFactory.newMap())
 #macro(cwEdge $cwUp $cwDown)
@@ -451,9 +462,10 @@
               #set($void = $cwE.get("down").get($roleS).put($srcId, true))
               #set($void = $cwE.get("upAll").put($tgtId, true))
               #set($void = $cwE.get("downAll").put($srcId, true))
-              #if($cwE.get("samples").size() < $sampleCap)
+              #if($pairN < $pairCap)
                 #set($void = $cwE.get("samples").add("${srcId}|${tgtId}|${roleS}"))
               #end
+              #set($pairN = $pairN + 1)
               #if(!$coveredAll.containsKey($tgtKey))
                 #set($void = $coveredAll.put($tgtKey, $objectFactory.newMap()))
               #end
@@ -808,7 +820,8 @@
 #set($rolesStr = "${rolesStr};")
 #end
 #set($rn = $roleName.get($r))
-#set($rolesStr = "${rolesStr}${r}|${rn}")
+#set($ro = $roleOpp.get($r))
+#set($rolesStr = "${rolesStr}${r}|${rn}|${ro}")
 #end
 #set($warn = "")
 #if($rolesDropped > 0)
@@ -819,6 +832,31 @@
 #end
 #if($scopeWarn != "")
 #set($warn = "${warn} ${scopeWarn}")
+#end
+## Work items of the related documents for the traceability matrix: lists of "id|title" (separators in titles
+## replaced), each written followed by ";" (no string growing in a loop: large documents).
+#set($itemN = 0)
+#set($itemLists = $objectFactory.newMap())
+#foreach($d in $docList)
+#set($itL = [])
+#if($linkedKeys.containsKey($d.get("key")))
+#foreach($w in $d.get("itemObjs"))
+#if($itemN < $itemCap)
+#set($wT = "")
+#set($wT = $w.getTitle())
+#set($wT = "$wT")
+#set($wT = $wT.replace("|", " "))
+#set($wT = $wT.replace(";", " "))
+#set($wI = "$w.getId()")
+#set($void = $itL.add("${wI}|${wT}"))
+#end
+#set($itemN = $itemN + 1)
+#end
+#end
+#set($void = $itemLists.put($d.get("key"), $itL))
+#end
+#if($pairN > $pairCap || $itemN > $itemCap)
+#set($warn = "${warn} Large page: the linked item lists and the traceability matrix are truncated (limit $pairCap links, $itemCap work items).")
 #end
 <div class="cw-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-col="$esc.html($colKey)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
   <div class="bw-muted">$esc.html($scopeText)</div>
@@ -839,7 +877,7 @@
 #set($uncStr = "${uncStr}${u}")
 #end
 #end
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-rev="$esc.html($d.get('rev'))" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-rev="$esc.html($d.get('rev'))" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)" data-it="#foreach($x in $itemLists.get($d.get('key')))$esc.html($x);#end"></i>
 #end
 #foreach($k in $edgeKeys)
 #set($e = $edges.get($k))
@@ -872,14 +910,7 @@
 #end
 #set($dStr = "${dStr}${r}:${ids}")
 #end
-#set($samplesStr = "")
-#foreach($s in $e.get("samples"))
-#if($samplesStr != "")
-#set($samplesStr = "${samplesStr};")
-#end
-#set($samplesStr = "${samplesStr}${s}")
-#end
-    <i class="bw-e" data-o="$esc.html($e.get('o'))" data-c="$esc.html($e.get('c'))" data-r="$esc.html($rStr)" data-u="$esc.html($uStr)" data-d="$esc.html($dStr)" data-s="$esc.html($samplesStr)"></i>
+    <i class="bw-e" data-o="$esc.html($e.get('o'))" data-c="$esc.html($e.get('c'))" data-r="$esc.html($rStr)" data-u="$esc.html($uStr)" data-d="$esc.html($dStr)" data-s="#foreach($x in $e.get('samples'))$esc.html($x);#end"></i>
 #end
   </div>
 </div>

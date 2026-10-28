@@ -222,3 +222,4 @@ projects would stay.
 | 2026-10-28 | Widget 0.4.1: no functional change; the shared `documents.vm` accepts a list of documents of other projects (`docOther`, used by docCoverage 0.2.1) | |
 | 2026-10-28 | Widget 0.4.2: no functional change; shared code for the collection context of docCoverage 0.3.0 (`documents.vm` collection branch, not used by docBranches; collection-aware links in `core.js`). Collection context for docBranches possible later on the same code | |
 | 2026-10-28 | "Spaces to include" stays a text parameter; a spaces selector is logged as a future improvement (no `@space` enumeration in 2512) | PO |
+| 2026-10-28 | Widget 0.4.3: no functional change; shared `exportWorkbook` takes an optional file name (traceability matrix of docCoverage 0.4.0) | |

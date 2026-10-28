@@ -57,6 +57,7 @@ public class CoverageHarness {
         WidgetHarness.link(41, "satisfies", 5);
         WidgetHarness.link(1, "satisfies", 2);
         WidgetHarness.link(12, "parent", 11);
+        WidgetHarness.ITEMS.get("VIA-12").title = "Satisfies 2 | with; separators";
         x = WidgetHarness.doc("VforIB", "_default", "SysReq_X");
         WidgetHarness.wi("VIB-1", "systemRequirement", x).links.add(new WidgetHarness.Link("satisfies", WidgetHarness.ITEMS.get("VIA-5")));
         WidgetHarness.Module y = WidgetHarness.doc("VforIB", "_default", "SysReq_Y");
@@ -87,7 +88,12 @@ public class CoverageHarness {
 
         String br = WidgetHarness.render(dir, params(docs, roles), false, out + "/velocity-browser.log");
         WidgetHarness.write(out + "/browser-fragment.html", br);
-        WidgetHarness.check(br.contains("data-roles=\"satisfies|satisfies;verifies|verifies\""), "roles and their names are passed to the page");
+        WidgetHarness.check(br.contains("data-roles=\"satisfies|satisfies|is satisfied by;verifies|verifies|is verified by\""), "roles with their names and opposite names are passed to the page");
+        WidgetHarness.check(br.contains("data-it=\"VIA-1|Title VIA-1;") && br.contains("VIA-6|Title VIA-6;\"") && !br.contains("VIA-7|"),
+            "matrix: work items with titles of the related documents (excluded type left out)");
+        WidgetHarness.check(br.contains("VIA-12|Satisfies 2   with  separators"), "matrix: separators in titles replaced");
+        WidgetHarness.check(br.contains("data-c=\"VforIA/_default/SysReq_A\"") && br.contains("data-s=\"VIA-11|VIA-1|satisfies;VIA-12|VIA-2|satisfies;VIA-13|VIA-2|satisfies;VIA-14|VIA-3|verifies;\""),
+            "matrix: all link pairs of a relation in the page model");
         WidgetHarness.check(br.contains("data-k=\"VforIA/Specs/CustomerSpec\"") && !br.contains("data-k=\"VforIA/_default/Other\"")
             && !br.contains("VforIB"), "only the selected documents of the current project are listed");
         WidgetHarness.check(br.contains("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/_default/SysReq_A\" data-r=\"satisfies:3;verifies:1\""), "SysReq_A -> CustomerSpec: 3 satisfies + 1 verifies (heading target ignored)");
@@ -178,6 +184,7 @@ public class CoverageHarness {
         for (int i = 1; i <= 5; i++) { r.put(i, new WidgetHarness.WorkItem("VIA-" + i, "customerRequirement", specR)); }
         r.put(7, new WidgetHarness.WorkItem("VIA-7", "heading", specR));
         for (int i = 11; i <= 14; i++) { r.put(i, new WidgetHarness.WorkItem("VIA-" + i, "systemRequirement", aR)); }
+        r.get(1).title = "Pinned title 1";
         for (int i = 21; i <= 23; i++) { r.put(i, new WidgetHarness.WorkItem("VIA-" + i, "systemRequirement", bR)); }
         r.get(11).links.add(new WidgetHarness.Link("satisfies", r.get(1)));
         r.get(12).links.add(new WidgetHarness.Link("satisfies", r.get(2)));
@@ -198,6 +205,7 @@ public class CoverageHarness {
             "collection: context read, collection and upstream on the scope line");
         WidgetHarness.check(cb.contains("data-k=\"VforIA/Specs/CustomerSpec\" data-p=\"VforIA\"") && cb.contains("data-items=\"5\" data-rev=\"100\" data-up=\"1\" data-cov=\"4\" data-unc-n=\"1\" data-unc=\"VIA-4\""),
             "collection: CustomerSpec at its revision (5 items), coverage 4/5, uncovered VIA-4");
+        WidgetHarness.check(cb.contains("data-it=\"VIA-1|Pinned title 1;"), "collection: matrix titles at the pinned revision");
         java.util.regex.Matcher ae = java.util.regex.Pattern.compile("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/_default/SysReq_A\" data-r=\"satisfies:3;verifies:1\" data-u=\"satisfies:([^;]*);").matcher(cb);
         WidgetHarness.check(ae.find() && ae.group(1).contains("VIA-5") && !ae.group(1).contains("VIA-7"),
             "collection: links of the pinned revision (VIA-13 satisfies VIA-5), heading target ignored");

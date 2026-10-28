@@ -17,7 +17,10 @@
     { color: 'rgb(211,84,0)', dash: '12,4,2,4' }
   ];
 
-  // data-roles "id|name;id|name" -> categories in selection order.
+  // Linked item pairs listed in the details box per relation (the Excel export and the matrix use all of them).
+  var SAMPLE_CAP = 30;
+
+  // data-roles "id|name|opposite name;..." -> categories in selection order.
   function readCats(s) {
     var cats = [];
     (s || '').split(';').forEach(function (part) {
@@ -25,7 +28,7 @@
       if (!f[0] || cats.length >= ROLE_STYLES.length) { return; }
       var st = ROLE_STYLES[cats.length];
       var name = f[1] || f[0];
-      cats.push({ id: f[0], name: name, label: name, color: st.color, dash: st.dash });
+      cats.push({ id: f[0], name: name, label: name, opp: f[2] || name, color: st.color, dash: st.dash });
     });
     return cats;
   }
@@ -51,6 +54,17 @@
       n.up = d.up === '1';
       n.uncBase = words(d.unc);
       n.uncBaseN = toInt(d.uncN);
+      // Work items (id, title) of a related document, sorted by id, for the traceability matrix.
+      n.its = [];
+      n.titles = {};
+      (d.it || '').split(';').forEach(function (part) {
+        var i = part.indexOf('|');
+        if (i <= 0) { return; }
+        var id = part.substring(0, i);
+        n.titles[id] = part.substring(i + 1);
+        n.its.push(id);
+      });
+      n.its.sort(idCompare);
     });
     var byKey = model.byKey;
     var edges = [];
@@ -67,7 +81,7 @@
       edges.push({
         o: a.o, c: a.c, kinds: kinds, meta: {}, indirect: false,
         up: roleLists(a.u), down: roleLists(a.d),
-        samples: parseSamples(a.s)
+        pairs: parseSamples(a.s), samples: []
       });
     }
     // Every upstream item covered by any line (all roles, all documents), per upstream document.
@@ -78,6 +92,19 @@
     });
     model.edges = edges;
     return model;
+  }
+
+  // Work item ids in natural order: prefix, then number (VIA-2 before VIA-10).
+  function idCompare(a, b) {
+    var na = a.split('-');
+    var nb = b.split('-');
+    var pa = na.slice(0, -1).join('-');
+    var pb = nb.slice(0, -1).join('-');
+    if (pa !== pb) { return pa < pb ? -1 : 1; }
+    var ia = parseInt(na[na.length - 1], 10);
+    var ib = parseInt(nb[nb.length - 1], 10);
+    if (isNaN(ia) || isNaN(ib) || ia === ib) { return a < b ? -1 : (a > b ? 1 : 0); }
+    return ia - ib;
   }
 
   function union(lists) {
@@ -171,6 +198,8 @@
       if (st.hidden[e.o] || st.hidden[e.c]) { return; }
       var r = restrictEdge(e, cats, st.rel);
       if (!r) { return; }
+      r.pairs = e.pairs.filter(function (p) { return st.rel[p.k]; });
+      r.samples = r.pairs.slice(0, SAMPLE_CAP);
       var shownRoles = cats.filter(function (c) { return st.rel[c.id]; });
       r.upSet = union(shownRoles.map(function (c) { return e.up[c.id]; }));
       r.downSet = union(shownRoles.map(function (c) { return e.down[c.id]; }));
@@ -245,10 +274,12 @@
   };
 
   Widget.prototype.showDetails = function (e) {
+    var self = this;
     this.detailDoc = null;
     var o = this.model.byKey[e.o];
     var c = this.model.byKey[e.c];
     var box = this.openDetails(c, o);
+    this.matrixButton(box, function () { self.exportEdgeMatrix(e); });
     this.edgeSummary(e).slice(1).forEach(function (l) { el('div', null, box, l); });
     this.sampleList(box, e, 'Linked work items (downstream ' + ARROW + ' upstream):');
   };
@@ -257,6 +288,7 @@
     var self = this;
     this.detailDoc = n;
     var box = this.openDetails(n, null);
+    this.matrixButton(box, function () { self.exportDocMatrix(n); });
     el('div', null, box, n.title + ' ' + DASH + ' ' + (this.multi ? n.project + ' / ' : '') + n.space);
     var c = this.coverage(n);
     if (!c) {
@@ -358,7 +390,7 @@
     edges.forEach(function (e) {
       var o = by[e.o];
       var c = by[e.c];
-      e.samples.forEach(function (sm) {
+      e.pairs.forEach(function (sm) {
         var cat = catById(cats, sm.k);
         items.push([self.docLabel(c), self.docLabel(o), sm.c, sm.o, cat ? cat.name : sm.k]);
         itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(c.project, sm.c, c.col)) });
@@ -370,8 +402,91 @@
         widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
       { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11, 11] },
       { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
-      { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
+      { name: 'Linked items', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
     ]);
+  };
+
+  // ------------------------------------------------------------------ traceability matrix (Excel, current filters)
+  // One row per link of a work item (the item repeated when it has several links); an item without a link gets
+  // "uncovered" (upstream document) or "not linked" in the linked item cell. Links = the shown lines and roles.
+
+  var MATRIX_HEAD = ['Work item', 'Title', 'Linked item', 'Linked item title', 'Link'];
+
+  Widget.prototype.matrixButton = function (box, onClick) {
+    var b = this.button(box.firstChild, 'Traceability matrix (Excel)', 'Download the traceability matrix of the work items as an Excel workbook', onClick);
+    b.style.marginLeft = '8px';
+  };
+
+  // Rows for the items of document n. links(id) -> [{ id, doc, kind }] of the item; empty = the text noLink.
+  Widget.prototype.matrixSheet = function (n, links, noLink, withDoc) {
+    var self = this;
+    var rows = [withDoc ? MATRIX_HEAD.concat(['Linked document']) : MATRIX_HEAD.slice()];
+    var urls = [];
+    n.its.forEach(function (id) {
+      var title = n.titles[id] || '';
+      var ls = links[id] || [];
+      if (!ls.length) {
+        rows.push(withDoc ? [id, title, noLink, '', '', ''] : [id, title, noLink, '', '']);
+        urls.push({ r: rows.length - 1, c: 0, url: absUrl(itemUrl(n.project, id, n.col)) });
+        return;
+      }
+      ls.forEach(function (l) {
+        var row = [id, title, l.id, l.doc.titles[l.id] || '', l.kind];
+        rows.push(withDoc ? row.concat([self.docLabel(l.doc)]) : row);
+        urls.push({ r: rows.length - 1, c: 0, url: absUrl(itemUrl(n.project, id, n.col)) });
+        urls.push({ r: rows.length - 1, c: 2, url: absUrl(itemUrl(l.doc.project, l.id, l.doc.col)) });
+      });
+    });
+    return { rows: rows, links: urls, widths: withDoc ? [16, 50, 16, 50, 22, 40] : [16, 50, 16, 50, 22] };
+  };
+
+  // Links of the items of document n through edge e: outgoing (n downstream) or incoming (n upstream).
+  Widget.prototype.addLinks = function (links, n, e) {
+    var by = this.model.byKey;
+    var cats = this.cats;
+    var up = e.o === n.key;
+    e.pairs.forEach(function (p) {
+      var cat = catById(cats, p.k);
+      var id = up ? p.o : p.c;
+      (links[id] = links[id] || []).push({
+        id: up ? p.c : p.o, doc: by[up ? e.c : e.o],
+        kind: cat ? (up ? cat.opp : cat.name) : p.k
+      });
+    });
+  };
+
+  Widget.prototype.matrixName = function (parts) {
+    return 'traceability-' + parts.join('-').replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xlsx';
+  };
+
+  Widget.prototype.exportDocMatrix = function (n) {
+    var self = this;
+    var links = {};
+    var upstream = false;
+    this.edges.forEach(function (e) {
+      if (e.o === n.key) { upstream = true; }
+      if (e.o === n.key || e.c === n.key) { self.addLinks(links, n, e); }
+    });
+    var sh = this.matrixSheet(n, links, upstream ? 'uncovered' : 'not linked', true);
+    sh.name = 'Traceability';
+    sh.what = 'traceability matrix';
+    this.exportWorkbook([sh], this.matrixName([n.id]));
+  };
+
+  Widget.prototype.exportEdgeMatrix = function (e) {
+    var o = this.model.byKey[e.o];
+    var c = this.model.byKey[e.c];
+    var cur = this.edges.filter(function (x) { return x.o === e.o && x.c === e.c; })[0] || e;
+    var upLinks = {};
+    var downLinks = {};
+    this.addLinks(upLinks, o, cur);
+    this.addLinks(downLinks, c, cur);
+    var s1 = this.matrixSheet(o, upLinks, 'uncovered', false);
+    s1.name = 'Upstream coverage';
+    s1.what = 'traceability matrix';
+    var s2 = this.matrixSheet(c, downLinks, 'not linked', false);
+    s2.name = 'Downstream links';
+    this.exportWorkbook([s1, s2], this.matrixName([c.id, o.id]));
   };
 
   startWidgets('cw-root', Widget, 'Coverage');
