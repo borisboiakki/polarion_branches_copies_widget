@@ -161,7 +161,8 @@ context (F15), non-LiveDoc documents.
    j. **Verified on 2512 (PO, 0.3.0).** The link role selectors show their defaults (`duplicates`, `branched_from`, `derived_from`) when the widget is
       added: `$factory.enumeration(...).values([...])` as in guide §2.1, not yet used on 2512. If the defaults are missing,
       select the roles by hand and report it.
-   k. **0.4.0, Projects parameter** (`@project`, guide §10.2, not yet used on 2512): the selector lists the projects;
+   k. **Verified on 2512 (PO, 0.4.0): selector works, documents and links of two projects shown, rendering time good.**
+      **0.4.0, Projects parameter** (`@project`, guide §10.2): the selector lists the projects;
       none selected = current project, numbers unchanged from 0.3.1; `id()` of a selected project is its id (otherwise
       the widget shows "The selected projects could not be read"); with two projects, documents of both, cross-project
       lines, documents and items open in their own project; `IModule.getProjectId()` gives the project of a document;
@@ -208,3 +209,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Widget 0.3.1: `icon.png` (608 x 405, white background) at the package root, as in a widget used by the PO; no reference in other files. Display in the widget list to check on 2512 | PO |
 | 2026-10-27 | PO test of 0.3.1 on 2512: type selector (Heading preselected, counts as before) and widget icon OK. Ready for release | PO |
 | 2026-10-28 | Widget 0.4.0: **Projects** parameter (`@project` multi-selector, none = current project). Document key `project/space/name`; SQL on `p.c_id IN (…)`; cross-project links between selected projects count (PO); scope line in the main view and the PDF header; project column in Excel; links open in the project of the document/item; warning above 5 projects. Minor release (PO). Open check §10.2 k | PO |
+| 2026-10-28 | PO test of 0.4.0 on 2512: project selector works, documents and cross-project links of two projects shown, rendering time good. Open check §10.2 k closed. Ready for release | PO |

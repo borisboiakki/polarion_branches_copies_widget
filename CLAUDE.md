@@ -106,9 +106,10 @@ Verified through web search (2026-10-27):
   multi-selector with `.values(["heading"])` lists the project's types with Heading preselected (read with `bwOptionIds`).
   Widget icon: an `icon.png` (608 x 405 PNG, as in a widget used by the PO; the Widget SDK guide documents none) at the
   package root, next to `render.vm`, with no reference in other files, shows in the widget list.
-- **Projects scope (docBranches 0.4.0 / docCoverage 0.2.0, NOT yet verified on 2512)**: parameter `projects` =
-  `$factory.enumeration("…", "@project")` multi-selector (guide §10.2), read with `bwOptionIds` (assumes `id()` = project
-  id); none = current project. Document key is `project/space/name` (`bwKey` uses `IModule.getProjectId()`); SQL uses
+- **Verified by the PO on 2512 with docBranches 0.4.0 / docCoverage 0.2.0 (projects scope)**: parameter `projects` =
+  `$factory.enumeration("…", "@project")` multi-selector (guide §10.2), read with `bwOptionIds` (`id()` = project id);
+  none = current project; documents and cross-project links of two projects shown; rendering time good. The `@document`
+  selector lists the current project's documents only, even with several projects selected (Polarion limitation, guide §10.2). Document key is `project/space/name` (`bwKey` uses `IModule.getProjectId()`); SQL uses
   `p.c_id IN ($projectSql)`; cross-project links between selected projects count (PO). The `@document` selector lists the
   current project only, so docCoverage's document selection limits the current project only.
 
