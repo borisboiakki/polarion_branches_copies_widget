@@ -123,7 +123,7 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
    time good. The document selector lists the current project's documents only, even with several projects selected:
    Polarion limitation of `@document` (guide §10.2), as designed in F16.
    0.2.1: parameter "Documents of other projects": listed documents only for the other projects, warnings for bad,
-   unselected and unknown entries (to check on 2512).
+   unselected and unknown entries — ✅ (PO, 2026-10-28: listed documents work, "not found" warning shown).
    0.2.0: Projects parameter, as docBranches §10.2 k; in addition: a downstream document of another project counts in
    the coverage of an upstream document of the current project, and the document selection still limits the current
    project.
@@ -150,3 +150,4 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
 | 2026-10-28 | Widget 0.2.0: **Projects** parameter (`@project`, none = current project), shared with docBranches 0.4.0. Document selection limits the current project only (the selector lists only that project); other selected projects keep all their documents (PO). Cross-project links count (PO). Minor release (PO). Open check §9 h | PO |
 | 2026-10-28 | PO test of 0.2.0 on 2512: project selector and multi-project data OK, rendering time good. The document selector lists the current project only (Polarion `@document` limitation, guide §10.2; expected, F16) | PO |
 | 2026-10-28 | Widget 0.2.1: text parameter "Documents of other projects" (`project/space/document`, comma separated), since the `@document` selector cannot list other projects (PO: keep the capability even if less comfortable). Shared `documents.vm` gets `docOther` (docBranches 0.4.1, no functional change). To check on 2512 | PO |
+| 2026-10-28 | PO test of 0.2.1 on 2512: "Documents of other projects" works with a valid project/space/document, the not-found warning is shown. Ready for release | PO |

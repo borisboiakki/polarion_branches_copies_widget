@@ -111,7 +111,7 @@ Verified through web search (2026-10-27):
   none = current project; documents and cross-project links of two projects shown; rendering time good. The `@document`
   selector lists the current project's documents only, even with several projects selected (Polarion limitation, guide §10.2).
   docCoverage 0.2.1 adds a text parameter `otherDocs` ("Documents of other projects", `project/space/document`) → `$docOther`
-  in `documents.vm` (not yet tested on 2512). Document key is `project/space/name` (`bwKey` uses `IModule.getProjectId()`); SQL uses
+  in `documents.vm` (verified by the PO on 2512: listed documents and the not-found warning). Document key is `project/space/name` (`bwKey` uses `IModule.getProjectId()`); SQL uses
   `p.c_id IN ($projectSql)`; cross-project links between selected projects count (PO). The `@document` selector lists the
   current project only, so docCoverage's document selection limits the current project only.
 
