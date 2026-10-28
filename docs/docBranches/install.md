@@ -19,6 +19,7 @@ Widget id `docBranches`, version in `widgets/docBranches/VERSION` (N.N.N; shown 
 
 | Parameter | Default | Meaning |
 |---|---|---|
+| Projects | none = current project | Projects analysed (project selector, several allowed). Relations between documents of two selected projects are shown |
 | Copy link roles | `duplicates` | Link roles that mark a copy / LiveDoc reuse (selector of the project's link roles, several allowed) |
 | Branch link roles | `branched_from` | Link roles of overwritten items in a branch (selector) |
 | Derived link roles | `derived_from` | Link roles of items reused with derivation (selector) |
@@ -60,7 +61,7 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 
 ## Known limitations
 
-- One project only; links to documents of other projects are ignored.
+- Projects: the current project by default, or the selected projects. Links to documents of projects that are not selected are ignored.
 - Documents are read through the Open API data service. Permission filtering for viewers who
   cannot read some documents has not been checked yet (see SPEC §10).
 - There is no PNG export (browsers block it on Polarion pages). Use the SVG download, or the PDF export of the page.

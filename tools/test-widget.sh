@@ -3,6 +3,7 @@
 # and PDF output in Chromium (Playwright), take screenshots and test the interactions.
 # Usage: tools/test-widget.sh [widget|all] [outDir]      (defaults: all, /tmp/bw-widget-test)
 # Per widget: tools/vtest/<widget>/*Harness.java (render on mocks; main class = that file) and tools/vtest/<widget>/browser-check.js.
+# The harness writes browser-fragment.html, pdf-fragment.html and (two projects in scope) multi-fragment.html.
 # The mock Polarion objects live in tools/vtest/docBranches/WidgetHarness.java and are compiled with every harness.
 # Output of each widget goes to <outDir>/<widget>/.
 set -euo pipefail
@@ -26,7 +27,8 @@ for w in "${widgets[@]}"; do
   main="$(cd "$root/tools/vtest/$w" && ls *Harness.java | head -1)"
   javac -nowarn -cp "$cp" -d "$out/cls" "${srcs[@]}" 2>&1 | grep -v '^Picked up\|^Note:' || true
   java -cp "$out/cls:$cp" "${main%.java}" "$root/widgets/$w/dist/$w" "$out" related 2>&1 | grep -v '^Picked up'
-  for f in browser pdf; do
+  for f in browser pdf multi; do
+    [ -f "$out/$f-fragment.html" ] || continue
     { printf '<!doctype html><html><head><meta charset="utf-8"><title>%s</title></head><body style="margin:16px;width:1180px">' "$f"
       cat "$out/$f-fragment.html"; echo '</body></html>'; } > "$out/$f.html"
   done

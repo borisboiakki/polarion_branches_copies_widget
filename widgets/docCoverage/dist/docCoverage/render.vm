@@ -5,7 +5,7 @@
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
 ## Terms: upstream document = document of the link targets (e.g. customer specification), downstream document =
 ## document of the link sources. Verified for "satisfies" on 2512 (spike C3). Edge "up>down": o = upstream, c = downstream.
-#set($bwVersion = "0.1.1")
+#set($bwVersion = "0.2.1")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -43,11 +43,16 @@
 
 ## ======================================================================= parameters
 ## Shared snippet params.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED params.vm".
-## Parameters common to the document widgets: excludedTypes (values only), spaces, showMode, lineCounts, extraFields, height.
+## Parameters common to the document widgets: projects and excludedTypes (values only), spaces, showMode, lineCounts, extraFields, height.
 ## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
 ## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
 ## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
 #set($bwUnset = "__unset__")
+
+## projects: @project multi-selector (guide 10.2), read in common.vm with bwOptionIds (nothing selected = current project).
+#set($projectVals = false)
+#set($projectVals = $parameters.projects.values)
+#set($projectVals = $parameters.projects.values())
 
 ## excludedTypes: workitem-type multi-selector, read in common.vm with bwOptionIds (nothing selected = all types counted).
 #set($excludedTypeVals = false)
@@ -121,9 +126,10 @@
 
 ## ======================================================================= lists
 ## Shared snippet common.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED common.vm".
-## Lists, project, output mode and the bwKey macro. Needs params.vm.
+## Lists, projects in scope, output mode and the bwKey / bwDocLabel macros. Needs params.vm.
 ## Option ids from the values() of an enumeration multi-selector: link roles (workitem-link-role, verified on 2512,
-## docCoverage spike C2: each value is a ProxyEnumOption, id() = role id) and work item types (workitem-type).
+## docCoverage spike C2: each value is a ProxyEnumOption, id() = role id), work item types (workitem-type, verified on
+## 2512) and projects (@project, id() expected to be the project id: not yet verified on 2512).
 ## Identifiers only, as they go into SQL.
 #macro(bwOptionIds $bwVals $bwOut)
   #if($bwVals)
@@ -158,12 +164,50 @@
   #set($typeSql = "${typeSql}'${t}'")
 #end
 
+## Current project (page) and projects in scope: the selected projects, or the current project when none is selected.
+## Project ids are identifiers only, as they go into SQL.
 #set($projectIdRaw = "")
 #set($projectIdRaw = $page.getReference().projectId())
 #set($projectId = "$projectIdRaw")
+#set($projectIds = [])
+#bwOptionIds($projectVals $projectIds)
+#set($scopeWarn = "")
+#if($projectIds.size() == 0 && $projectVals && $projectVals.size() > 0)
+  #set($scopeWarn = "The selected projects could not be read; the current project is used.")
+#end
+#if($projectIds.size() == 0 && $projectId.matches("[A-Za-z0-9_.-]+"))
+  #set($void = $projectIds.add($projectId))
+#end
+## On a page outside a project (repository level), the first selected project stands for the current project.
+#if(!$projectId.matches("[A-Za-z0-9_.-]+") && $projectIds.size() > 0)
+  #set($projectId = $projectIds.get(0))
+#end
 #set($projectOk = false)
-#if($projectId.matches("[A-Za-z0-9_.-]+"))
+#if($projectIds.size() > 0)
   #set($projectOk = true)
+#end
+#set($multiProject = false)
+#if($projectIds.size() > 1)
+  #set($multiProject = true)
+#end
+#if($projectIds.size() > 5)
+  #set($scopeWarn = "${scopeWarn} $projectIds.size() projects selected: the page may render slowly.")
+#end
+#set($projectSql = "")
+#set($projectsStr = "")
+#foreach($p in $projectIds)
+  #if($projectSql != "")
+    #set($projectSql = "${projectSql},")
+    #set($projectsStr = "${projectsStr},")
+  #end
+  #set($projectSql = "${projectSql}'${p}'")
+  #set($projectsStr = "${projectsStr}${p}")
+#end
+## Scope line of the main view and the PDF header
+#set($scopeText = "Project: ${projectsStr}")
+#if($multiProject)
+  #set($projectsTxt = $projectsStr.replace(",", ", "))
+  #set($scopeText = "Projects: ${projectsTxt}")
 #end
 
 #set($isStatic = false)
@@ -171,7 +215,7 @@
   #set($isStatic = true)
 #end
 
-## Document key used everywhere: "space/name"
+## Document key used everywhere: "project/space/name" (bwKeyProject = project of the document).
 ## Referenced objects (document of a link, "branched from" source) can be unresolvable (deleted, no access).
 ## Any access other than isUnresolvable() then throws, so they are only used when isUnresolvable() is false.
 #macro(bwKey $bwMod)
@@ -180,19 +224,39 @@
   #if($bwMod)
     #set($bwUr = $bwMod.isUnresolvable())
   #end
+  #set($bwKeyProject = "")
   #if("$bwUr" == "false")
+    #set($bwP = "")
+    #set($bwP = $bwMod.getProjectId())
+    #if("$bwP" == "")
+      #set($bwP = $projectId)
+    #end
     #set($bwF = "")
     #set($bwF = $bwMod.getModuleFolder())
     #set($bwN = "")
     #set($bwN = $bwMod.getId())
     #if("$bwN" != "")
-      #set($bwKeyOut = "${bwF}/${bwN}")
+      #set($bwKeyOut = "${bwP}/${bwF}/${bwN}")
+      #set($bwKeyProject = "$bwP")
     #end
   #end
 #end
 
-## Selected documents -> keys "space/name". Verified on 2512 (spike C1): each value is a ProxyEnumOption,
+## Document label for tables and lists: "space / name", prefixed with the project when several projects are in scope.
+#macro(bwDocLabel $bwD)
+  #set($bwLs = $bwD.get("space"))
+  #set($bwLn = $bwD.get("id"))
+  #set($bwDocLabelOut = "${bwLs} / ${bwLn}")
+  #if($multiProject)
+    #set($bwLp = $bwD.get("project"))
+    #set($bwDocLabelOut = "${bwLp} / ${bwDocLabelOut}")
+  #end
+#end
+
+## Selected documents -> keys "project/space/name". Verified on 2512 (spike C1): each value is a ProxyEnumOption,
 ## getModelObject() a ProxyDocument, getOldApi() the Open API Module (getReference().spaceId() is empty).
+## The selector lists the documents of the current project only: the selection limits the current project, the other
+## projects in scope keep all their documents (documents.vm).
 #set($docOnly = [])
 #set($docSelLost = 0)
 #set($docVals = false)
@@ -219,6 +283,70 @@
       #set($docSelLost = $docSelLost + 1)
     #end
   #end
+#end
+
+## Documents of other projects: text "project/space/document, ..." (the @document selector lists the current project
+## only). "project/document" means the default space. Entries of the current project are added to the selection
+## (docOnly); entries of another selected project limit that project's documents (docOther, documents.vm).
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.otherDocs.value)
+#set($tmp = $parameters.otherDocs.value())
+#set($otherDocsStr = "")
+#if("$tmp" != $bwUnset)
+  #set($otherDocsStr = "$tmp")
+#end
+#set($docOther = [])
+#set($otherBad = 0)
+#set($otherOut = [])
+#foreach($oEntry in $otherDocsStr.split(","))
+  #set($oEntryT = $oEntry.trim())
+  #if($oEntryT != "")
+    #set($oParts = [])
+    #foreach($oX in $oEntryT.split("/"))
+      #set($void = $oParts.add($oX.trim()))
+    #end
+    #set($oProj = "")
+    #set($oSpace = "")
+    #set($oName = "")
+    #if($oParts.size() == 2)
+      #set($oProj = $oParts.get(0))
+      #set($oSpace = "_default")
+      #set($oName = $oParts.get(1))
+    #elseif($oParts.size() == 3)
+      #set($oProj = $oParts.get(0))
+      #set($oSpace = $oParts.get(1))
+      #set($oName = $oParts.get(2))
+    #end
+    #if(!$oProj.matches("[A-Za-z0-9_.-]+") || $oSpace == "" || $oName == "")
+      #set($otherBad = $otherBad + 1)
+    #else
+      #set($oKey = "${oProj}/${oSpace}/${oName}")
+      #if($oProj == $projectId)
+        #if(!$docOnly.contains($oKey))
+          #set($void = $docOnly.add($oKey))
+        #end
+      #elseif($projectIds.contains($oProj))
+        #if(!$docOther.contains($oKey))
+          #set($void = $docOther.add($oKey))
+        #end
+      #elseif(!$otherOut.contains($oProj))
+        #set($void = $otherOut.add($oProj))
+      #end
+    #end
+  #end
+#end
+#if($otherBad > 0)
+  #set($scopeWarn = "${scopeWarn} $otherBad entries of Documents of other projects could not be read (write project/space/document).")
+#end
+#if($otherOut.size() > 0)
+  #set($otherOutStr = "")
+  #foreach($oP in $otherOut)
+    #if($otherOutStr != "")
+      #set($otherOutStr = "${otherOutStr}, ")
+    #end
+    #set($otherOutStr = "${otherOutStr}${oP}")
+  #end
+  #set($scopeWarn = "${scopeWarn} Documents of other projects ignored, project not selected: ${otherOutStr}.")
 #end
 
 ## Link roles: selector values (id() = role id, spike C2; verified with 2 roles by the PO on 2512). At most maxRoles.
@@ -272,24 +400,32 @@
 #set($roleColors = ["rgb(51,103,214)", "rgb(198,40,40)", "rgb(26,127,55)", "rgb(142,68,173)", "rgb(211,84,0)"])
 #set($roleDashes = ["", "9,5", "2,4", "6,3", "12,4,2,4"])
 
+#if($docOnly.size() > 0 && !$projectIds.contains($projectId))
+  #set($scopeWarn = "${scopeWarn} The selected documents belong to project ${projectId}, which is not in the selected projects: they are ignored.")
+#end
+
 #if(!$projectOk)
-  <div class="bw-warn">Document Coverage: place this widget on a page of a project.</div>
+  <div class="bw-warn">Document Coverage: place this widget on a page of a project or select the projects.</div>
 #elseif($roleIds.size() == 0)
   <div class="bw-warn">Document Coverage: select at least one link role in the widget parameters.</div>
 #else
 
 ## ======================================================================= documents
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
-## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
-## status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
-## (space/name) to keep; empty or unset = all documents.
+## Collects the documents of the projects in scope into docList / docByKey (maps with key, project, id, title, space,
+## type, status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## (project/space/name) to keep among the documents of the current project; docOther = the same for the documents of
+## the other projects in scope. Empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
   #set($docOnly = [])
 #end
+#if(!$docOther)
+  #set($docOther = [])
+#end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
-#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
+#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id IN (${projectSql})")
 #set($typeFilterSql = "")
 #if($typeSql != "")
   #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
@@ -297,6 +433,7 @@
 #foreach($m in $ds.sqlSearch($docSql))
   #bwKey($m)
   #set($dKey = $bwKeyOut)
+  #set($dProj = $bwKeyProject)
   #set($dSpace = "")
   #set($dSpace = $m.getModuleFolder())
   #set($keep = true)
@@ -306,7 +443,10 @@
   #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
     #set($keep = false)
   #end
-  #if($keep && $docOnly.size() > 0 && !$docOnly.contains($dKey))
+  #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+    #set($keep = false)
+  #end
+  #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
     #set($keep = false)
   #end
   #if($keep)
@@ -350,12 +490,14 @@
     #set($nameStr = "$dName")
     #set($spaceSql = $spaceStr.replace("'", "''"))
     #set($nameSql = $nameStr.replace("'", "''"))
-    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
+    #set($projSql = $dProj.replace("'", "''"))
+    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projSql}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
     #set($dItems = -1)
     #set($dItemObjs = [])
     #set($dItemObjs = $ds.sqlSearch($cntSql))
     #set($dItems = $dItemObjs.size())
     #set($void = $d.put("key", $dKey))
+    #set($void = $d.put("project", "$dProj"))
     #set($void = $d.put("id", "$dName"))
     #set($void = $d.put("title", "$dTitle"))
     #set($void = $d.put("space", "$dSpace"))
@@ -371,20 +513,32 @@
   #end
 #end
 
+## Listed documents of other projects that were not found (or are excluded by Spaces to include).
+#set($otherMissing = "")
+#foreach($oKey in $docOther)
+  #if(!$docByKey.containsKey($oKey))
+    #set($otherMissing = "${otherMissing} ${oKey}")
+  #end
+#end
+#if($otherMissing != "")
+  #set($scopeWarn = "${scopeWarn} Documents of other projects not found:${otherMissing}.")
+#end
+
 ## ======================================================================= links
 ## Link-source items of the selected documents with a selected role whose target is in another selected document.
-## The documents are filtered in SQL (space and name) and again in Velocity.
+## The documents are filtered in SQL (project, space and name) and again in Velocity.
 #set($condS = "")
 #set($condT = "")
 #foreach($d in $docList)
+  #set($kPr = $d.get("project").replace("'", "''"))
   #set($kSp = $d.get("space").replace("'", "''"))
   #set($kNm = $d.get("id").replace("'", "''"))
   #if($condS != "")
     #set($condS = "${condS} OR ")
     #set($condT = "${condT} OR ")
   #end
-  #set($condS = "${condS}(ms.c_modulefolder = '${kSp}' AND ms.c_id = '${kNm}')")
-  #set($condT = "${condT}(mt.c_modulefolder = '${kSp}' AND mt.c_id = '${kNm}')")
+  #set($condS = "${condS}(p.c_id = '${kPr}' AND ms.c_modulefolder = '${kSp}' AND ms.c_id = '${kNm}')")
+  #set($condT = "${condT}(pt.c_id = '${kPr}' AND mt.c_modulefolder = '${kSp}' AND mt.c_id = '${kNm}')")
 #end
 #set($srcTypeSql = "")
 #if($typeSql != "")
@@ -417,7 +571,7 @@
   #set($cwE = $edges.get($cwPk))
 #end
 #if($docList.size() > 1)
-  #set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${srcTypeSql} AND (${condS}) AND (${condT})")
+  #set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project INNER JOIN project pt ON pt.c_uri = wt.fk_uri_project WHERE p.c_id IN (${projectSql}) AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${srcTypeSql} AND (${condS}) AND (${condT})")
   #foreach($wi in $ds.sqlSearch($linkSql))
     #set($srcMod = false)
     #set($srcMod = $wi.getModule())
@@ -617,7 +771,7 @@
   #set($outH = $ch * 700 / $cw)
 #end
 <div class="cw-root">
-<div><b>Document Coverage</b> &mdash; project $esc.html($projectId) &mdash; $edgeKeys.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
+<div><b>Document Coverage</b> &mdash; $esc.html($scopeText) &mdash; $edgeKeys.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
 #set($legend = "")
 #set($ri = 0)
 #foreach($r in $roleIds)
@@ -641,6 +795,9 @@
 <div class="bw-muted">Arrow: downstream &rarr; upstream (link direction), upstream documents on the left. Line style: $esc.html($legend).</div>
 #if($rolesDropped > 0)
 <div class="bw-warn">Only the first $maxRoles link roles are used ($rolesDropped ignored).</div>
+#end
+#if($scopeWarn != "")
+<div class="bw-warn">$esc.html($scopeWarn)</div>
 #end
 #if($edgeKeys.size() == 0)
 <p>No link of the selected roles between the selected documents.</p>
@@ -690,7 +847,13 @@
     #set($lines = [])
     #set($void = $lines.add($d.get("id")))
     #set($void = $lines.add($d.get("title")))
-    #set($void = $lines.add($d.get("space")))
+    #if($multiProject)
+      #set($dPs = $d.get("project"))
+      #set($dSs = $d.get("space"))
+      #set($void = $lines.add("${dPs} / ${dSs}"))
+    #else
+      #set($void = $lines.add($d.get("space")))
+    #end
     #if($d.get("upstream"))
       #cwPct($d.get("covered") $d.get("items"))
       #set($void = $lines.add("Coverage: ${cwPctOut}"))
@@ -746,7 +909,10 @@
   #set($downTxt = $cwPctOut)
   #cwPct($e.get("upAll").size() $o.get("items"))
   #set($upTxt = $cwPctOut)
-<tr><td>$esc.html($c.get("space")) / $esc.html($c.get("id"))</td><td>$esc.html($cwLabel)</td><td>$esc.html($o.get("space")) / $esc.html($o.get("id"))</td><td>$esc.html($downTxt)</td><td>$esc.html($upTxt)</td></tr>
+  #bwDocLabel($c)
+  #set($cLabel = $bwDocLabelOut)
+  #bwDocLabel($o)
+<tr><td>$esc.html($cLabel)</td><td>$esc.html($cwLabel)</td><td>$esc.html($bwDocLabelOut)</td><td>$esc.html($downTxt)</td><td>$esc.html($upTxt)</td></tr>
 #end
 </table>
 <table class="bw-table">
@@ -769,7 +935,8 @@
     #if($uncN > 100)
       #set($uncTxt = "${uncTxt} ... ($uncN in total)")
     #end
-<tr><td>$esc.html($d.get("space")) / $esc.html($d.get("id"))</td><td>$d.get("items")</td><td>$esc.html($cwPctOut)</td><td>$esc.html($uncTxt)</td></tr>
+    #bwDocLabel($d)
+<tr><td>$esc.html($bwDocLabelOut)</td><td>$d.get("items")</td><td>$esc.html($cwPctOut)</td><td>$esc.html($uncTxt)</td></tr>
   #end
 #end
 </table>
@@ -780,9 +947,8 @@
       #if($unrelated != "")
         #set($unrelated = "${unrelated}, ")
       #end
-      #set($dSp = $d.get("space"))
-      #set($dId = $d.get("id"))
-      #set($unrelated = "${unrelated}${dSp} / ${dId}")
+      #bwDocLabel($d)
+      #set($unrelated = "${unrelated}${bwDocLabelOut}")
     #end
   #end
   #if($unrelated != "")
@@ -811,7 +977,11 @@
 #if($docSelLost > 0)
 #set($warn = "${warn} $docSelLost selected document(s) could not be read.")
 #end
-<div class="cw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
+#if($scopeWarn != "")
+#set($warn = "${warn} ${scopeWarn}")
+#end
+<div class="cw-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
+  <div class="bw-muted">$esc.html($scopeText)</div>
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
 #set($upFlag = "0")
@@ -829,7 +999,7 @@
 #set($uncStr = "${uncStr}${u}")
 #end
 #end
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
 #end
 #foreach($k in $edgeKeys)
 #set($e = $edges.get($k))
@@ -959,8 +1129,9 @@
     return p.substring(0, p.lastIndexOf('/') + 1);
   }
 
-  function docUrl(project, node) {
-    return basePath() + HASH + '/project/' + encodeURIComponent(project) + '/wiki/' +
+  // Documents and work items open in their own project (node.project, from the page model).
+  function docUrl(node) {
+    return basePath() + HASH + '/project/' + encodeURIComponent(node.project) + '/wiki/' +
       encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
   }
 
@@ -1003,7 +1174,7 @@
     for (var i = 0; i < nEls.length; i++) {
       var d = nEls[i].dataset;
       var n = {
-        key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
+        key: d.k, project: d.p || root.dataset.project || '', id: d.id || '', title: d.title || d.id || '', space: d.space || '',
         type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
@@ -1027,6 +1198,11 @@
       if (f.length === 3) { out.push({ c: f[0], o: f[1], k: f[2] }); }
     }
     return out;
+  }
+
+  // Sort key of a document: project, space, name.
+  function docSortKey(n) {
+    return n.project + '/' + n.space + '/' + n.id;
   }
 
   function catById(cats, id) {
@@ -1127,7 +1303,7 @@
 
     var cols = [];
     linked.sort(function (x, y) {
-      return (x.space + '/' + x.title).localeCompare(y.space + '/' + y.title);
+      return (x.project + '/' + x.space + '/' + x.title).localeCompare(y.project + '/' + y.space + '/' + y.title);
     });
     for (var d = 0; d < linked.length; d++) {
       var L = lvl[linked[d].key];
@@ -1188,7 +1364,7 @@
     var gridCols = Math.max(3, cols.length);
     if (isolated.length) {
       isolated.sort(function (x, y) {
-        return (x.space + '/' + x.title).localeCompare(y.space + '/' + y.title);
+        return (x.project + '/' + x.space + '/' + x.title).localeCompare(y.project + '/' + y.space + '/' + y.title);
       });
       for (var m = 0; m < isolated.length; m++) {
         pos[isolated[m].key] = {
@@ -1216,6 +1392,8 @@
     self.model = model;
     var ds = root.dataset;
     self.project = ds.project || '';
+    // Several projects in scope: documents are labelled with their project.
+    self.multi = (ds.projects || '').split(',').filter(function (x) { return x; }).length > 1;
     self.height = toInt(ds.height) || 600;
     self.state = {
       mode: ds.mode === 'all' ? 'all' : 'related',
@@ -1349,7 +1527,7 @@
     var lines = [
       { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
       { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
-      { text: n.space, weight: 400, color: 'rgb(110,118,135)' }
+      { text: this.multi ? n.project + ' / ' + n.space : n.space, weight: 400, color: 'rgb(110,118,135)' }
     ];
     this.state.extras.forEach(function (f) {
       var v = n[f];
@@ -1434,8 +1612,8 @@
     var nodes = lay.linked.concat(lay.isolated);
     nodes.forEach(function (n) {
       var p = lay.pos[n.key];
-      var match = !filter || (n.id + ' ' + n.title + ' ' + n.space).toLowerCase().indexOf(filter) >= 0;
-      var a = svg('a', { href: docUrl(self.project, n), target: '_top', 'class': 'bw-node' }, gNodes);
+      var match = !filter || (n.id + ' ' + n.title + ' ' + n.space + ' ' + n.project).toLowerCase().indexOf(filter) >= 0;
+      var a = svg('a', { href: docUrl(n), target: '_top', 'class': 'bw-node' }, gNodes);
       var g = svg('g', { opacity: match ? 1 : 0.3 }, a);
       svg('rect', {
         x: p.x, y: p.y, width: NODE_W, height: h, rx: 6,
@@ -1448,7 +1626,7 @@
           'font-weight': ln.weight, fill: ln.color
         }, g, trunc(ln.text, 36));
       });
-      svg('title', null, a, n.space + ' / ' + n.id + ' ' + DASH + ' ' + n.title);
+      svg('title', null, a, self.docLabel(n) + ' ' + DASH + ' ' + n.title);
       if (self.onNode) { self.onNode(a, n); }
     });
   };
@@ -1465,33 +1643,41 @@
 
   Base.hideTip = function () { this.tip.style.display = 'none'; };
 
+  // "space / name", prefixed with the project when several projects are in scope.
+  Base.docLabel = function (n) {
+    return (this.multi ? n.project + ' / ' : '') + n.space + ' / ' + n.id;
+  };
+
   // Opens the details box with a header "origin -> target" and a Close button; returns the box.
   Base.openDetails = function (o, c) {
     var box = this.details;
     box.textContent = '';
     box.style.display = 'block';
     var head = el('div', { 'class': 'bw-details-head' }, box);
-    el('a', { href: docUrl(this.project, o), target: '_top' }, head, o.id);
+    el('a', { href: docUrl(o), target: '_top' }, head, o.id);
     if (c) {
       el('span', null, head, '  ' + ARROW + '  ');
-      el('a', { href: docUrl(this.project, c), target: '_top' }, head, c.id);
+      el('a', { href: docUrl(c), target: '_top' }, head, c.id);
     }
     var close = this.button(head, 'Close', 'Close the details', function () { box.style.display = 'none'; });
     close.style.marginLeft = '12px';
     return box;
   };
 
-  // List of work item pairs (target item -> origin item) with the category name.
+  // List of work item pairs (target item -> origin item) with the category name. Each item opens in the project
+  // of its document.
   Base.sampleList = function (box, e, title) {
     var self = this;
+    var pc = this.model.byKey[e.c].project;
+    var po = this.model.byKey[e.o].project;
     if (!e.samples.length) { return; }
     el('div', { 'class': 'bw-muted' }, box, title);
     var ul = el('ul', { 'class': 'bw-items' }, box);
     e.samples.forEach(function (s) {
       var li = el('li', null, ul);
-      el('a', { href: itemUrl(self.project, s.c), target: '_top' }, li, s.c);
+      el('a', { href: itemUrl(pc, s.c), target: '_top' }, li, s.c);
       el('span', null, li, ' ' + ARROW + ' ');
-      el('a', { href: itemUrl(self.project, s.o), target: '_top' }, li, s.o);
+      el('a', { href: itemUrl(po, s.o), target: '_top' }, li, s.o);
       var cat = catById(self.cats, s.k);
       el('span', { 'class': 'bw-muted' }, li, ' (' + (cat ? cat.name : s.k) + ')');
     });
@@ -1556,7 +1742,7 @@
 
   Base.shownDocs = function () {
     return this.lay.linked.concat(this.lay.isolated).slice().sort(function (a, b) {
-      return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
+      return docSortKey(a).localeCompare(docSortKey(b));
     });
   };
 
@@ -1564,8 +1750,7 @@
     var by = this.model.byKey;
     return this.edges.slice().sort(function (a, b) {
       var oa = by[a.o], ob = by[b.o], ca = by[a.c], cb = by[b.c];
-      return (oa.space + '/' + oa.id).localeCompare(ob.space + '/' + ob.id) ||
-        (ca.space + '/' + ca.id).localeCompare(cb.space + '/' + cb.id);
+      return docSortKey(oa).localeCompare(docSortKey(ob)) || docSortKey(ca).localeCompare(docSortKey(cb));
     });
   };
 
@@ -1771,9 +1956,9 @@
     all.style.fontWeight = '600';
     var boxes = [];
     this.model.nodes.slice().sort(function (a, b) {
-      return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
+      return docSortKey(a).localeCompare(docSortKey(b));
     }).forEach(function (n) {
-      var lab = self.checkbox(panel, n.space + ' / ' + n.id, true, function (on) {
+      var lab = self.checkbox(panel, self.docLabel(n), true, function (on) {
         if (on) { delete self.state.hidden[n.key]; } else { self.state.hidden[n.key] = true; }
         update();
       });
@@ -1889,7 +2074,7 @@
     var self = this;
     this.detailDoc = n;
     var box = this.openDetails(n, null);
-    el('div', null, box, n.title + ' ' + DASH + ' ' + n.space);
+    el('div', null, box, n.title + ' ' + DASH + ' ' + (this.multi ? n.project + ' / ' : '') + n.space);
     var c = this.coverage(n);
     if (!c) {
       el('div', { 'class': 'bw-muted' }, box, 'No shown link points to this document (not upstream).');
@@ -1899,7 +2084,7 @@
         el('div', { 'class': 'bw-muted' }, box, 'Uncovered items:');
         var ul = el('ul', { 'class': 'bw-items' }, box);
         c.uncovered.forEach(function (id) {
-          el('a', { href: itemUrl(self.project, id), target: '_top' }, el('li', null, ul), id);
+          el('a', { href: itemUrl(n.project, id), target: '_top' }, el('li', null, ul), id);
         });
         if (c.uncoveredN > c.uncovered.length) {
           el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (c.uncoveredN - c.uncovered.length) + ' more');
@@ -1923,9 +2108,9 @@
       var o = self.model.byKey[e.o];
       var c = self.model.byKey[e.c];
       return [
-        { text: c.space + ' / ' + c.id, href: docUrl(self.project, c) },
+        { text: self.docLabel(c), href: docUrl(c) },
         kindsLabel(e, self.cats),
-        { text: o.space + ' / ' + o.id, href: docUrl(self.project, o) },
+        { text: self.docLabel(o), href: docUrl(o) },
         covText({ covered: size(e.downSet), total: c.items }),
         covText({ covered: size(e.upSet), total: o.items })
       ];
@@ -1933,7 +2118,7 @@
     this.htmlTable(['Downstream', 'Roles (links)', 'Upstream', 'Downstream items with links', 'Upstream items covered'], rows, 'No relation found.');
     var cov = this.shownDocs().filter(function (n) { return n.up; }).map(function (n) {
       var c = self.coverage(n);
-      return [{ text: n.space + ' / ' + n.id, href: docUrl(self.project, n) }, String(n.items), covText(c), String(c.uncoveredN)];
+      return [{ text: self.docLabel(n), href: docUrl(n) }, String(n.items), covText(c), String(c.uncoveredN)];
     });
     if (cov.length) {
       this.htmlTable(['Upstream document', 'Work items', 'Coverage', 'Uncovered items'], cov, '');
@@ -1947,8 +2132,8 @@
     var by = this.model.byKey;
     var cats = this.cats;
     var edges = this.sortedEdges();
-    var rel = [['Downstream space', 'Downstream document', 'Downstream title', 'Roles',
-      'Upstream space', 'Upstream document', 'Upstream title']
+    var rel = [['Downstream project', 'Downstream space', 'Downstream document', 'Downstream title', 'Roles',
+      'Upstream project', 'Upstream space', 'Upstream document', 'Upstream title']
       .concat(cats.map(function (c) { return c.name + ' links'; }))
       .concat(['Links', 'Downstream items with links', 'Downstream work items', 'Downstream with links (%)',
         'Upstream items covered', 'Upstream work items', 'Upstream covered (%)'])];
@@ -1958,31 +2143,31 @@
       var c = by[e.c];
       var pd = pct(size(e.downSet), c.items);
       var pu = pct(size(e.upSet), o.items);
-      rel.push([c.space, c.id, c.title, kindsLabel(e, cats), o.space, o.id, o.title]
+      rel.push([c.project, c.space, c.id, c.title, kindsLabel(e, cats), o.project, o.space, o.id, o.title]
         .concat(cats.map(function (k) { return e.kinds[k.id]; }))
         .concat([e.links, size(e.downSet), c.items < 0 ? '' : c.items, pd === null ? '' : pd,
           size(e.upSet), o.items < 0 ? '' : o.items, pu === null ? '' : pu]));
-      relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, c)) });
-      relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, o)) });
+      relLinks.push({ r: i + 1, c: 2, url: absUrl(docUrl(c)) });
+      relLinks.push({ r: i + 1, c: 7, url: absUrl(docUrl(o)) });
     });
-    var docs = [['Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
+    var docs = [['Project', 'Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
       'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items']];
     var shown = this.shownDocs();
     shown.forEach(function (n) {
       var c = self.coverage(n);
       var p = c ? pct(c.covered, c.total) : null;
-      docs.push([n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
+      docs.push([n.project, n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
         n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '']);
     });
-    var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
+    var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 2, url: absUrl(docUrl(n)) }; });
     var unc = [['Upstream document', 'Uncovered item']];
     var uncLinks = [];
     shown.forEach(function (n) {
       var c = self.coverage(n);
       if (!c) { return; }
       c.uncovered.forEach(function (id) {
-        unc.push([n.space + ' / ' + n.id, id]);
-        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(self.project, id)) });
+        unc.push([self.docLabel(n), id]);
+        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(n.project, id)) });
       });
     });
     var items = [['Downstream document', 'Upstream document', 'Downstream item', 'Upstream item', 'Role']];
@@ -1992,15 +2177,15 @@
       var c = by[e.c];
       e.samples.forEach(function (sm) {
         var cat = catById(cats, sm.k);
-        items.push([c.space + ' / ' + c.id, o.space + ' / ' + o.id, sm.c, sm.o, cat ? cat.name : sm.k]);
-        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(self.project, sm.c)) });
-        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(self.project, sm.o)) });
+        items.push([self.docLabel(c), self.docLabel(o), sm.c, sm.o, cat ? cat.name : sm.k]);
+        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(c.project, sm.c)) });
+        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(o.project, sm.o)) });
       });
     });
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
-        widths: [14, 28, 34, 24, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
-      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
+        widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
       { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
     ]);

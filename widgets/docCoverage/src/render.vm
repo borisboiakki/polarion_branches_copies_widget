@@ -25,8 +25,10 @@
 ## ======================================================================= lists
 ## BW_SHARED common.vm
 
-## Selected documents -> keys "space/name". Verified on 2512 (spike C1): each value is a ProxyEnumOption,
+## Selected documents -> keys "project/space/name". Verified on 2512 (spike C1): each value is a ProxyEnumOption,
 ## getModelObject() a ProxyDocument, getOldApi() the Open API Module (getReference().spaceId() is empty).
+## The selector lists the documents of the current project only: the selection limits the current project, the other
+## projects in scope keep all their documents (documents.vm).
 #set($docOnly = [])
 #set($docSelLost = 0)
 #set($docVals = false)
@@ -53,6 +55,70 @@
       #set($docSelLost = $docSelLost + 1)
     #end
   #end
+#end
+
+## Documents of other projects: text "project/space/document, ..." (the @document selector lists the current project
+## only). "project/document" means the default space. Entries of the current project are added to the selection
+## (docOnly); entries of another selected project limit that project's documents (docOther, documents.vm).
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.otherDocs.value)
+#set($tmp = $parameters.otherDocs.value())
+#set($otherDocsStr = "")
+#if("$tmp" != $bwUnset)
+  #set($otherDocsStr = "$tmp")
+#end
+#set($docOther = [])
+#set($otherBad = 0)
+#set($otherOut = [])
+#foreach($oEntry in $otherDocsStr.split(","))
+  #set($oEntryT = $oEntry.trim())
+  #if($oEntryT != "")
+    #set($oParts = [])
+    #foreach($oX in $oEntryT.split("/"))
+      #set($void = $oParts.add($oX.trim()))
+    #end
+    #set($oProj = "")
+    #set($oSpace = "")
+    #set($oName = "")
+    #if($oParts.size() == 2)
+      #set($oProj = $oParts.get(0))
+      #set($oSpace = "_default")
+      #set($oName = $oParts.get(1))
+    #elseif($oParts.size() == 3)
+      #set($oProj = $oParts.get(0))
+      #set($oSpace = $oParts.get(1))
+      #set($oName = $oParts.get(2))
+    #end
+    #if(!$oProj.matches("[A-Za-z0-9_.-]+") || $oSpace == "" || $oName == "")
+      #set($otherBad = $otherBad + 1)
+    #else
+      #set($oKey = "${oProj}/${oSpace}/${oName}")
+      #if($oProj == $projectId)
+        #if(!$docOnly.contains($oKey))
+          #set($void = $docOnly.add($oKey))
+        #end
+      #elseif($projectIds.contains($oProj))
+        #if(!$docOther.contains($oKey))
+          #set($void = $docOther.add($oKey))
+        #end
+      #elseif(!$otherOut.contains($oProj))
+        #set($void = $otherOut.add($oProj))
+      #end
+    #end
+  #end
+#end
+#if($otherBad > 0)
+  #set($scopeWarn = "${scopeWarn} $otherBad entries of Documents of other projects could not be read (write project/space/document).")
+#end
+#if($otherOut.size() > 0)
+  #set($otherOutStr = "")
+  #foreach($oP in $otherOut)
+    #if($otherOutStr != "")
+      #set($otherOutStr = "${otherOutStr}, ")
+    #end
+    #set($otherOutStr = "${otherOutStr}${oP}")
+  #end
+  #set($scopeWarn = "${scopeWarn} Documents of other projects ignored, project not selected: ${otherOutStr}.")
 #end
 
 ## Link roles: selector values (id() = role id, spike C2; verified with 2 roles by the PO on 2512). At most maxRoles.
@@ -106,8 +172,12 @@
 #set($roleColors = ["rgb(51,103,214)", "rgb(198,40,40)", "rgb(26,127,55)", "rgb(142,68,173)", "rgb(211,84,0)"])
 #set($roleDashes = ["", "9,5", "2,4", "6,3", "12,4,2,4"])
 
+#if($docOnly.size() > 0 && !$projectIds.contains($projectId))
+  #set($scopeWarn = "${scopeWarn} The selected documents belong to project ${projectId}, which is not in the selected projects: they are ignored.")
+#end
+
 #if(!$projectOk)
-  <div class="bw-warn">Document Coverage: place this widget on a page of a project.</div>
+  <div class="bw-warn">Document Coverage: place this widget on a page of a project or select the projects.</div>
 #elseif($roleIds.size() == 0)
   <div class="bw-warn">Document Coverage: select at least one link role in the widget parameters.</div>
 #else
@@ -115,20 +185,32 @@
 ## ======================================================================= documents
 ## BW_SHARED documents.vm
 
+## Listed documents of other projects that were not found (or are excluded by Spaces to include).
+#set($otherMissing = "")
+#foreach($oKey in $docOther)
+  #if(!$docByKey.containsKey($oKey))
+    #set($otherMissing = "${otherMissing} ${oKey}")
+  #end
+#end
+#if($otherMissing != "")
+  #set($scopeWarn = "${scopeWarn} Documents of other projects not found:${otherMissing}.")
+#end
+
 ## ======================================================================= links
 ## Link-source items of the selected documents with a selected role whose target is in another selected document.
-## The documents are filtered in SQL (space and name) and again in Velocity.
+## The documents are filtered in SQL (project, space and name) and again in Velocity.
 #set($condS = "")
 #set($condT = "")
 #foreach($d in $docList)
+  #set($kPr = $d.get("project").replace("'", "''"))
   #set($kSp = $d.get("space").replace("'", "''"))
   #set($kNm = $d.get("id").replace("'", "''"))
   #if($condS != "")
     #set($condS = "${condS} OR ")
     #set($condT = "${condT} OR ")
   #end
-  #set($condS = "${condS}(ms.c_modulefolder = '${kSp}' AND ms.c_id = '${kNm}')")
-  #set($condT = "${condT}(mt.c_modulefolder = '${kSp}' AND mt.c_id = '${kNm}')")
+  #set($condS = "${condS}(p.c_id = '${kPr}' AND ms.c_modulefolder = '${kSp}' AND ms.c_id = '${kNm}')")
+  #set($condT = "${condT}(pt.c_id = '${kPr}' AND mt.c_modulefolder = '${kSp}' AND mt.c_id = '${kNm}')")
 #end
 #set($srcTypeSql = "")
 #if($typeSql != "")
@@ -161,7 +243,7 @@
   #set($cwE = $edges.get($cwPk))
 #end
 #if($docList.size() > 1)
-  #set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${srcTypeSql} AND (${condS}) AND (${condT})")
+  #set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project INNER JOIN project pt ON pt.c_uri = wt.fk_uri_project WHERE p.c_id IN (${projectSql}) AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${srcTypeSql} AND (${condS}) AND (${condT})")
   #foreach($wi in $ds.sqlSearch($linkSql))
     #set($srcMod = false)
     #set($srcMod = $wi.getModule())
@@ -361,7 +443,7 @@
   #set($outH = $ch * 700 / $cw)
 #end
 <div class="cw-root">
-<div><b>Document Coverage</b> &mdash; project $esc.html($projectId) &mdash; $edgeKeys.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
+<div><b>Document Coverage</b> &mdash; $esc.html($scopeText) &mdash; $edgeKeys.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
 #set($legend = "")
 #set($ri = 0)
 #foreach($r in $roleIds)
@@ -385,6 +467,9 @@
 <div class="bw-muted">Arrow: downstream &rarr; upstream (link direction), upstream documents on the left. Line style: $esc.html($legend).</div>
 #if($rolesDropped > 0)
 <div class="bw-warn">Only the first $maxRoles link roles are used ($rolesDropped ignored).</div>
+#end
+#if($scopeWarn != "")
+<div class="bw-warn">$esc.html($scopeWarn)</div>
 #end
 #if($edgeKeys.size() == 0)
 <p>No link of the selected roles between the selected documents.</p>
@@ -434,7 +519,13 @@
     #set($lines = [])
     #set($void = $lines.add($d.get("id")))
     #set($void = $lines.add($d.get("title")))
-    #set($void = $lines.add($d.get("space")))
+    #if($multiProject)
+      #set($dPs = $d.get("project"))
+      #set($dSs = $d.get("space"))
+      #set($void = $lines.add("${dPs} / ${dSs}"))
+    #else
+      #set($void = $lines.add($d.get("space")))
+    #end
     #if($d.get("upstream"))
       #cwPct($d.get("covered") $d.get("items"))
       #set($void = $lines.add("Coverage: ${cwPctOut}"))
@@ -490,7 +581,10 @@
   #set($downTxt = $cwPctOut)
   #cwPct($e.get("upAll").size() $o.get("items"))
   #set($upTxt = $cwPctOut)
-<tr><td>$esc.html($c.get("space")) / $esc.html($c.get("id"))</td><td>$esc.html($cwLabel)</td><td>$esc.html($o.get("space")) / $esc.html($o.get("id"))</td><td>$esc.html($downTxt)</td><td>$esc.html($upTxt)</td></tr>
+  #bwDocLabel($c)
+  #set($cLabel = $bwDocLabelOut)
+  #bwDocLabel($o)
+<tr><td>$esc.html($cLabel)</td><td>$esc.html($cwLabel)</td><td>$esc.html($bwDocLabelOut)</td><td>$esc.html($downTxt)</td><td>$esc.html($upTxt)</td></tr>
 #end
 </table>
 <table class="bw-table">
@@ -513,7 +607,8 @@
     #if($uncN > 100)
       #set($uncTxt = "${uncTxt} ... ($uncN in total)")
     #end
-<tr><td>$esc.html($d.get("space")) / $esc.html($d.get("id"))</td><td>$d.get("items")</td><td>$esc.html($cwPctOut)</td><td>$esc.html($uncTxt)</td></tr>
+    #bwDocLabel($d)
+<tr><td>$esc.html($bwDocLabelOut)</td><td>$d.get("items")</td><td>$esc.html($cwPctOut)</td><td>$esc.html($uncTxt)</td></tr>
   #end
 #end
 </table>
@@ -524,9 +619,8 @@
       #if($unrelated != "")
         #set($unrelated = "${unrelated}, ")
       #end
-      #set($dSp = $d.get("space"))
-      #set($dId = $d.get("id"))
-      #set($unrelated = "${unrelated}${dSp} / ${dId}")
+      #bwDocLabel($d)
+      #set($unrelated = "${unrelated}${bwDocLabelOut}")
     #end
   #end
   #if($unrelated != "")
@@ -555,7 +649,11 @@
 #if($docSelLost > 0)
 #set($warn = "${warn} $docSelLost selected document(s) could not be read.")
 #end
-<div class="cw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
+#if($scopeWarn != "")
+#set($warn = "${warn} ${scopeWarn}")
+#end
+<div class="cw-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
+  <div class="bw-muted">$esc.html($scopeText)</div>
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
 #set($upFlag = "0")
@@ -573,7 +671,7 @@
 #set($uncStr = "${uncStr}${u}")
 #end
 #end
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
 #end
 #foreach($k in $edgeKeys)
 #set($e = $edges.get($k))

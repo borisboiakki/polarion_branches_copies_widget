@@ -1,3 +1,4 @@
+$parameters.put("projects", $factory.enumeration("Projects (none = current project)", "@project").allowNoValue(true).allowMultipleValues(true).build())
 $parameters.put("copyLinkRoles", $factory.enumeration("Copy link roles", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).values(["duplicates"]).build())
 $parameters.put("branchLinkRoles", $factory.enumeration("Branch link roles", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).values(["branched_from"]).build())
 $parameters.put("derivedLinkRoles", $factory.enumeration("Derived link roles", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).values(["derived_from"]).build())

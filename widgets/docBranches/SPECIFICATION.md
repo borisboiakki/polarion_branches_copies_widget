@@ -57,7 +57,7 @@ in their standard configuration, so these are the defaults. They can still be ch
 | F13 | **PDF/print**: static rendering of the graph (no JS) plus a relations table, so standard Polarion PDF export works | Should |
 | F14 | Tabular view of nodes/edges (also the PDF fallback) | Should |
 | F15 | Baseline/Collection-aware view (relations as of a Collection) | Future |
-| F16 | Cross-project relations | Future |
+| F16 | **Projects** parameter (`@project` multi-selector, 0.4.0): documents of the selected projects (none = current project); relations between documents of two selected projects are shown; the scope ("Project: X" / "Projects: A, B") is shown at the top of the widget and in the PDF header; each document shows its project when several are in scope | Should (done) |
 
 ## 5. Non-functional requirements
 
@@ -121,7 +121,7 @@ is in the configured role set R(kind).
 
 ## 8. Out of scope (v1)
 
-Creating or merging branches (Polarion does this natively), cross-project relations (F16), Collection
+Creating or merging branches (Polarion does this natively), relations to projects that are not selected (F16), Collection
 context (F15), non-LiveDoc documents.
 
 ## 9. Technical risks / to verify on a 2512 instance
@@ -161,6 +161,12 @@ context (F15), non-LiveDoc documents.
    j. **Verified on 2512 (PO, 0.3.0).** The link role selectors show their defaults (`duplicates`, `branched_from`, `derived_from`) when the widget is
       added: `$factory.enumeration(...).values([...])` as in guide §2.1, not yet used on 2512. If the defaults are missing,
       select the roles by hand and report it.
+   k. **Verified on 2512 (PO, 0.4.0): selector works, documents and links of two projects shown, rendering time good.**
+      **0.4.0, Projects parameter** (`@project`, guide §10.2): the selector lists the projects;
+      none selected = current project, numbers unchanged from 0.3.1; `id()` of a selected project is its id (otherwise
+      the widget shows "The selected projects could not be read"); with two projects, documents of both, cross-project
+      lines, documents and items open in their own project; `IModule.getProjectId()` gives the project of a document;
+      rendering time with the intended number of projects.
 
 ## 11. Decision log
 
@@ -202,3 +208,6 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | Widget 0.3.1: the excluded work item types are chosen with a `workitem-type` multi-selector (default Heading, none selected = all types counted) instead of comma-separated text; shared macro `bwRoleIds` renamed `bwOptionIds`. Patch release (PO). To check on 2512: selector lists the types with Heading preselected; counts unchanged with Heading | PO |
 | 2026-10-27 | Widget 0.3.1: `icon.png` (608 x 405, white background) at the package root, as in a widget used by the PO; no reference in other files. Display in the widget list to check on 2512 | PO |
 | 2026-10-27 | PO test of 0.3.1 on 2512: type selector (Heading preselected, counts as before) and widget icon OK. Ready for release | PO |
+| 2026-10-28 | Widget 0.4.0: **Projects** parameter (`@project` multi-selector, none = current project). Document key `project/space/name`; SQL on `p.c_id IN (…)`; cross-project links between selected projects count (PO); scope line in the main view and the PDF header; project column in Excel; links open in the project of the document/item; warning above 5 projects. Minor release (PO). Open check §10.2 k | PO |
+| 2026-10-28 | PO test of 0.4.0 on 2512: project selector works, documents and cross-project links of two projects shown, rendering time good. Open check §10.2 k closed. Ready for release | PO |
+| 2026-10-28 | Widget 0.4.1: no functional change; the shared `documents.vm` accepts a list of documents of other projects (`docOther`, used by docCoverage 0.2.1) | |

@@ -1,14 +1,18 @@
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
-## Collects the documents of the project into docList / docByKey (maps with key, id, title, space, type,
-## status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
-## (space/name) to keep; empty or unset = all documents.
+## Collects the documents of the projects in scope into docList / docByKey (maps with key, project, id, title, space,
+## type, status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
+## (project/space/name) to keep among the documents of the current project; docOther = the same for the documents of
+## the other projects in scope. Empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
   #set($docOnly = [])
 #end
+#if(!$docOther)
+  #set($docOther = [])
+#end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
-#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}'")
+#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id IN (${projectSql})")
 #set($typeFilterSql = "")
 #if($typeSql != "")
   #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
@@ -16,6 +20,7 @@
 #foreach($m in $ds.sqlSearch($docSql))
   #bwKey($m)
   #set($dKey = $bwKeyOut)
+  #set($dProj = $bwKeyProject)
   #set($dSpace = "")
   #set($dSpace = $m.getModuleFolder())
   #set($keep = true)
@@ -25,7 +30,10 @@
   #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
     #set($keep = false)
   #end
-  #if($keep && $docOnly.size() > 0 && !$docOnly.contains($dKey))
+  #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+    #set($keep = false)
+  #end
+  #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
     #set($keep = false)
   #end
   #if($keep)
@@ -69,12 +77,14 @@
     #set($nameStr = "$dName")
     #set($spaceSql = $spaceStr.replace("'", "''"))
     #set($nameSql = $nameStr.replace("'", "''"))
-    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectId}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
+    #set($projSql = $dProj.replace("'", "''"))
+    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projSql}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
     #set($dItems = -1)
     #set($dItemObjs = [])
     #set($dItemObjs = $ds.sqlSearch($cntSql))
     #set($dItems = $dItemObjs.size())
     #set($void = $d.put("key", $dKey))
+    #set($void = $d.put("project", "$dProj"))
     #set($void = $d.put("id", "$dName"))
     #set($void = $d.put("title", "$dTitle"))
     #set($void = $d.put("space", "$dSpace"))

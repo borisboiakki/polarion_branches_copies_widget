@@ -10,7 +10,8 @@ import org.apache.velocity.runtime.log.LogSystem;
 
 /**
  * Renders the built widget (widgets/docBranches/dist/docBranches/render.vm) with Velocity 1.4 against mock
- * Polarion objects that reproduce the VforIA spike test set (tests/v0.1.x/spike-tests.md section 0).
+ * Polarion objects that reproduce the VforIA spike test set (tests/v0.1.x/spike-tests.md section 0), plus a second
+ * project VforIB with a copy of SRS_Test (same space and name) to test the project scope.
  *
  * Usage: java WidgetHarness <widgetDir> <outDir>
  * Writes browser.html and pdf.html (static mode) and velocity.log to outDir.
@@ -49,6 +50,7 @@ public class WidgetHarness {
 
     public static class Module {
         final String folder, name, title;
+        String project = "VforIA";
         Module branchedFrom, derivedFrom;
         User author = new User("TESTUSER", "Test User");
         boolean unresolvable;
@@ -59,6 +61,7 @@ public class WidgetHarness {
         }
         public boolean isUnresolvable() { return unresolvable; }
         public String getId() { check(); return name; }
+        public String getProjectId() { check(); return project; }
         public String getModuleFolder() { check(); return folder; }
         public String getTitle() { check(); return title; }
         public Opt getType() { return new Opt("systemReqSpecification", "System Requirement Specification"); }
@@ -71,7 +74,7 @@ public class WidgetHarness {
             if ("derivedFrom".equals(field)) { return derivedFrom; }
             return null;
         }
-        public String toString() { return "Module(" + folder + "/" + name + ")"; }
+        public String toString() { return "Module(" + project + "/" + folder + "/" + name + ")"; }
     }
 
     public static class Role {
@@ -117,6 +120,20 @@ public class WidgetHarness {
 
     static void link(int from, String role, int to) {
         ITEMS.get("VIA-" + from).links.add(new Link(role, ITEMS.get("VIA-" + to)));
+    }
+
+    /** Document and work item of another project. */
+    static Module doc(String project, String folder, String name) {
+        Module m = new Module(folder, name, name);
+        m.project = project;
+        MODULES.add(m);
+        return m;
+    }
+
+    static WorkItem wi(String id, String type, Module m) {
+        WorkItem w = new WorkItem(id, type, m);
+        ITEMS.put(w.id, w);
+        return w;
     }
 
     static void buildTestSet() {
@@ -175,6 +192,9 @@ public class WidgetHarness {
         WorkItem ghostItem = new WorkItem("VIA-999", "systemRequirement", g);
         ghostItem.unresolvable = true;
         ga.links.add(new Link("duplicates", ghostItem));
+        // Project VforIB: a copy of VforIA's SRS_Test with the same space and name (cross-project duplicates links).
+        Module ib = doc("VforIB", "Requirements", "SRS_Test");
+        for (int i = 1; i <= 3; i++) { wi("VIB-" + i, "systemRequirement", ib).links.add(new Link("duplicates", ITEMS.get("VIA-" + (508 + i)))); }
         for (WorkItem w : ITEMS.values()) { w.links.add(new Link("parent", w)); }
     }
 
@@ -185,20 +205,26 @@ public class WidgetHarness {
             SQL_COUNT++;
             List<Object> out = new ArrayList<Object>();
             Set<String> excluded = listAfter(sql, "c_type NOT IN (");
+            // Projects of the documents (p) and, in docBranches, of the link targets (pt).
+            Set<String> projects = listAfter(sql, "p.c_id IN (");
+            if (!sql.contains("p.c_id IN (") && quoted(sql, "p.c_id = '") != null) { projects.add(quoted(sql, "p.c_id = '")); }
+            Set<String> tProjects = sql.contains("pt.c_id IN (") ? listAfter(sql, "pt.c_id IN (") : null;
             if (sql.startsWith("SELECT m.c_uri FROM module m")) {
-                out.addAll(MODULES);
+                for (Module m : MODULES) { if (projects.contains(m.project)) { out.add(m); } }
             } else if (sql.startsWith("SELECT w.c_uri FROM workitem w")) {
+                String project = quoted(sql, "p.c_id = '");
                 String folder = quoted(sql, "m.c_modulefolder = '");
                 String name = quoted(sql, "m.c_id = '");
                 for (WorkItem w : ITEMS.values()) {
-                    if (w.module.folder.equals(folder) && w.module.name.equals(name) && !excluded.contains(w.type)) { out.add(w); }
+                    if (w.module.project.equals(project) && w.module.folder.equals(folder) && w.module.name.equals(name) && !excluded.contains(w.type)) { out.add(w); }
                 }
             } else if (sql.startsWith("SELECT DISTINCT ws.c_uri")) {
                 Set<String> roles = listAfter(sql, "l.c_role IN (");
                 for (WorkItem w : ITEMS.values()) {
-                    if (excluded.contains(w.type)) { continue; }
+                    if (excluded.contains(w.type) || !projects.contains(w.module.project)) { continue; }
                     for (Link l : w.links) {
-                        if (roles.contains(l.role.getId()) && l.target.module != w.module) { out.add(w); break; }
+                        if (roles.contains(l.role.getId()) && l.target.module != w.module
+                            && (tProjects == null || tProjects.contains(l.target.module.project))) { out.add(w); break; }
                     }
                 }
             } else {
@@ -238,7 +264,7 @@ public class WidgetHarness {
     public static class DocRef {
         final Module m;
         DocRef(Module m) { this.m = m; }
-        public String projectId() { return "VforIA"; }
+        public String projectId() { return m.project; }
         public String spaceId() { return ""; }
         public String name() { return m.getId(); }
     }
@@ -415,11 +441,34 @@ public class WidgetHarness {
         check(browser.contains("data-kc=\"5\""), "link roles read from the selectors (copy relations found)");
         check(!browser.contains("Missing_Source"), "unresolvable source documents are ignored");
         check(!browser.contains("VIA-999"), "links to unresolvable work items are ignored");
-        check(browser.contains("data-o=\"Requirements/SRS_Test\" data-c=\"Requirements/SRS_Test_Branch_Test_C\""),
+        check(browser.contains("data-o=\"VforIA/Requirements/SRS_Test\" data-c=\"VforIA/Requirements/SRS_Test_Branch_Test_C\""),
             "normal relations are still found");
+        check(!browser.contains("VforIB") && browser.contains(">Project: VforIA<"), "no project selected: current project only, scope shown");
         int sqlBrowser = SQL_COUNT;
         String pdf = render(widgetDir, params, true, outDir + "/velocity-pdf.log");
         write(outDir + "/pdf-fragment.html", pdf);
+        check(pdf.contains("Project: VforIA &mdash;"), "PDF: scope in the header");
+        // Two projects: documents of both, cross-project copy (same space and name in both projects).
+        params.put("projects", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("VforIA"), new RoleOpt("VforIB")))));
+        String multi = render(widgetDir, params, false, outDir + "/velocity-multi.log");
+        write(outDir + "/multi-fragment.html", multi);
+        check(multi.contains("data-o=\"VforIA/Requirements/SRS_Test\" data-c=\"VforIB/Requirements/SRS_Test\" data-kc=\"3\""),
+            "two projects: cross-project copy found");
+        check(multi.contains("data-k=\"VforIB/Requirements/SRS_Test\" data-p=\"VforIB\"") && multi.contains("data-projects=\"VforIA,VforIB\"")
+            && multi.contains(">Projects: VforIA, VforIB<"), "two projects: documents carry their project, scope shown");
+        String multiPdf = render(widgetDir, params, true, outDir + "/velocity-multipdf.log");
+        check(multiPdf.contains("<td>VforIA / Requirements / SRS_Test</td><td>copy</td><td>VforIB / Requirements / SRS_Test</td>"),
+            "two projects, PDF: documents labelled with their project");
+        // Only the other project.
+        params.put("projects", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("VforIB")))));
+        String other = render(widgetDir, params, false, outDir + "/velocity-other.log");
+        check(other.contains("data-k=\"VforIB/Requirements/SRS_Test\"") && !other.contains("data-k=\"VforIA/"), "one other project: its documents only");
+        // Unreadable selection: current project and a warning.
+        params.put("projects", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("not a project id")))));
+        String bad = render(widgetDir, params, false, outDir + "/velocity-badproj.log");
+        check(bad.contains("The selected projects could not be read; the current project is used.") && bad.contains("data-k=\"VforIA/Requirements/SRS_Test\""),
+            "unreadable project selection: warning, current project");
+        params.remove("projects");
         // No copy role selected: no copy relation; no role at all: message.
         params.put("copyLinkRoles", new Param(null, new ArrayList<Object>()));
         String noCopy = render(widgetDir, params, false, outDir + "/velocity-nocopy.log");

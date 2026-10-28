@@ -78,8 +78,9 @@
     return p.substring(0, p.lastIndexOf('/') + 1);
   }
 
-  function docUrl(project, node) {
-    return basePath() + HASH + '/project/' + encodeURIComponent(project) + '/wiki/' +
+  // Documents and work items open in their own project (node.project, from the page model).
+  function docUrl(node) {
+    return basePath() + HASH + '/project/' + encodeURIComponent(node.project) + '/wiki/' +
       encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
   }
 
@@ -122,7 +123,7 @@
     for (var i = 0; i < nEls.length; i++) {
       var d = nEls[i].dataset;
       var n = {
-        key: d.k, id: d.id || '', title: d.title || d.id || '', space: d.space || '',
+        key: d.k, project: d.p || root.dataset.project || '', id: d.id || '', title: d.title || d.id || '', space: d.space || '',
         type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
@@ -146,6 +147,11 @@
       if (f.length === 3) { out.push({ c: f[0], o: f[1], k: f[2] }); }
     }
     return out;
+  }
+
+  // Sort key of a document: project, space, name.
+  function docSortKey(n) {
+    return n.project + '/' + n.space + '/' + n.id;
   }
 
   function catById(cats, id) {
@@ -246,7 +252,7 @@
 
     var cols = [];
     linked.sort(function (x, y) {
-      return (x.space + '/' + x.title).localeCompare(y.space + '/' + y.title);
+      return (x.project + '/' + x.space + '/' + x.title).localeCompare(y.project + '/' + y.space + '/' + y.title);
     });
     for (var d = 0; d < linked.length; d++) {
       var L = lvl[linked[d].key];
@@ -307,7 +313,7 @@
     var gridCols = Math.max(3, cols.length);
     if (isolated.length) {
       isolated.sort(function (x, y) {
-        return (x.space + '/' + x.title).localeCompare(y.space + '/' + y.title);
+        return (x.project + '/' + x.space + '/' + x.title).localeCompare(y.project + '/' + y.space + '/' + y.title);
       });
       for (var m = 0; m < isolated.length; m++) {
         pos[isolated[m].key] = {
@@ -335,6 +341,8 @@
     self.model = model;
     var ds = root.dataset;
     self.project = ds.project || '';
+    // Several projects in scope: documents are labelled with their project.
+    self.multi = (ds.projects || '').split(',').filter(function (x) { return x; }).length > 1;
     self.height = toInt(ds.height) || 600;
     self.state = {
       mode: ds.mode === 'all' ? 'all' : 'related',
@@ -468,7 +476,7 @@
     var lines = [
       { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
       { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
-      { text: n.space, weight: 400, color: 'rgb(110,118,135)' }
+      { text: this.multi ? n.project + ' / ' + n.space : n.space, weight: 400, color: 'rgb(110,118,135)' }
     ];
     this.state.extras.forEach(function (f) {
       var v = n[f];
@@ -553,8 +561,8 @@
     var nodes = lay.linked.concat(lay.isolated);
     nodes.forEach(function (n) {
       var p = lay.pos[n.key];
-      var match = !filter || (n.id + ' ' + n.title + ' ' + n.space).toLowerCase().indexOf(filter) >= 0;
-      var a = svg('a', { href: docUrl(self.project, n), target: '_top', 'class': 'bw-node' }, gNodes);
+      var match = !filter || (n.id + ' ' + n.title + ' ' + n.space + ' ' + n.project).toLowerCase().indexOf(filter) >= 0;
+      var a = svg('a', { href: docUrl(n), target: '_top', 'class': 'bw-node' }, gNodes);
       var g = svg('g', { opacity: match ? 1 : 0.3 }, a);
       svg('rect', {
         x: p.x, y: p.y, width: NODE_W, height: h, rx: 6,
@@ -567,7 +575,7 @@
           'font-weight': ln.weight, fill: ln.color
         }, g, trunc(ln.text, 36));
       });
-      svg('title', null, a, n.space + ' / ' + n.id + ' ' + DASH + ' ' + n.title);
+      svg('title', null, a, self.docLabel(n) + ' ' + DASH + ' ' + n.title);
       if (self.onNode) { self.onNode(a, n); }
     });
   };
@@ -584,33 +592,41 @@
 
   Base.hideTip = function () { this.tip.style.display = 'none'; };
 
+  // "space / name", prefixed with the project when several projects are in scope.
+  Base.docLabel = function (n) {
+    return (this.multi ? n.project + ' / ' : '') + n.space + ' / ' + n.id;
+  };
+
   // Opens the details box with a header "origin -> target" and a Close button; returns the box.
   Base.openDetails = function (o, c) {
     var box = this.details;
     box.textContent = '';
     box.style.display = 'block';
     var head = el('div', { 'class': 'bw-details-head' }, box);
-    el('a', { href: docUrl(this.project, o), target: '_top' }, head, o.id);
+    el('a', { href: docUrl(o), target: '_top' }, head, o.id);
     if (c) {
       el('span', null, head, '  ' + ARROW + '  ');
-      el('a', { href: docUrl(this.project, c), target: '_top' }, head, c.id);
+      el('a', { href: docUrl(c), target: '_top' }, head, c.id);
     }
     var close = this.button(head, 'Close', 'Close the details', function () { box.style.display = 'none'; });
     close.style.marginLeft = '12px';
     return box;
   };
 
-  // List of work item pairs (target item -> origin item) with the category name.
+  // List of work item pairs (target item -> origin item) with the category name. Each item opens in the project
+  // of its document.
   Base.sampleList = function (box, e, title) {
     var self = this;
+    var pc = this.model.byKey[e.c].project;
+    var po = this.model.byKey[e.o].project;
     if (!e.samples.length) { return; }
     el('div', { 'class': 'bw-muted' }, box, title);
     var ul = el('ul', { 'class': 'bw-items' }, box);
     e.samples.forEach(function (s) {
       var li = el('li', null, ul);
-      el('a', { href: itemUrl(self.project, s.c), target: '_top' }, li, s.c);
+      el('a', { href: itemUrl(pc, s.c), target: '_top' }, li, s.c);
       el('span', null, li, ' ' + ARROW + ' ');
-      el('a', { href: itemUrl(self.project, s.o), target: '_top' }, li, s.o);
+      el('a', { href: itemUrl(po, s.o), target: '_top' }, li, s.o);
       var cat = catById(self.cats, s.k);
       el('span', { 'class': 'bw-muted' }, li, ' (' + (cat ? cat.name : s.k) + ')');
     });
@@ -675,7 +691,7 @@
 
   Base.shownDocs = function () {
     return this.lay.linked.concat(this.lay.isolated).slice().sort(function (a, b) {
-      return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
+      return docSortKey(a).localeCompare(docSortKey(b));
     });
   };
 
@@ -683,8 +699,7 @@
     var by = this.model.byKey;
     return this.edges.slice().sort(function (a, b) {
       var oa = by[a.o], ob = by[b.o], ca = by[a.c], cb = by[b.c];
-      return (oa.space + '/' + oa.id).localeCompare(ob.space + '/' + ob.id) ||
-        (ca.space + '/' + ca.id).localeCompare(cb.space + '/' + cb.id);
+      return docSortKey(oa).localeCompare(docSortKey(ob)) || docSortKey(ca).localeCompare(docSortKey(cb));
     });
   };
 

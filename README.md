@@ -1,12 +1,12 @@
 # Polarion document widgets
 
-Siemens Polarion **LiveReport widgets** that show the LiveDocs of a project as a graph and the relations
+Siemens Polarion **LiveReport widgets** that show the LiveDocs of a project (or of several projects) as a graph and the relations
 between them, deduced from work item links. They share one client core, one build and one test setup.
 
 | Widget | What it shows | Status | Docs |
 |---|---|---|---|
-| <img src="docs/docBranches/icon.svg" width="32" alt=""> **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.3.1** validated on Polarion 2512 | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
-| <img src="docs/docCoverage/icon.svg" width="32" alt=""> **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.1.1** validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
+| <img src="docs/docBranches/icon.svg" width="32" alt=""> **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.4.1** (0.4.0 validated on Polarion 2512; 0.4.1 = shared code only) | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
+| <img src="docs/docCoverage/icon.svg" width="32" alt=""> **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.2.1** validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) |
 
 **Users: see the [user manual](docs/USER_MANUAL.md)** (deployment, adding the widgets to a page, parameters, toolbar).
 
@@ -22,9 +22,9 @@ open for both widgets: behaviour for viewers who cannot read some documents (see
 - Interactive SVG graph (layered layout, zoom, highlight, tooltips, details with the linked work items).
 - Table view, SVG download, Excel workbook download (CSV fallback).
 - Static graph + table in PDF export and print (no JavaScript).
-- Link roles, documents and excluded work item types chosen with Polarion selectors in the widget parameters (no typing).
+- Projects, link roles, documents and excluded work item types chosen with Polarion selectors in the widget parameters (no typing).
 - Viewer toggles (relation kinds or roles, item counts, extra document fields), defaults set as widget parameters.
-- Velocity 1.4-safe templates, SQL scoped to one project, `isUnresolvable()` guard on every referenced object.
+- Velocity 1.4-safe templates, SQL scoped to the current project or the selected projects, `isUnresolvable()` guard on every referenced object.
 
 ## Architecture
 

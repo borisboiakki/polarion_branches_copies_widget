@@ -1,4 +1,6 @@
-$parameters.put("docs", $factory.enumeration("Documents (none = all documents of the project)", "@document").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("projects", $factory.enumeration("Projects (none = current project)", "@project").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("docs", $factory.enumeration("Documents of the current project (none = all documents)", "@document").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("otherDocs", $factory.string("Documents of other projects (project/space/document, comma separated, empty = all)").value("").build())
 $parameters.put("roles", $factory.enumeration("Link roles (1 to 5)", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).build())
 $parameters.put("excludedTypes", $factory.enumeration("Work item types not counted", "workitem-type").allowNoValue(true).allowMultipleValues(true).values(["heading"]).build())
 $parameters.put("spaces", $factory.string("Spaces to include (comma separated, empty = all)").value("").build())
