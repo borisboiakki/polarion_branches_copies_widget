@@ -5,7 +5,7 @@
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
 ## Terms: upstream document = document of the link targets (e.g. customer specification), downstream document =
 ## document of the link sources. Verified for "satisfies" on 2512 (spike C3). Edge "up>down": o = upstream, c = downstream.
-#set($bwVersion = "0.2.1")
+#set($bwVersion = "0.3.0")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -242,7 +242,8 @@
   #end
 #end
 
-## Document label for tables and lists: "space / name", prefixed with the project when several projects are in scope.
+## Document label for tables and lists: "space / name", prefixed with the project when several projects are in scope,
+## "(HEAD)" added for a document of a collection without a pinned revision (documents.vm).
 #macro(bwDocLabel $bwD)
   #set($bwLs = $bwD.get("space"))
   #set($bwLn = $bwD.get("id"))
@@ -250,6 +251,103 @@
   #if($multiProject)
     #set($bwLp = $bwD.get("project"))
     #set($bwDocLabelOut = "${bwLp} / ${bwDocLabelOut}")
+  #end
+  #if($bwD.get("rev") == "HEAD")
+    #set($bwDocLabelOut = "${bwDocLabelOut} (HEAD)")
+  #end
+#end
+
+## ======================================================================= collection
+## Collection context (verified on 2512, spike tests/docCoverage-v0.3.x K1/K6/K7): the page opened in a collection gives
+## its reference through the transaction context; the PDF export has none, so the parameter "Collection" is used then
+## (and on pages outside the collection). Mode "ignore": always the current documents (HEAD).
+## In a collection the Projects, Documents and Documents of other projects parameters are not used (PO, F17).
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.collectionMode.singleValue)
+#set($tmp = $parameters.collectionMode.singleValue())
+#set($colMode = "use")
+#if("$tmp" == "ignore")
+  #set($colMode = "ignore")
+#end
+#set($colRef = false)
+#set($colFrom = "")
+#set($colParamN = 0)
+#if($colMode == "use")
+  #set($colCtx = false)
+  #set($colCtx = $transaction.context())
+  #if($colCtx)
+    #set($colRef = $colCtx.contextCollection())
+  #end
+  #if($colRef)
+    #set($colFrom = "context")
+  #else
+    #set($colVals = false)
+    #set($colVals = $parameters.collection.values)
+    #set($colVals = $parameters.collection.values())
+    #if($colVals)
+      #foreach($v in $colVals)
+        #set($colParamN = $colParamN + 1)
+        #if(!$colRef)
+          #set($colMo = false)
+          #set($colMo = $v.getModelObject())
+          #set($colMoUr = "unknown")
+          #if($colMo)
+            #set($colMoUr = $colMo.isUnresolvable())
+          #end
+          #if("$colMoUr" == "false")
+            #set($colRef = $colMo.getReference())
+            #set($colFrom = "parameter")
+          #end
+        #end
+      #end
+    #end
+  #end
+#end
+## Collection name and upstream collections for the scope line.
+#set($colText = "")
+#set($colKey = "")
+#if($colRef)
+  #set($colP = "")
+  #set($colP = $colRef.projectId())
+  #set($colI = "")
+  #set($colI = $colRef.id())
+  #set($colKey = "${colP}/${colI}")
+  #set($colName = "")
+  #set($colOld = false)
+  #set($colObj = false)
+  #set($colObj = $colRef.get($transaction))
+  #if($colObj)
+    #set($colOld = $colObj.getOldApi())
+  #end
+  #if($colOld)
+    #set($colName = $colOld.getName())
+  #end
+  #if("$colName" == "")
+    #set($colName = "$colKey")
+  #end
+  #set($colText = "Collection: ${colName}")
+  #set($colUps = "")
+  #if($colOld)
+    #set($colUpList = false)
+    #set($colUpList = $colOld.getUpstreamCollections())
+    #if($colUpList)
+      #foreach($u in $colUpList)
+        #set($uName = "")
+        #set($uName = $u.getName())
+        #if("$uName" != "")
+          #if($colUps != "")
+            #set($colUps = "${colUps}, ")
+          #end
+          #set($colUps = "${colUps}${uName}")
+        #end
+      #end
+    #end
+  #end
+  #if($colUps != "")
+    #set($colText = "${colText} (with upstream: ${colUps})")
+  #end
+  #if($colParamN > 1)
+    #set($scopeWarn = "${scopeWarn} Several collections selected: the first one is used.")
   #end
 #end
 
@@ -262,6 +360,20 @@
 #set($docVals = false)
 #set($docVals = $parameters.docs.values)
 #set($docVals = $parameters.docs.values())
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.otherDocs.value)
+#set($tmp = $parameters.otherDocs.value())
+#set($otherDocsStr = "")
+#if("$tmp" != $bwUnset)
+  #set($otherDocsStr = "$tmp")
+#end
+#if($colRef)
+  #if(($docVals && $docVals.size() > 0) || $otherDocsStr.trim() != "" || ($projectVals && $projectVals.size() > 0))
+    #set($scopeWarn = "${scopeWarn} In a collection the Projects and Documents parameters are not used.")
+  #end
+  #set($docVals = false)
+  #set($otherDocsStr = "")
+#end
 #if($docVals)
   #foreach($v in $docVals)
     #set($mo = false)
@@ -288,13 +400,6 @@
 ## Documents of other projects: text "project/space/document, ..." (the @document selector lists the current project
 ## only). "project/document" means the default space. Entries of the current project are added to the selection
 ## (docOnly); entries of another selected project limit that project's documents (docOther, documents.vm).
-#set($tmp = $bwUnset)
-#set($tmp = $parameters.otherDocs.value)
-#set($tmp = $parameters.otherDocs.value())
-#set($otherDocsStr = "")
-#if("$tmp" != $bwUnset)
-  #set($otherDocsStr = "$tmp")
-#end
 #set($docOther = [])
 #set($otherBad = 0)
 #set($otherOut = [])
@@ -400,7 +505,7 @@
 #set($roleColors = ["rgb(51,103,214)", "rgb(198,40,40)", "rgb(26,127,55)", "rgb(142,68,173)", "rgb(211,84,0)"])
 #set($roleDashes = ["", "9,5", "2,4", "6,3", "12,4,2,4"])
 
-#if($docOnly.size() > 0 && !$projectIds.contains($projectId))
+#if(!$colRef && $docOnly.size() > 0 && !$projectIds.contains($projectId))
   #set($scopeWarn = "${scopeWarn} The selected documents belong to project ${projectId}, which is not in the selected projects: they are ignored.")
 #end
 
@@ -412,10 +517,14 @@
 
 ## ======================================================================= documents
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
-## Collects the documents of the projects in scope into docList / docByKey (maps with key, project, id, title, space,
-## type, status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
-## (project/space/name) to keep among the documents of the current project; docOther = the same for the documents of
-## the other projects in scope. Empty or unset = all documents.
+## Collects the documents into docList / docByKey (maps with key, project, id, title, space, type, status, created,
+## updated, rev, items, itemObjs, module). Needs common.vm.
+## HEAD (no colRef): the documents of the projects in scope. Optional: docOnly = list of keys (project/space/name) to
+## keep among the documents of the current project; docOther = the same for the documents of the other projects in
+## scope. Empty or unset = all documents.
+## Collection (colRef = collection reference, set by the widget): the documents of the collection and of its upstream
+## collections, each at the revision the collection pins (rev = that revision, "HEAD" when none is pinned), with their
+## work items at that revision. Verified on 2512 (docCoverage spike K2, K3, extra round).
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
   #set($docOnly = [])
@@ -425,91 +534,153 @@
 #end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
-#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id IN (${projectSql})")
 #set($typeFilterSql = "")
 #if($typeSql != "")
   #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
 #end
-#foreach($m in $ds.sqlSearch($docSql))
-  #bwKey($m)
-  #set($dKey = $bwKeyOut)
-  #set($dProj = $bwKeyProject)
-  #set($dSpace = "")
-  #set($dSpace = $m.getModuleFolder())
-  #set($keep = true)
-  #if($dKey == "" || $docByKey.containsKey($dKey))
-    #set($keep = false)
+
+## Document map of module bwDocM (key bwDocKey, project bwDocProj, space bwDocSpace) -> bwDocOut.
+#macro(bwDocMap $bwDocM)
+  #set($bwDocOut = $objectFactory.newMap())
+  #set($dName = $bwDocM.getId())
+  #set($dTitle = "")
+  #set($dTitle = $bwDocM.getTitle())
+  #if("$dTitle" == "")
+    #set($dTitle = "$dName")
   #end
-  #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
-    #set($keep = false)
+  #set($dType = "")
+  #set($dTypeObj = false)
+  #set($dTypeObj = $bwDocM.getType())
+  #if($dTypeObj)
+    #set($dType = $dTypeObj.getId())
+    #set($dType = $dTypeObj.getName())
   #end
-  #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
-    #set($keep = false)
+  #set($dStatus = "")
+  #set($dStatusObj = false)
+  #set($dStatusObj = $bwDocM.getStatus())
+  #if($dStatusObj)
+    #set($dStatus = $dStatusObj.getId())
+    #set($dStatus = $dStatusObj.getName())
   #end
-  #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
-    #set($keep = false)
+  #set($dCreated = "")
+  #set($dDate = false)
+  #set($dDate = $bwDocM.getCreated())
+  #if($dDate)
+    #set($dCreated = "$dDate")
+    #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
   #end
-  #if($keep)
-    #set($d = $objectFactory.newMap())
-    #set($dName = $m.getId())
-    #set($dTitle = "")
-    #set($dTitle = $m.getTitle())
-    #if("$dTitle" == "")
-      #set($dTitle = "$dName")
+  #set($dUpdated = "")
+  #set($dDate = false)
+  #set($dDate = $bwDocM.getUpdated())
+  #if($dDate)
+    #set($dUpdated = "$dDate")
+    #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
+  #end
+  #set($void = $bwDocOut.put("key", $bwDocKey))
+  #set($void = $bwDocOut.put("project", "$bwDocProj"))
+  #set($void = $bwDocOut.put("id", "$dName"))
+  #set($void = $bwDocOut.put("title", "$dTitle"))
+  #set($void = $bwDocOut.put("space", "$bwDocSpace"))
+  #set($void = $bwDocOut.put("type", "$dType"))
+  #set($void = $bwDocOut.put("status", "$dStatus"))
+  #set($void = $bwDocOut.put("created", "$dCreated"))
+  #set($void = $bwDocOut.put("updated", "$dUpdated"))
+  #set($void = $bwDocOut.put("rev", ""))
+  #set($void = $bwDocOut.put("items", -1))
+  #set($void = $bwDocOut.put("itemObjs", []))
+  #set($void = $bwDocOut.put("module", $bwDocM))
+#end
+
+#if($colRef)
+  ## ------------------------------------------------------------------ collection
+  #set($colDocs = $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+  #foreach($cd in $colDocs)
+    #set($m = false)
+    #set($m = $cd.getOldApi())
+    #bwKey($m)
+    #set($bwDocKey = $bwKeyOut)
+    #set($bwDocProj = $bwKeyProject)
+    #set($bwDocSpace = "")
+    #if($bwDocKey != "")
+      #set($bwDocSpace = $m.getModuleFolder())
     #end
-    #set($dType = "")
-    #set($dTypeObj = false)
-    #set($dTypeObj = $m.getType())
-    #if($dTypeObj)
-      #set($dType = $dTypeObj.getId())
-      #set($dType = $dTypeObj.getName())
+    #if($bwDocKey != "" && !$docByKey.containsKey($bwDocKey) && ($spaceFilter.size() == 0 || $spaceFilter.contains("$bwDocSpace")))
+      #bwDocMap($m)
+      #set($dRev = "")
+      #set($dRev = $m.getRevision())
+      #if("$dRev" == "")
+        #set($dRev = "HEAD")
+      #end
+      #set($void = $bwDocOut.put("rev", "$dRev"))
+      #set($void = $bwDocOut.put("items", 0))
+      #set($void = $docList.add($bwDocOut))
+      #set($void = $docByKey.put($bwDocKey, $bwDocOut))
     #end
-    #set($dStatus = "")
-    #set($dStatusObj = false)
-    #set($dStatusObj = $m.getStatus())
-    #if($dStatusObj)
-      #set($dStatus = $dStatusObj.getId())
-      #set($dStatus = $dStatusObj.getName())
+  #end
+  ## Work items of all the collection documents in one query, grouped by their document (at the collection revision).
+  #set($colItemSql = "select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module")
+  #if($typeSql != "")
+    #set($colItemSql = "${colItemSql} where w.c_type not in (${typeSql})")
+  #end
+  #foreach($cw in $transaction.objects().searchBySql($colItemSql).collection($colRef))
+    #set($cwi = false)
+    #set($cwi = $cw.getOldApi())
+    #if($cwi)
+      #set($cwm = false)
+      #set($cwm = $cwi.getModule())
+      #bwKey($cwm)
+      #if($bwKeyOut != "" && $docByKey.containsKey($bwKeyOut))
+        #set($void = $docByKey.get($bwKeyOut).get("itemObjs").add($cwi))
+      #end
     #end
-    #set($dCreated = "")
-    #set($dDate = false)
-    #set($dDate = $m.getCreated())
-    #if($dDate)
-      #set($dCreated = "$dDate")
-      #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
+  #end
+  #foreach($d in $docList)
+    #set($void = $d.put("items", $d.get("itemObjs").size()))
+  #end
+#else
+  ## ------------------------------------------------------------------ HEAD
+  #set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id IN (${projectSql})")
+  #foreach($m in $ds.sqlSearch($docSql))
+    #bwKey($m)
+    #set($dKey = $bwKeyOut)
+    #set($dProj = $bwKeyProject)
+    #set($dSpace = "")
+    #set($dSpace = $m.getModuleFolder())
+    #set($keep = true)
+    #if($dKey == "" || $docByKey.containsKey($dKey))
+      #set($keep = false)
     #end
-    #set($dUpdated = "")
-    #set($dDate = false)
-    #set($dDate = $m.getUpdated())
-    #if($dDate)
-      #set($dUpdated = "$dDate")
-      #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
+    #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
+      #set($keep = false)
     #end
-    ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
-    #set($spaceStr = "$dSpace")
-    #set($nameStr = "$dName")
-    #set($spaceSql = $spaceStr.replace("'", "''"))
-    #set($nameSql = $nameStr.replace("'", "''"))
-    #set($projSql = $dProj.replace("'", "''"))
-    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projSql}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
-    #set($dItems = -1)
-    #set($dItemObjs = [])
-    #set($dItemObjs = $ds.sqlSearch($cntSql))
-    #set($dItems = $dItemObjs.size())
-    #set($void = $d.put("key", $dKey))
-    #set($void = $d.put("project", "$dProj"))
-    #set($void = $d.put("id", "$dName"))
-    #set($void = $d.put("title", "$dTitle"))
-    #set($void = $d.put("space", "$dSpace"))
-    #set($void = $d.put("type", "$dType"))
-    #set($void = $d.put("status", "$dStatus"))
-    #set($void = $d.put("created", "$dCreated"))
-    #set($void = $d.put("updated", "$dUpdated"))
-    #set($void = $d.put("items", $dItems))
-    #set($void = $d.put("itemObjs", $dItemObjs))
-    #set($void = $d.put("module", $m))
-    #set($void = $docList.add($d))
-    #set($void = $docByKey.put($dKey, $d))
+    #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+      #set($keep = false)
+    #end
+    #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
+      #set($keep = false)
+    #end
+    #if($keep)
+      #set($bwDocKey = $dKey)
+      #set($bwDocProj = $dProj)
+      #set($bwDocSpace = "$dSpace")
+      #bwDocMap($m)
+      #set($d = $bwDocOut)
+      ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
+      #set($spaceStr = "$dSpace")
+      #set($nameStr = $d.get("id"))
+      #set($spaceSql = $spaceStr.replace("'", "''"))
+      #set($nameSql = $nameStr.replace("'", "''"))
+      #set($projSql = $dProj.replace("'", "''"))
+      #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projSql}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
+      #set($dItems = -1)
+      #set($dItemObjs = [])
+      #set($dItemObjs = $ds.sqlSearch($cntSql))
+      #set($dItems = $dItemObjs.size())
+      #set($void = $d.put("items", $dItems))
+      #set($void = $d.put("itemObjs", $dItemObjs))
+      #set($void = $docList.add($d))
+      #set($void = $docByKey.put($dKey, $d))
+    #end
   #end
 #end
 
@@ -522,6 +693,27 @@
 #end
 #if($otherMissing != "")
   #set($scopeWarn = "${scopeWarn} Documents of other projects not found:${otherMissing}.")
+#end
+## In a collection: projects of its documents (labels, page model) and the collection on the scope line.
+#if($colRef)
+  #set($colProjects = [])
+  #foreach($d in $docList)
+    #if(!$colProjects.contains($d.get("project")))
+      #set($void = $colProjects.add($d.get("project")))
+    #end
+  #end
+  #set($multiProject = false)
+  #if($colProjects.size() > 1)
+    #set($multiProject = true)
+  #end
+  #set($projectsStr = "")
+  #foreach($p in $colProjects)
+    #if($projectsStr != "")
+      #set($projectsStr = "${projectsStr},")
+    #end
+    #set($projectsStr = "${projectsStr}${p}")
+  #end
+  #set($scopeText = $colText)
 #end
 
 ## ======================================================================= links
@@ -570,9 +762,43 @@
   #end
   #set($cwE = $edges.get($cwPk))
 #end
-#if($docList.size() > 1)
+## In a collection: link sources and targets from the collection tables (spike K4: links of the pinned revisions, items
+## of documents outside the collection never returned). Each target item ("project/id") -> its document at the collection
+## revision, as the target object read from a link is the current (HEAD) item.
+#set($colTgt = $objectFactory.newMap())
+#set($linkSrc = [])
+#if($docList.size() > 1 && $colRef)
+  #set($colLinkFrom = "from col_struct_workitem_linkedworkitems l inner join col_workitem ws on ws.c_uri = l.fk_uri_p_workitem inner join col_workitem wt on wt.c_uri = l.fk_uri_workitem inner join col_module ms on ms.c_uri = ws.fk_uri_module inner join col_module mt on mt.c_uri = wt.fk_uri_module where l.c_role in (${roleSql}) and ms.c_uri <> mt.c_uri")
+  #set($colTgtType = "")
+  #set($colSrcType = "")
+  #if($typeSql != "")
+    #set($colTgtType = " and wt.c_type not in (${typeSql})")
+    #set($colSrcType = " and ws.c_type not in (${typeSql})")
+  #end
+  #foreach($ct in $transaction.objects().searchBySql("select distinct wt.c_uri, wt.c_col_rev ${colLinkFrom}${colTgtType}").collection($colRef))
+    #set($cti = false)
+    #set($cti = $ct.getOldApi())
+    #if($cti)
+      #set($ctm = false)
+      #set($ctm = $cti.getModule())
+      #bwKey($ctm)
+      #set($ctP = $cti.getProjectId())
+      #set($ctI = $cti.getId())
+      #set($void = $colTgt.put("${ctP}/${ctI}", $bwKeyOut))
+    #end
+  #end
+  #foreach($cs in $transaction.objects().searchBySql("select distinct ws.c_uri, ws.c_col_rev ${colLinkFrom}${colSrcType}").collection($colRef))
+    #set($csi = false)
+    #set($csi = $cs.getOldApi())
+    #if($csi)
+      #set($void = $linkSrc.add($csi))
+    #end
+  #end
+#elseif($docList.size() > 1)
   #set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project INNER JOIN project pt ON pt.c_uri = wt.fk_uri_project WHERE p.c_id IN (${projectSql}) AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri${srcTypeSql} AND (${condS}) AND (${condT})")
-  #foreach($wi in $ds.sqlSearch($linkSql))
+  #set($linkSrc = $ds.sqlSearch($linkSql))
+#end
+  #foreach($wi in $linkSrc)
     #set($srcMod = false)
     #set($srcMod = $wi.getModule())
     #bwKey($srcMod)
@@ -591,41 +817,51 @@
             #set($tUr = $tgt.isUnresolvable())
           #end
           #if("$tUr" == "false")
-            #set($tType = "")
-            #set($tTypeObj = false)
-            #set($tTypeObj = $tgt.getType())
-            #if($tTypeObj)
-              #set($tType = $tTypeObj.getId())
-            #end
-            #if(!$excludedTypes.contains("$tType"))
-              #set($tgtMod = false)
-              #set($tgtMod = $tgt.getModule())
-              #bwKey($tgtMod)
-              #set($tgtKey = $bwKeyOut)
-              #if($tgtKey != "" && $tgtKey != $srcKey && $docByKey.containsKey($tgtKey))
-                #set($tgtId = "$tgt.getId()")
-                #cwEdge($tgtKey $srcKey)
-                #set($nl = $cwE.get("links").get($roleS) + 1)
-                #set($void = $cwE.get("links").put($roleS, $nl))
-                #set($void = $cwE.get("up").get($roleS).put($tgtId, true))
-                #set($void = $cwE.get("down").get($roleS).put($srcId, true))
-                #set($void = $cwE.get("upAll").put($tgtId, true))
-                #set($void = $cwE.get("downAll").put($srcId, true))
-                #if($cwE.get("samples").size() < $sampleCap)
-                  #set($void = $cwE.get("samples").add("${srcId}|${tgtId}|${roleS}"))
-                #end
-                #if(!$coveredAll.containsKey($tgtKey))
-                  #set($void = $coveredAll.put($tgtKey, $objectFactory.newMap()))
-                #end
-                #set($void = $coveredAll.get($tgtKey).put($tgtId, true))
+            ## Target document: from the collection map (target types already filtered in SQL), else the current one.
+            #set($tgtKey = "")
+            #if($colRef)
+              #set($tP = $tgt.getProjectId())
+              #set($tI = $tgt.getId())
+              #set($tPI = "${tP}/${tI}")
+              #if($colTgt.containsKey($tPI))
+                #set($tgtKey = $colTgt.get($tPI))
               #end
+            #else
+              #set($tType = "")
+              #set($tTypeObj = false)
+              #set($tTypeObj = $tgt.getType())
+              #if($tTypeObj)
+                #set($tType = $tTypeObj.getId())
+              #end
+              #if(!$excludedTypes.contains("$tType"))
+                #set($tgtMod = false)
+                #set($tgtMod = $tgt.getModule())
+                #bwKey($tgtMod)
+                #set($tgtKey = $bwKeyOut)
+              #end
+            #end
+            #if($tgtKey != "" && $tgtKey != $srcKey && $docByKey.containsKey($tgtKey))
+              #set($tgtId = "$tgt.getId()")
+              #cwEdge($tgtKey $srcKey)
+              #set($nl = $cwE.get("links").get($roleS) + 1)
+              #set($void = $cwE.get("links").put($roleS, $nl))
+              #set($void = $cwE.get("up").get($roleS).put($tgtId, true))
+              #set($void = $cwE.get("down").get($roleS).put($srcId, true))
+              #set($void = $cwE.get("upAll").put($tgtId, true))
+              #set($void = $cwE.get("downAll").put($srcId, true))
+              #if($cwE.get("samples").size() < $sampleCap)
+                #set($void = $cwE.get("samples").add("${srcId}|${tgtId}|${roleS}"))
+              #end
+              #if(!$coveredAll.containsKey($tgtKey))
+                #set($void = $coveredAll.put($tgtKey, $objectFactory.newMap()))
+              #end
+              #set($void = $coveredAll.get($tgtKey).put($tgtId, true))
             #end
           #end
         #end
       #end
     #end
   #end
-#end
 
 ## ======================================================================= coverage
 ## Per upstream document: counted items covered by any shown link, uncovered items (first uncCap).
@@ -847,13 +1083,15 @@
     #set($lines = [])
     #set($void = $lines.add($d.get("id")))
     #set($void = $lines.add($d.get("title")))
+    #set($dSs = $d.get("space"))
     #if($multiProject)
       #set($dPs = $d.get("project"))
-      #set($dSs = $d.get("space"))
-      #set($void = $lines.add("${dPs} / ${dSs}"))
-    #else
-      #set($void = $lines.add($d.get("space")))
+      #set($dSs = "${dPs} / ${dSs}")
     #end
+    #if($d.get("rev") == "HEAD")
+      #set($dSs = "${dSs}  (HEAD)")
+    #end
+    #set($void = $lines.add($dSs))
     #if($d.get("upstream"))
       #cwPct($d.get("covered") $d.get("items"))
       #set($void = $lines.add("Coverage: ${cwPctOut}"))
@@ -980,7 +1218,7 @@
 #if($scopeWarn != "")
 #set($warn = "${warn} ${scopeWarn}")
 #end
-<div class="cw-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
+<div class="cw-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-col="$esc.html($colKey)" data-mode="$showMode" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-warn="$esc.html($warn)">
   <div class="bw-muted">$esc.html($scopeText)</div>
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
@@ -999,7 +1237,7 @@
 #set($uncStr = "${uncStr}${u}")
 #end
 #end
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-rev="$esc.html($d.get('rev'))" data-up="$upFlag" data-cov="$covN" data-unc-n="$uncN" data-unc="$esc.html($uncStr)"></i>
 #end
 #foreach($k in $edgeKeys)
 #set($e = $edges.get($k))
@@ -1129,14 +1367,25 @@
     return p.substring(0, p.lastIndexOf('/') + 1);
   }
 
-  // Documents and work items open in their own project (node.project, from the page model).
-  function docUrl(node) {
-    return basePath() + HASH + '/project/' + encodeURIComponent(node.project) + '/wiki/' +
-      encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
+  // Documents and work items open in their own project (node.project, from the page model). In a collection (col =
+  // "collection project/collection id", root data-col) they open in the collection context, at the collection revision:
+  // .../project/P/collection/ID/... for the collection's project, .../project/P/collection/CP//ID/... for another
+  // project (formats rendered by Polarion 2512, docCoverage spike K2/K3).
+  function projectPath(project, col) {
+    var p = basePath() + HASH + '/project/' + encodeURIComponent(project);
+    if (!col) { return p; }
+    var i = col.lastIndexOf('/');
+    var cp = col.substring(0, i);
+    var cid = encodeURIComponent(col.substring(i + 1));
+    return p + '/collection/' + (cp === project ? cid : encodeURIComponent(cp) + '//' + cid);
   }
 
-  function itemUrl(project, id) {
-    return basePath() + HASH + '/project/' + encodeURIComponent(project) + '/workitem?id=' + encodeURIComponent(id);
+  function docUrl(node) {
+    return projectPath(node.project, node.col) + '/wiki/' + encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
+  }
+
+  function itemUrl(project, id, col) {
+    return projectPath(project, col) + '/workitem?id=' + encodeURIComponent(id);
   }
 
   function absUrl(u) {
@@ -1175,6 +1424,7 @@
       var d = nEls[i].dataset;
       var n = {
         key: d.k, project: d.p || root.dataset.project || '', id: d.id || '', title: d.title || d.id || '', space: d.space || '',
+        col: root.dataset.col || '', rev: d.rev || '',
         type: d.type || '', status: d.status || '',
         created: d.created || '', updated: d.updated || '',
         items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
@@ -1527,7 +1777,7 @@
     var lines = [
       { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
       { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
-      { text: this.multi ? n.project + ' / ' + n.space : n.space, weight: 400, color: 'rgb(110,118,135)' }
+      { text: (this.multi ? n.project + ' / ' + n.space : n.space) + (n.rev === 'HEAD' ? '  (HEAD)' : ''), weight: 400, color: 'rgb(110,118,135)' }
     ];
     this.state.extras.forEach(function (f) {
       var v = n[f];
@@ -1643,9 +1893,10 @@
 
   Base.hideTip = function () { this.tip.style.display = 'none'; };
 
-  // "space / name", prefixed with the project when several projects are in scope.
+  // "space / name", prefixed with the project when several projects are in scope; "(HEAD)" for a document of a
+  // collection without a pinned revision.
   Base.docLabel = function (n) {
-    return (this.multi ? n.project + ' / ' : '') + n.space + ' / ' + n.id;
+    return (this.multi ? n.project + ' / ' : '') + n.space + ' / ' + n.id + (n.rev === 'HEAD' ? ' (HEAD)' : '');
   };
 
   // Opens the details box with a header "origin -> target" and a Close button; returns the box.
@@ -1668,16 +1919,16 @@
   // of its document.
   Base.sampleList = function (box, e, title) {
     var self = this;
-    var pc = this.model.byKey[e.c].project;
-    var po = this.model.byKey[e.o].project;
+    var nc = this.model.byKey[e.c];
+    var no = this.model.byKey[e.o];
     if (!e.samples.length) { return; }
     el('div', { 'class': 'bw-muted' }, box, title);
     var ul = el('ul', { 'class': 'bw-items' }, box);
     e.samples.forEach(function (s) {
       var li = el('li', null, ul);
-      el('a', { href: itemUrl(pc, s.c), target: '_top' }, li, s.c);
+      el('a', { href: itemUrl(nc.project, s.c, nc.col), target: '_top' }, li, s.c);
       el('span', null, li, ' ' + ARROW + ' ');
-      el('a', { href: itemUrl(po, s.o), target: '_top' }, li, s.o);
+      el('a', { href: itemUrl(no.project, s.o, no.col), target: '_top' }, li, s.o);
       var cat = catById(self.cats, s.k);
       el('span', { 'class': 'bw-muted' }, li, ' (' + (cat ? cat.name : s.k) + ')');
     });
@@ -2084,7 +2335,7 @@
         el('div', { 'class': 'bw-muted' }, box, 'Uncovered items:');
         var ul = el('ul', { 'class': 'bw-items' }, box);
         c.uncovered.forEach(function (id) {
-          el('a', { href: itemUrl(n.project, id), target: '_top' }, el('li', null, ul), id);
+          el('a', { href: itemUrl(n.project, id, n.col), target: '_top' }, el('li', null, ul), id);
         });
         if (c.uncoveredN > c.uncovered.length) {
           el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (c.uncoveredN - c.uncovered.length) + ' more');
@@ -2151,13 +2402,13 @@
       relLinks.push({ r: i + 1, c: 7, url: absUrl(docUrl(o)) });
     });
     var docs = [['Project', 'Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
-      'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items']];
+      'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items', 'Revision']];
     var shown = this.shownDocs();
     shown.forEach(function (n) {
       var c = self.coverage(n);
       var p = c ? pct(c.covered, c.total) : null;
       docs.push([n.project, n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
-        n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '']);
+        n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '', n.rev]);
     });
     var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 2, url: absUrl(docUrl(n)) }; });
     var unc = [['Upstream document', 'Uncovered item']];
@@ -2167,7 +2418,7 @@
       if (!c) { return; }
       c.uncovered.forEach(function (id) {
         unc.push([self.docLabel(n), id]);
-        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(n.project, id)) });
+        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(n.project, id, n.col)) });
       });
     });
     var items = [['Downstream document', 'Upstream document', 'Downstream item', 'Upstream item', 'Role']];
@@ -2178,14 +2429,14 @@
       e.samples.forEach(function (sm) {
         var cat = catById(cats, sm.k);
         items.push([self.docLabel(c), self.docLabel(o), sm.c, sm.o, cat ? cat.name : sm.k]);
-        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(c.project, sm.c)) });
-        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(o.project, sm.o)) });
+        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(c.project, sm.c, c.col)) });
+        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(o.project, sm.o, o.col)) });
       });
     });
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
         widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
-      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11, 11] },
       { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
     ]);

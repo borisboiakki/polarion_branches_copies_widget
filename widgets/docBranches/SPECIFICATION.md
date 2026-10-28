@@ -168,6 +168,15 @@ context (F15), non-LiveDoc documents.
       lines, documents and items open in their own project; `IModule.getProjectId()` gives the project of a document;
       rendering time with the intended number of projects.
 
+### Future improvement: Spaces selector (logged 2026-10-28, PO)
+
+"Spaces to include" stays a text parameter (comma separated). A selector, as for link roles and types, is not available
+out of the box: Polarion 2512 has no dynamic `@space` enumeration (guide §10.2). Possible approach: a `customEnum` built
+in `parameters.vm` from the spaces of the current project's documents (`sqlSearch` on `module` + `getModuleFolder()`),
+read with `bwOptionIds`. To verify first with a mini spike: whether `parameters.vm` can query Polarion (`$trackerService`,
+`$page`). The list would cover the current project only (like `@document`), so a text field for the spaces of the other
+projects would stay.
+
 ## 11. Decision log
 
 | Date | Decision | Notes |
@@ -211,3 +220,5 @@ context (F15), non-LiveDoc documents.
 | 2026-10-28 | Widget 0.4.0: **Projects** parameter (`@project` multi-selector, none = current project). Document key `project/space/name`; SQL on `p.c_id IN (…)`; cross-project links between selected projects count (PO); scope line in the main view and the PDF header; project column in Excel; links open in the project of the document/item; warning above 5 projects. Minor release (PO). Open check §10.2 k | PO |
 | 2026-10-28 | PO test of 0.4.0 on 2512: project selector works, documents and cross-project links of two projects shown, rendering time good. Open check §10.2 k closed. Ready for release | PO |
 | 2026-10-28 | Widget 0.4.1: no functional change; the shared `documents.vm` accepts a list of documents of other projects (`docOther`, used by docCoverage 0.2.1) | |
+| 2026-10-28 | Widget 0.4.2: no functional change; shared code for the collection context of docCoverage 0.3.0 (`documents.vm` collection branch, not used by docBranches; collection-aware links in `core.js`). Collection context for docBranches possible later on the same code | |
+| 2026-10-28 | "Spaces to include" stays a text parameter; a spaces selector is logged as a future improvement (no `@space` enumeration in 2512) | PO |

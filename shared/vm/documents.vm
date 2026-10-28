@@ -1,8 +1,12 @@
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
-## Collects the documents of the projects in scope into docList / docByKey (maps with key, project, id, title, space,
-## type, status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
-## (project/space/name) to keep among the documents of the current project; docOther = the same for the documents of
-## the other projects in scope. Empty or unset = all documents.
+## Collects the documents into docList / docByKey (maps with key, project, id, title, space, type, status, created,
+## updated, rev, items, itemObjs, module). Needs common.vm.
+## HEAD (no colRef): the documents of the projects in scope. Optional: docOnly = list of keys (project/space/name) to
+## keep among the documents of the current project; docOther = the same for the documents of the other projects in
+## scope. Empty or unset = all documents.
+## Collection (colRef = collection reference, set by the widget): the documents of the collection and of its upstream
+## collections, each at the revision the collection pins (rev = that revision, "HEAD" when none is pinned), with their
+## work items at that revision. Verified on 2512 (docCoverage spike K2, K3, extra round).
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
   #set($docOnly = [])
@@ -12,90 +16,152 @@
 #end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
-#set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id IN (${projectSql})")
 #set($typeFilterSql = "")
 #if($typeSql != "")
   #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
 #end
-#foreach($m in $ds.sqlSearch($docSql))
-  #bwKey($m)
-  #set($dKey = $bwKeyOut)
-  #set($dProj = $bwKeyProject)
-  #set($dSpace = "")
-  #set($dSpace = $m.getModuleFolder())
-  #set($keep = true)
-  #if($dKey == "" || $docByKey.containsKey($dKey))
-    #set($keep = false)
+
+## Document map of module bwDocM (key bwDocKey, project bwDocProj, space bwDocSpace) -> bwDocOut.
+#macro(bwDocMap $bwDocM)
+  #set($bwDocOut = $objectFactory.newMap())
+  #set($dName = $bwDocM.getId())
+  #set($dTitle = "")
+  #set($dTitle = $bwDocM.getTitle())
+  #if("$dTitle" == "")
+    #set($dTitle = "$dName")
   #end
-  #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
-    #set($keep = false)
+  #set($dType = "")
+  #set($dTypeObj = false)
+  #set($dTypeObj = $bwDocM.getType())
+  #if($dTypeObj)
+    #set($dType = $dTypeObj.getId())
+    #set($dType = $dTypeObj.getName())
   #end
-  #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
-    #set($keep = false)
+  #set($dStatus = "")
+  #set($dStatusObj = false)
+  #set($dStatusObj = $bwDocM.getStatus())
+  #if($dStatusObj)
+    #set($dStatus = $dStatusObj.getId())
+    #set($dStatus = $dStatusObj.getName())
   #end
-  #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
-    #set($keep = false)
+  #set($dCreated = "")
+  #set($dDate = false)
+  #set($dDate = $bwDocM.getCreated())
+  #if($dDate)
+    #set($dCreated = "$dDate")
+    #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
   #end
-  #if($keep)
-    #set($d = $objectFactory.newMap())
-    #set($dName = $m.getId())
-    #set($dTitle = "")
-    #set($dTitle = $m.getTitle())
-    #if("$dTitle" == "")
-      #set($dTitle = "$dName")
+  #set($dUpdated = "")
+  #set($dDate = false)
+  #set($dDate = $bwDocM.getUpdated())
+  #if($dDate)
+    #set($dUpdated = "$dDate")
+    #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
+  #end
+  #set($void = $bwDocOut.put("key", $bwDocKey))
+  #set($void = $bwDocOut.put("project", "$bwDocProj"))
+  #set($void = $bwDocOut.put("id", "$dName"))
+  #set($void = $bwDocOut.put("title", "$dTitle"))
+  #set($void = $bwDocOut.put("space", "$bwDocSpace"))
+  #set($void = $bwDocOut.put("type", "$dType"))
+  #set($void = $bwDocOut.put("status", "$dStatus"))
+  #set($void = $bwDocOut.put("created", "$dCreated"))
+  #set($void = $bwDocOut.put("updated", "$dUpdated"))
+  #set($void = $bwDocOut.put("rev", ""))
+  #set($void = $bwDocOut.put("items", -1))
+  #set($void = $bwDocOut.put("itemObjs", []))
+  #set($void = $bwDocOut.put("module", $bwDocM))
+#end
+
+#if($colRef)
+  ## ------------------------------------------------------------------ collection
+  #set($colDocs = $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+  #foreach($cd in $colDocs)
+    #set($m = false)
+    #set($m = $cd.getOldApi())
+    #bwKey($m)
+    #set($bwDocKey = $bwKeyOut)
+    #set($bwDocProj = $bwKeyProject)
+    #set($bwDocSpace = "")
+    #if($bwDocKey != "")
+      #set($bwDocSpace = $m.getModuleFolder())
     #end
-    #set($dType = "")
-    #set($dTypeObj = false)
-    #set($dTypeObj = $m.getType())
-    #if($dTypeObj)
-      #set($dType = $dTypeObj.getId())
-      #set($dType = $dTypeObj.getName())
+    #if($bwDocKey != "" && !$docByKey.containsKey($bwDocKey) && ($spaceFilter.size() == 0 || $spaceFilter.contains("$bwDocSpace")))
+      #bwDocMap($m)
+      #set($dRev = "")
+      #set($dRev = $m.getRevision())
+      #if("$dRev" == "")
+        #set($dRev = "HEAD")
+      #end
+      #set($void = $bwDocOut.put("rev", "$dRev"))
+      #set($void = $bwDocOut.put("items", 0))
+      #set($void = $docList.add($bwDocOut))
+      #set($void = $docByKey.put($bwDocKey, $bwDocOut))
     #end
-    #set($dStatus = "")
-    #set($dStatusObj = false)
-    #set($dStatusObj = $m.getStatus())
-    #if($dStatusObj)
-      #set($dStatus = $dStatusObj.getId())
-      #set($dStatus = $dStatusObj.getName())
+  #end
+  ## Work items of all the collection documents in one query, grouped by their document (at the collection revision).
+  #set($colItemSql = "select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module")
+  #if($typeSql != "")
+    #set($colItemSql = "${colItemSql} where w.c_type not in (${typeSql})")
+  #end
+  #foreach($cw in $transaction.objects().searchBySql($colItemSql).collection($colRef))
+    #set($cwi = false)
+    #set($cwi = $cw.getOldApi())
+    #if($cwi)
+      #set($cwm = false)
+      #set($cwm = $cwi.getModule())
+      #bwKey($cwm)
+      #if($bwKeyOut != "" && $docByKey.containsKey($bwKeyOut))
+        #set($void = $docByKey.get($bwKeyOut).get("itemObjs").add($cwi))
+      #end
     #end
-    #set($dCreated = "")
-    #set($dDate = false)
-    #set($dDate = $m.getCreated())
-    #if($dDate)
-      #set($dCreated = "$dDate")
-      #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
+  #end
+  #foreach($d in $docList)
+    #set($void = $d.put("items", $d.get("itemObjs").size()))
+  #end
+#else
+  ## ------------------------------------------------------------------ HEAD
+  #set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id IN (${projectSql})")
+  #foreach($m in $ds.sqlSearch($docSql))
+    #bwKey($m)
+    #set($dKey = $bwKeyOut)
+    #set($dProj = $bwKeyProject)
+    #set($dSpace = "")
+    #set($dSpace = $m.getModuleFolder())
+    #set($keep = true)
+    #if($dKey == "" || $docByKey.containsKey($dKey))
+      #set($keep = false)
     #end
-    #set($dUpdated = "")
-    #set($dDate = false)
-    #set($dDate = $m.getUpdated())
-    #if($dDate)
-      #set($dUpdated = "$dDate")
-      #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
+    #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
+      #set($keep = false)
     #end
-    ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
-    #set($spaceStr = "$dSpace")
-    #set($nameStr = "$dName")
-    #set($spaceSql = $spaceStr.replace("'", "''"))
-    #set($nameSql = $nameStr.replace("'", "''"))
-    #set($projSql = $dProj.replace("'", "''"))
-    #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projSql}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
-    #set($dItems = -1)
-    #set($dItemObjs = [])
-    #set($dItemObjs = $ds.sqlSearch($cntSql))
-    #set($dItems = $dItemObjs.size())
-    #set($void = $d.put("key", $dKey))
-    #set($void = $d.put("project", "$dProj"))
-    #set($void = $d.put("id", "$dName"))
-    #set($void = $d.put("title", "$dTitle"))
-    #set($void = $d.put("space", "$dSpace"))
-    #set($void = $d.put("type", "$dType"))
-    #set($void = $d.put("status", "$dStatus"))
-    #set($void = $d.put("created", "$dCreated"))
-    #set($void = $d.put("updated", "$dUpdated"))
-    #set($void = $d.put("items", $dItems))
-    #set($void = $d.put("itemObjs", $dItemObjs))
-    #set($void = $d.put("module", $m))
-    #set($void = $docList.add($d))
-    #set($void = $docByKey.put($dKey, $d))
+    #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+      #set($keep = false)
+    #end
+    #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
+      #set($keep = false)
+    #end
+    #if($keep)
+      #set($bwDocKey = $dKey)
+      #set($bwDocProj = $dProj)
+      #set($bwDocSpace = "$dSpace")
+      #bwDocMap($m)
+      #set($d = $bwDocOut)
+      ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
+      #set($spaceStr = "$dSpace")
+      #set($nameStr = $d.get("id"))
+      #set($spaceSql = $spaceStr.replace("'", "''"))
+      #set($nameSql = $nameStr.replace("'", "''"))
+      #set($projSql = $dProj.replace("'", "''"))
+      #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projSql}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
+      #set($dItems = -1)
+      #set($dItemObjs = [])
+      #set($dItemObjs = $ds.sqlSearch($cntSql))
+      #set($dItems = $dItemObjs.size())
+      #set($void = $d.put("items", $dItems))
+      #set($void = $d.put("itemObjs", $dItemObjs))
+      #set($void = $docList.add($d))
+      #set($void = $docByKey.put($dKey, $d))
+    #end
   #end
 #end

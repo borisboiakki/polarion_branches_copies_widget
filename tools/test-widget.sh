@@ -3,7 +3,8 @@
 # and PDF output in Chromium (Playwright), take screenshots and test the interactions.
 # Usage: tools/test-widget.sh [widget|all] [outDir]      (defaults: all, /tmp/bw-widget-test)
 # Per widget: tools/vtest/<widget>/*Harness.java (render on mocks; main class = that file) and tools/vtest/<widget>/browser-check.js.
-# The harness writes browser-fragment.html, pdf-fragment.html and (two projects in scope) multi-fragment.html.
+# The harness writes browser-fragment.html, pdf-fragment.html, (two projects in scope) multi-fragment.html and (docCoverage,
+# collection context) collection-fragment.html.
 # The mock Polarion objects live in tools/vtest/docBranches/WidgetHarness.java and are compiled with every harness.
 # Output of each widget goes to <outDir>/<widget>/.
 set -euo pipefail
@@ -27,7 +28,7 @@ for w in "${widgets[@]}"; do
   main="$(cd "$root/tools/vtest/$w" && ls *Harness.java | head -1)"
   javac -nowarn -cp "$cp" -d "$out/cls" "${srcs[@]}" 2>&1 | grep -v '^Picked up\|^Note:' || true
   java -cp "$out/cls:$cp" "${main%.java}" "$root/widgets/$w/dist/$w" "$out" related 2>&1 | grep -v '^Picked up'
-  for f in browser pdf multi; do
+  for f in browser pdf multi collection; do
     [ -f "$out/$f-fragment.html" ] || continue
     { printf '<!doctype html><html><head><meta charset="utf-8"><title>%s</title></head><body style="margin:16px;width:1180px">' "$f"
       cat "$out/$f-fragment.html"; echo '</body></html>'; } > "$out/$f.html"
@@ -39,7 +40,7 @@ for w in "${widgets[@]}"; do
   node "$root/tools/vtest/$w/browser-check.js" "$out"
   echo "Screenshots and exports in $out"
 done
-# Spike widget of docCoverage: Velocity 1.4 smoke test on the docBranches mocks.
+# Spike widgets of docCoverage (cvSpike, ccSpike): Velocity 1.4 smoke tests on the docBranches mocks.
 if [ "$which" = all ]; then
   echo "=== cvSpike"
   out="$base/cvSpike"
@@ -47,4 +48,10 @@ if [ "$which" = all ]; then
   "$root/tools/vcheck.sh" "$root/tests/docCoverage-v0.1.x/spike-widget/cvSpike/"*.vm
   javac -nowarn -cp "$cp" -d "$out/cls" "$root/tools/vtest/docBranches/WidgetHarness.java" "$root/tools/vtest/cvSpike/SpikeHarness.java" 2>&1 | grep -v '^Picked up\|^Note:' || true
   java -cp "$out/cls:$cp" SpikeHarness "$root/tests/docCoverage-v0.1.x/spike-widget/cvSpike" "$out" 2>&1 | grep -v '^Picked up'
+  echo "=== ccSpike"
+  out="$base/ccSpike"
+  mkdir -p "$out/cls"
+  "$root/tools/vcheck.sh" "$root/tests/docCoverage-v0.3.x/spike-widget/ccSpike/"*.vm
+  javac -nowarn -cp "$cp" -d "$out/cls" "$root/tools/vtest/docBranches/WidgetHarness.java" "$root/tools/vtest/ccSpike/CollectionSpikeHarness.java" 2>&1 | grep -v '^Picked up\|^Note:' || true
+  java -cp "$out/cls:$cp" CollectionSpikeHarness "$root/tests/docCoverage-v0.3.x/spike-widget/ccSpike" "$out" 2>&1 | grep -v '^Picked up'
 fi

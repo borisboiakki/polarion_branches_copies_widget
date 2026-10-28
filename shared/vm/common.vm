@@ -115,7 +115,8 @@
   #end
 #end
 
-## Document label for tables and lists: "space / name", prefixed with the project when several projects are in scope.
+## Document label for tables and lists: "space / name", prefixed with the project when several projects are in scope,
+## "(HEAD)" added for a document of a collection without a pinned revision (documents.vm).
 #macro(bwDocLabel $bwD)
   #set($bwLs = $bwD.get("space"))
   #set($bwLn = $bwD.get("id"))
@@ -123,5 +124,8 @@
   #if($multiProject)
     #set($bwLp = $bwD.get("project"))
     #set($bwDocLabelOut = "${bwLp} / ${bwDocLabelOut}")
+  #end
+  #if($bwD.get("rev") == "HEAD")
+    #set($bwDocLabelOut = "${bwDocLabelOut} (HEAD)")
   #end
 #end

@@ -1,0 +1,6 @@
+$parameters.put("test", $factory.customEnum("Test to run").addEnumItem("ctx", "K1 Collection context").addEnumItem("docs", "K2 Documents of the collection and links").addEnumItem("items", "K3a Work items per document (col_workitem)").addEnumItem("itemsRel", "K3b Work items per document (col_rel_module_workitem)").addEnumItem("links", "K4 Links between the documents of the collection").addEnumItem("sql", "K8 Custom SQL in the collection").addEnumItem("page", "K9 Page location (PDF export)").allowNoValue(false).allowMultipleValues(false).singleValue("ctx").build())
+$parameters.put("collection", $factory.enumeration("Collection (used only outside a collection context)", "@collection").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("roles", $factory.enumeration("Link roles", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("excludedTypes", $factory.string("Work item types not counted (comma separated)").value("heading").build())
+$parameters.put("sql", $factory.string("Custom SQL (test K8, must select c_uri, c_col_rev)").value("select c_uri, c_col_rev from col_module").build())
+$parameters.put("maxRows", $factory.integer("Max rows to display").value(30).build())

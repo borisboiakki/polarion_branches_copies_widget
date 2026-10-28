@@ -113,6 +113,26 @@ function expect(ok, what) {
   expect(xText.length === 1 && xText[0].indexOf('VforIB / _default') >= 0 && xText[0].indexOf('/project/VforIB/wiki/_default/SysReq_X') >= 0,
     'two projects: box shows the project and opens the document in its project');
   expect((await p.textContent('.cw-root')).indexOf('Coverage: 83% (5/6)') >= 0, 'two projects: cross-project coverage 5/6');
+  // Collection context: documents and items open in the collection, the document without revision is marked HEAD.
+  await p.goto('file://' + dir + '/collection.html');
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: dir + '/shot-collection.png', fullPage: true });
+  const colText = await p.textContent('.cw-root');
+  expect(colText.indexOf('Collection: Release 1 (with upstream: Base)') >= 0 && colText.indexOf('Coverage: 80% (4/5)') >= 0,
+    'collection: scope line and coverage 4/5');
+  const colLinks = await p.$$eval('a.bw-node', els => els.map(a => a.textContent + '|' + a.getAttribute('href')));
+  expect(colLinks.some(t => t.indexOf('/project/VforIA/collection/7/wiki/Specs/CustomerSpec') >= 0),
+    'collection: document of the collection project opens in the collection');
+  expect(colLinks.some(t => t.indexOf('(HEAD)') >= 0 && t.indexOf('/project/VforIB/collection/VforIA//7/wiki/_default/SysReq_Z') >= 0),
+    'collection: document of another project marked HEAD, opens in the collection');
+  await p.evaluate(() => {
+    const a = Array.from(document.querySelectorAll('.bw-node')).find(n => n.querySelector('title').textContent.indexOf('CustomerSpec') >= 0);
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  });
+  await p.waitForTimeout(100);
+  const unc = await p.$$eval('.bw-details a', els => els.map(a => a.textContent + '|' + a.getAttribute('href')));
+  expect(unc.some(t => t.indexOf('VIA-4|') === 0 && t.indexOf('/project/VforIA/collection/7/workitem?id=VIA-4') >= 0),
+    'collection: uncovered item opens in the collection');
   console.log('errors:', JSON.stringify(errors));
   expect(errors.length === 0, 'no JavaScript errors');
   await b.close();

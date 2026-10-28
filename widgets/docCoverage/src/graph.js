@@ -267,7 +267,7 @@
         el('div', { 'class': 'bw-muted' }, box, 'Uncovered items:');
         var ul = el('ul', { 'class': 'bw-items' }, box);
         c.uncovered.forEach(function (id) {
-          el('a', { href: itemUrl(n.project, id), target: '_top' }, el('li', null, ul), id);
+          el('a', { href: itemUrl(n.project, id, n.col), target: '_top' }, el('li', null, ul), id);
         });
         if (c.uncoveredN > c.uncovered.length) {
           el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (c.uncoveredN - c.uncovered.length) + ' more');
@@ -334,13 +334,13 @@
       relLinks.push({ r: i + 1, c: 7, url: absUrl(docUrl(o)) });
     });
     var docs = [['Project', 'Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
-      'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items']];
+      'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items', 'Revision']];
     var shown = this.shownDocs();
     shown.forEach(function (n) {
       var c = self.coverage(n);
       var p = c ? pct(c.covered, c.total) : null;
       docs.push([n.project, n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
-        n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '']);
+        n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '', n.rev]);
     });
     var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 2, url: absUrl(docUrl(n)) }; });
     var unc = [['Upstream document', 'Uncovered item']];
@@ -350,7 +350,7 @@
       if (!c) { return; }
       c.uncovered.forEach(function (id) {
         unc.push([self.docLabel(n), id]);
-        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(n.project, id)) });
+        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(n.project, id, n.col)) });
       });
     });
     var items = [['Downstream document', 'Upstream document', 'Downstream item', 'Upstream item', 'Role']];
@@ -361,14 +361,14 @@
       e.samples.forEach(function (sm) {
         var cat = catById(cats, sm.k);
         items.push([self.docLabel(c), self.docLabel(o), sm.c, sm.o, cat ? cat.name : sm.k]);
-        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(c.project, sm.c)) });
-        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(o.project, sm.o)) });
+        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(c.project, sm.c, c.col)) });
+        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(o.project, sm.o, o.col)) });
       });
     });
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
         widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
-      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11, 11] },
       { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
     ]);

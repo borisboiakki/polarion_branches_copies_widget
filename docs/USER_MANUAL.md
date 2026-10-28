@@ -116,6 +116,8 @@ system or software specifications.
 | Projects | none = current project | Projects to analyse (choose in the list, several allowed). Links between documents of two chosen projects count, e.g. a system specification in another project that satisfies the customer specification | — |
 | Documents of the current project | none = all documents | The LiveDocs to analyse. Select at least the upstream document and its downstream documents. The list shows the documents of the current project only (Polarion limitation): for the other projects, use the next parameter | Hide/show with the **Documents** button |
 | Documents of other projects | empty = all documents of the other chosen projects | Type the documents of the other projects, comma separated, as `project/space/document`, e.g. `PROJ_B/Requirements/SysReq, PROJ_C/_default/SwReq`. `project/document` means the default space. When filled, only the listed documents of the other projects are analysed. The project must also be chosen in *Projects*. Wrong, unknown or unselected entries are reported in a warning | Hide/show with the **Documents** button |
+| Collection context | Use | *Use*: when the page is opened in a **collection**, only the documents of the collection (and of its upstream collections) are analysed, each at the revision the collection pins. *Projects* and the document parameters are then not used. *Ignore*: always the current documents | — |
+| Collection | none | Used only when the page is **not** opened in a collection: in the **PDF export** (Polarion's PDF export does not know the collection) or to tie a page outside the collection to it. Choose the same collection as the page | — |
 | Link roles (1 to 5) | none, **must be set** | The link roles that count as coverage, e.g. `satisfies`, `verifies`. If more than 5 are selected, only the first 5 are used and a warning is shown | Each role can be hidden or shown |
 | Work item types not counted | Heading | These types are not counted in the coverage, and links to them are ignored. Choose none to count all types | — |
 | Spaces to include | empty = all | Limit the documents to some spaces, comma separated (the default space is `_default`) | — |
@@ -123,6 +125,12 @@ system or software specifications.
 | Link counts on the lines by default | Shown | Or *Hidden*: the lines show only the role names | yes |
 | Extra document fields shown by default | none | Type, status, created, updated, work item count | yes |
 | Graph height in pixels | 600 | Height of the graph area | — |
+
+**In a collection** the scope line shows the collection, e.g. `Collection: Release 1 (with upstream: System baseline)`.
+Documents, work items, links and coverage are those of the revision each document has in the collection, so the numbers
+can differ from the current documents. A document added to the collection without a fixed revision is read as it is now
+and is marked **(HEAD)**. Documents and work items open in the collection. For a PDF of a collection report, set the
+*Collection* parameter, or print the page from the browser (the browser print keeps the collection).
 
 When you hide a role or a document in the toolbar, the coverage is **recalculated**. For example, you can hide the
 test specification to see the coverage by the system specifications only. Items that were covered only by hidden
@@ -164,7 +172,7 @@ The workbook follows the current toolbar choices, and every item and document ha
 | Widget | Sheets |
 |---|---|
 | Branches and Copies | Relations, Documents, Linked items (up to 30 per document pair) |
-| Coverage | Relations, Documents (with coverage), Uncovered items (up to 500 per document), Linked items (up to 30 per pair) |
+| Coverage | Relations, Documents (with coverage and the collection revision), Uncovered items (up to 500 per document), Linked items (up to 30 per pair) |
 
 If the browser blocks the Excel library, the button downloads the relations as a CSV file instead, and the status line
 says so.
@@ -180,6 +188,8 @@ there; the PDF uses the **parameter defaults** of the widget.
   projects are ignored. The scope line at the top says which projects are analysed.
 - With several projects, every document shows its project (box, table, Excel), and links open the document or work
   item in its own project. Each extra project adds rendering time: a warning is shown above 5 projects.
+- Document Coverage in a collection: Polarion's PDF export of the page has no collection, so it shows the current
+  documents unless the *Collection* parameter is set (see section 5).
 - Link roles and work item types are chosen from the current project's configuration. Other projects must use the
   same role and type ids for their links and items to be found.
 - Links between items of the same document and links to items you cannot read are ignored.

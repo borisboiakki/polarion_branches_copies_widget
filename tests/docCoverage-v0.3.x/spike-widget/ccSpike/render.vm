@@ -1,0 +1,662 @@
+## Document Coverage - collection context spike (K1-K8). Read-only diagnostics, one test per widget instance.
+## See tests/docCoverage-v0.3.x/spike-tests.md for what each test checks and what to report.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+## A set whose value is null keeps the previous value, so every accessor form is tried and every value is reset first.
+## Times: Long arithmetic does not compute on 2512, so start and end stamps (ms) are printed.
+<style>
+  .ccs { font-family: Arial, sans-serif; font-size: 12px; }
+  .ccs h4 { margin: 4px 0 8px 0; }
+  .ccs table { border-collapse: collapse; margin: 6px 0; }
+  .ccs td, .ccs th { border: 1px solid rgb(187,187,187); padding: 2px 6px; text-align: left; vertical-align: top; }
+  .ccs th { background: rgb(238,238,238); }
+  .ccs .ok { color: rgb(26,127,55); font-weight: bold; }
+  .ccs .ko { color: rgb(198,40,40); font-weight: bold; }
+  .ccs pre, .ccs code.h { background: rgb(246,246,246); padding: 4px; white-space: pre-wrap; word-break: break-all; }
+</style>
+
+## ---------------------------------------------------------------- parameters
+#set($test = "ctx")
+#set($tmp = "")
+#set($tmp = $parameters.test.singleValue)
+#set($tmp = $parameters.test.singleValue())
+#if("$tmp" != "")
+  #set($test = "$tmp")
+#end
+#set($bwInt = 0)
+#set($tmp = "")
+#set($tmp = $parameters.maxRows.value)
+#set($tmp = $parameters.maxRows.value())
+#set($tmpS = "$tmp")
+#set($maxRows = 30)
+#if($tmpS.matches("[0-9]{1,5}"))
+  #set($maxRows = $bwInt.parseInt($tmpS))
+#end
+#set($tmp = "")
+#set($tmp = $parameters.excludedTypes.value)
+#set($tmp = $parameters.excludedTypes.value())
+#set($excludedTypesStr = "$tmp")
+#set($tmp = "")
+#set($tmp = $parameters.sql.value)
+#set($tmp = $parameters.sql.value())
+#set($customSql = "$tmp")
+#set($typeSql = "")
+#foreach($p in $excludedTypesStr.split(","))
+  #set($pt = $p.trim())
+  #if($pt.matches("[A-Za-z0-9_.-]+"))
+    #if($typeSql != "")
+      #set($typeSql = "${typeSql},")
+    #end
+    #set($typeSql = "${typeSql}'${pt}'")
+  #end
+#end
+#set($roleIds = [])
+#set($roleVals = false)
+#set($roleVals = $parameters.roles.values)
+#set($roleVals = $parameters.roles.values())
+#if($roleVals)
+  #foreach($v in $roleVals)
+    #set($rId = "")
+    #set($rId = $v.id())
+    #set($rIdS = "$rId")
+    #if($rIdS.matches("[A-Za-z0-9_.-]+") && !$roleIds.contains($rIdS))
+      #set($void = $roleIds.add($rIdS))
+    #end
+  #end
+#end
+#set($roleSql = "")
+#foreach($r in $roleIds)
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+#set($projectId = "")
+#set($projectId = $page.getReference().projectId())
+#set($ds = $trackerService.getDataService())
+#set($isPdf = "")
+#set($isPdf = $widgetContext.target().isPdf())
+
+## ---------------------------------------------------------------- collection reference
+## Context first (page opened in a collection), else the collection parameter (explicit reference, K6).
+#set($ctxObj = false)
+#set($ctxObj = $transaction.context)
+#set($ctxObj = $transaction.context())
+#set($ctxCls = "")
+#set($ctxRef = false)
+#if($ctxObj)
+  #set($ctxCls = $ctxObj.getClass().getName())
+  #set($ctxRef = $ctxObj.contextCollection)
+  #set($ctxRef = $ctxObj.contextCollection())
+#end
+#set($colRef = false)
+#set($colFrom = "none")
+#if($ctxRef)
+  #set($colRef = $ctxRef)
+  #set($colFrom = "page context")
+#else
+  #set($colVals = false)
+  #set($colVals = $parameters.collection.values)
+  #set($colVals = $parameters.collection.values())
+  #set($colOptCls = "")
+  #set($colOptId = "")
+  #if($colVals)
+    #foreach($v in $colVals)
+      #if(!$colRef)
+        #set($colOptCls = $v.getClass().getName())
+        #set($colOptId = $v.id())
+        #set($mo = false)
+        #set($mo = $v.getModelObject())
+        #if($mo)
+          #set($colRef = $mo.getReference())
+          #set($colFrom = "collection parameter")
+        #end
+      #end
+    #end
+  #end
+#end
+
+## Description of a Rendering API object returned by searchBySql: class, reference, Open API object and revisions.
+#macro(ccsObj $o)
+  #set($ccsCls = "")
+  #set($ccsCls = $o.getClass().getName())
+  #set($ccsRefP = "")
+  #set($ccsRefI = "")
+  #set($ccsRefR = "")
+  #set($ccsR = false)
+  #set($ccsR = $o.getReference())
+  #if($ccsR)
+    #set($ccsRefP = $ccsR.projectId())
+    #set($ccsRefI = $ccsR.name())
+    #set($ccsRefI = $ccsR.id())
+    #set($ccsRefR = $ccsR.revision())
+  #end
+  #set($ccsOld = false)
+  #set($ccsOld = $o.getOldApi())
+  #set($ccsOldCls = "")
+  #set($ccsRev = "")
+  #set($ccsDataRev = "")
+  #if($ccsOld)
+    #set($ccsOldCls = $ccsOld.getClass().getName())
+    #set($ccsRev = $ccsOld.getRevision())
+    #set($ccsDataRev = $ccsOld.getDataRevision())
+  #end
+#end
+
+## Document key project/space/name of an Open API module, with its revision.
+#macro(ccsKey $mod)
+  #set($ccsKeyOut = "")
+  #set($ccsKeyRev = "")
+  #set($ccsUr = "unknown")
+  #if($mod)
+    #set($ccsUr = $mod.isUnresolvable())
+  #end
+  #if("$ccsUr" == "false")
+    #set($ccsKp = "")
+    #set($ccsKp = $mod.getProjectId())
+    #set($ccsKf = "")
+    #set($ccsKf = $mod.getModuleFolder())
+    #set($ccsKn = "")
+    #set($ccsKn = $mod.getId())
+    #set($ccsKeyRev = $mod.getRevision())
+    #if("$ccsKn" != "")
+      #set($ccsKeyOut = "${ccsKp}/${ccsKf}/${ccsKn}")
+    #end
+  #end
+#end
+
+## Project, space and name of the last ccsKey, quotes doubled for SQL.
+#macro(ccsQuote)
+  #set($hp = "$ccsKp")
+  #set($hf = "$ccsKf")
+  #set($hn = "$ccsKn")
+  #set($hp = $hp.replace("'", "''"))
+  #set($hf = $hf.replace("'", "''"))
+  #set($hn = $hn.replace("'", "''"))
+#end
+
+<div class="ccs">
+<h4>Document Coverage collection spike &mdash; test <code>$!esc.html($test)</code> &mdash; project <code>$!esc.html($projectId)</code> &mdash; PDF: <code>$!isPdf</code></h4>
+<p>Collection reference from: <b>$colFrom</b>. Reference: <code>$!esc.html("$colRef")</code> (class <code>$!esc.html($colRef.getClass().getName())</code>)</p>
+
+## ================================================================ K1 context
+#if($test == "ctx")
+  #set($pageRev = "")
+  #set($pageRev = $page.getReference().revision())
+  <table>
+    <tr><th>Item</th><th>Value</th></tr>
+    <tr><td>transaction class</td><td>$!esc.html($transaction.getClass().getName())</td></tr>
+    <tr><td>transaction.context() class</td><td>$!esc.html($ctxCls)</td></tr>
+    <tr><td>context: contextCollection()</td><td>$!esc.html("$ctxRef")</td></tr>
+    <tr><td>page reference revision()</td><td>$!esc.html("$pageRev")</td></tr>
+    <tr><td>collection parameter: option class / id()</td><td>$!esc.html($colOptCls) / $!esc.html($colOptId)</td></tr>
+  </table>
+  #if($colRef)
+    #set($cRefP = "")
+    #set($cRefP = $colRef.projectId())
+    #set($cRefI = "")
+    #set($cRefI = $colRef.id())
+    #set($cRefR = "")
+    #set($cRefR = $colRef.revision())
+    #set($colObj = false)
+    #set($colObj = $colRef.get($transaction))
+    #set($colObjCls = "")
+    #set($colOld = false)
+    #set($colName = "")
+    #if($colObj)
+      #set($colObjCls = $colObj.getClass().getName())
+      #set($colName = $colObj.fields().name().get())
+      #set($colOld = $colObj.getOldApi())
+    #end
+    #set($colFromMgr = false)
+    #if(!$colOld && "$cRefI" != "")
+      #set($colFromMgr = true)
+      #set($colOld = $trackerService.getBaselineCollectionsManager().getCollection("$cRefP", "$cRefI"))
+    #end
+    <table>
+      <tr><th>Reference / object</th><th>Value</th></tr>
+      <tr><td>reference projectId() / id() / revision()</td><td>$!esc.html("$cRefP") / $!esc.html("$cRefI") / $!esc.html("$cRefR")</td></tr>
+      <tr><td>reference.get(transaction) class</td><td>$!esc.html($colObjCls)</td></tr>
+      <tr><td>fields().name().get()</td><td>$!esc.html("$colName")</td></tr>
+      #if($colOld)
+        #set($oName = "")
+        #set($oName = $colOld.getName())
+        #set($oId = "")
+        #set($oId = $colOld.getId())
+        #set($oProj = "")
+        #set($oProj = $colOld.getProjectId())
+        #set($oRev = "")
+        #set($oRev = $colOld.getRevision())
+        #set($oFrozen = "")
+        #set($oFrozen = $colOld.isFrozen())
+        #set($oClosed = "")
+        #set($oClosed = $colOld.isClosed())
+        <tr><td>Open API collection (from the #if($colFromMgr)collections manager#else reference#end) class</td><td>$!esc.html($colOld.getClass().getName())</td></tr>
+        <tr><td>getId() / getName() / getProjectId() / getRevision()</td><td>$!esc.html("$oId") / $!esc.html("$oName") / $!esc.html("$oProj") / $!esc.html("$oRev")</td></tr>
+        <tr><td>isFrozen() / isClosed()</td><td>$!esc.html("$oFrozen") / $!esc.html("$oClosed")</td></tr>
+      #else
+        <tr><td>Open API collection</td><td class="ko">not found</td></tr>
+      #end
+    </table>
+    #if($colOld)
+      <p>Elements (Open API getElements(), first $maxRows):</p>
+      <table>
+        <tr><th>#</th><th>element class</th><th>getRevision()</th><th>getObjectWithRevision(): class | project/space/name | getRevision()</th><th>getObject(): getRevision()</th></tr>
+        #set($n = 0)
+        #foreach($el in $colOld.getElements())
+          #set($n = $n + 1)
+          #if($n <= $maxRows)
+            #set($eRev = "")
+            #set($eRev = $el.getRevision())
+            #set($eo = false)
+            #set($eo = $el.getObjectWithRevision())
+            #set($eoCls = "")
+            #if($eo)
+              #set($eoCls = $eo.getClass().getName())
+            #end
+            #ccsKey($eo)
+            #set($eoKey = $ccsKeyOut)
+            #set($eoRev = $ccsKeyRev)
+            #set($eh = false)
+            #set($eh = $el.getObject())
+            #ccsKey($eh)
+            <tr><td>$n</td><td>$!esc.html($el.getClass().getName())</td><td>$!esc.html("$eRev")</td><td>$!esc.html($eoCls) | $!esc.html($eoKey) | $!esc.html("$eoRev")</td><td>$!esc.html("$ccsKeyRev")</td></tr>
+          #end
+        #end
+      </table>
+      <p>$n element(s).</p>
+      #set($ups = false)
+      #set($ups = $colOld.getUpstreamCollections())
+      #if($ups)
+        <p>Upstream collections: #foreach($u in $ups)<code>$!esc.html("$u")</code> #end</p>
+      #end
+    #end
+  #else
+    <p>No collection context. Outside a collection this is expected; inside a collection report it as a finding. Select a
+    collection in the parameter "Collection" to run the other tests outside a collection (K6).</p>
+  #end
+
+## ================================================================ K9 page location
+## The PDF export has no collection context (K7, 2026-10-28): look for the collection in the page location.
+#elseif($test == "page")
+  #set($pRef = false)
+  #set($pRef = $page.getReference())
+  #set($pRefP = "")
+  #set($pRefS = "")
+  #set($pRefN = "")
+  #set($pRefI = "")
+  #set($pRefC = "")
+  #if($pRef)
+    #set($pRefP = $pRef.projectId())
+    #set($pRefS = $pRef.spaceId())
+    #set($pRefN = $pRef.name())
+    #set($pRefI = $pRef.id())
+    #set($pRefC = $pRef.getClass().getName())
+  #end
+  #set($pOld = false)
+  #set($pOld = $page.getOldApi())
+  #set($pOldCls = "")
+  #set($pOldUri = "")
+  #set($pOldName = "")
+  #set($pOldSpace = "")
+  #set($pOldLoc = "")
+  #if($pOld)
+    #set($pOldCls = $pOld.getClass().getName())
+    #set($pOldUri = $pOld.getUri())
+    #set($pOldName = $pOld.getPageName())
+    #set($pOldSpace = $pOld.getSpaceId())
+    #set($pOldLoc = $pOld.getLocation())
+  #end
+  #set($wcPage = false)
+  #set($wcPage = $widgetContext.page())
+  #set($wcPage = $widgetContext.getPage())
+  #set($wcDoc = false)
+  #set($wcDoc = $widgetContext.getDisplayedObject())
+  <table>
+    <tr><th>Item</th><th>Value</th></tr>
+    <tr><td>page class / as text</td><td>$!esc.html($page.getClass().getName()) / $!esc.html("$page")</td></tr>
+    <tr><td>page reference class / as text</td><td>$!esc.html($pRefC) / $!esc.html("$pRef")</td></tr>
+    <tr><td>reference projectId() / spaceId() / name() / id()</td><td>$!esc.html("$pRefP") / $!esc.html("$pRefS") / $!esc.html("$pRefN") / $!esc.html("$pRefI")</td></tr>
+    <tr><td>page getOldApi() class / as text</td><td>$!esc.html($pOldCls) / $!esc.html("$pOld")</td></tr>
+    <tr><td>getUri() / getLocation()</td><td>$!esc.html("$pOldUri") / $!esc.html("$pOldLoc")</td></tr>
+    <tr><td>getSpaceId() / getPageName()</td><td>$!esc.html("$pOldSpace") / $!esc.html("$pOldName")</td></tr>
+    <tr><td>widgetContext class</td><td>$!esc.html($widgetContext.getClass().getName())</td></tr>
+    <tr><td>widgetContext page() / getDisplayedObject()</td><td>$!esc.html("$wcPage") / $!esc.html("$wcDoc")</td></tr>
+    <tr><td>context: contextCollection()</td><td>$!esc.html("$ctxRef")</td></tr>
+  </table>
+  <p>Run this test in the browser view and in the PDF export of the page in the collection, and on a page outside the
+  collection. Does the page location contain the collection id?</p>
+
+#elseif(!$colRef)
+  <p class="ko">No collection: open the page in a collection, or select one in the parameter "Collection".</p>
+
+## ================================================================ K2 documents
+#elseif($test == "docs")
+  #set($sqlC = "select c_uri, c_col_rev from col_module")
+  <pre>$esc.html($sqlC)</pre>
+  #set($t0 = $date.systemTime)
+  #set($res = $transaction.objects().searchBySql($sqlC).collection($colRef))
+  #set($cnt = 0)
+  #foreach($d in $res)
+    #set($cnt = $cnt + 1)
+  #end
+  #set($t1 = $date.systemTime)
+  <p>Result class <code>$!esc.html($res.getClass().getName())</code>: <b>$cnt</b> document(s), start / end $t0 / $t1 ms.</p>
+  <table>
+    <tr><th>#</th><th>class</th><th>reference: project | id | revision</th><th>getOldApi(): class</th><th>key (project/space/name)</th><th>getRevision() / getDataRevision()</th><th>title</th><th>work items: getContainedWorkItems() / HEAD SQL</th><th>link in collection context (and its HTML)</th><th>link without collection context</th></tr>
+    #set($n = 0)
+    #foreach($d in $res)
+      #set($n = $n + 1)
+      #if($n <= $maxRows)
+        #ccsObj($d)
+        #ccsKey($ccsOld)
+        #set($title = "")
+        #set($cwi = "")
+        #set($headCnt = "")
+        #if($ccsOld)
+          #set($title = $ccsOld.getTitle())
+          #set($cwiList = false)
+          #set($cwiList = $ccsOld.getContainedWorkItems())
+          #if($cwiList)
+            #set($cwi = $cwiList.size())
+          #end
+          #ccsQuote()
+          #set($hSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${hp}' AND m.c_modulefolder = '${hf}' AND m.c_id = '${hn}'")
+          #set($headCnt = $ds.sqlSearch($hSql).size())
+        #end
+        #set($lnk = "")
+        #set($lnk = $d.render().withLinks().openLinksInCollectionContext($colRef))
+        #set($lnkS = "$lnk")
+        #set($lnk0 = "")
+        #set($lnk0 = $d.render().withLinks())
+        #set($lnk0S = "$lnk0")
+        <tr><td>$n</td><td>$!esc.html($ccsCls)</td><td>$!esc.html("$ccsRefP") | $!esc.html("$ccsRefI") | $!esc.html("$ccsRefR")</td><td>$!esc.html($ccsOldCls)</td><td>$!esc.html($ccsKeyOut)</td><td>$!esc.html("$ccsRev") / $!esc.html("$ccsDataRev")</td><td>$!esc.html("$title")</td><td>$cwi / $headCnt</td><td>$lnkS<br><code class="h">$!esc.html($lnkS)</code></td><td><code class="h">$!esc.html($lnk0S)</code></td></tr>
+      #end
+    #end
+  </table>
+
+## ================================================================ K3 items per document
+#elseif($test == "items" || $test == "itemsRel")
+  #set($typeFilterSql = "")
+  #set($headTypeSql = "")
+  #if($typeSql != "")
+    #set($typeFilterSql = " and w.c_type not in (${typeSql})")
+    #set($headTypeSql = " AND w.c_type NOT IN (${typeSql})")
+  #end
+  #set($res = $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+  #if($test == "items")
+    <p>Query per document: <code>select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module where m.c_modulefolder = ... and m.c_id = ...$!esc.html($typeFilterSql)</code></p>
+  #else
+    <p>Query per document: <code>select w.c_uri, w.c_col_rev from col_module m inner join col_rel_module_workitem r on r.fk_uri_module = m.c_uri inner join col_workitem w on w.c_uri = r.fk_uri_workitem where m.c_modulefolder = ... and m.c_id = ...$!esc.html($typeFilterSql)</code></p>
+  #end
+  <p>Documents with the same space and name in two projects of the collection are mixed (spike only).</p>
+  <table>
+    <tr><th>#</th><th>document (project/space/name) @ revision</th><th>items in collection</th><th>items HEAD</th><th>first items: id @ getRevision() (reference revision)</th><th>first item link in collection context</th><th>SQL start / end (ms)</th></tr>
+    #set($n = 0)
+    #foreach($d in $res)
+      #set($n = $n + 1)
+      #if($n <= $maxRows)
+        #ccsObj($d)
+        #ccsKey($ccsOld)
+        #set($dKey = $ccsKeyOut)
+        #set($dRev = $ccsKeyRev)
+        #ccsQuote()
+        #set($cond = "m.c_modulefolder = '${hf}' and m.c_id = '${hn}'")
+        #if($test == "items")
+          #set($iSql = "select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module where ${cond}${typeFilterSql}")
+        #else
+          #set($iSql = "select w.c_uri, w.c_col_rev from col_module m inner join col_rel_module_workitem r on r.fk_uri_module = m.c_uri inner join col_workitem w on w.c_uri = r.fk_uri_workitem where ${cond}${typeFilterSql}")
+        #end
+        #set($c0 = $date.systemTime)
+        #set($its = $transaction.objects().searchBySql($iSql).collection($colRef))
+        #set($ic = 0)
+        #set($first = "")
+        #set($firstLnk = "")
+        #foreach($w in $its)
+          #set($ic = $ic + 1)
+          #if($ic <= 5)
+            #ccsObj($w)
+            #set($wId = "")
+            #if($ccsOld)
+              #set($wId = $ccsOld.getId())
+            #end
+            #set($first = "${first}${wId} @ ${ccsRev} (${ccsRefR}); ")
+            #if($ic == 1)
+              #set($fl = "")
+              #set($fl = $w.render().withLinks().openLinksInCollectionContext($colRef))
+              #set($firstLnk = "$fl")
+            #end
+          #end
+        #end
+        #set($c1 = $date.systemTime)
+        #set($hSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${hp}' AND ${cond}${headTypeSql}")
+        #set($headCnt = $ds.sqlSearch($hSql).size())
+        <tr><td>$n</td><td>$!esc.html($dKey) @ $!esc.html("$dRev")</td><td>$ic</td><td>$headCnt</td><td>$!esc.html($first)</td><td>$firstLnk<br><code class="h">$!esc.html($firstLnk)</code></td><td>$c0 / $c1</td></tr>
+      #end
+    #end
+  </table>
+
+## ================================================================ K4 links
+#elseif($test == "links" && $roleIds.size() == 0)
+  <p class="ko">Select at least one link role in the parameter "Link roles".</p>
+#elseif($test == "links")
+  #set($from = "from col_struct_workitem_linkedworkitems l inner join col_workitem ws on ws.c_uri = l.fk_uri_p_workitem inner join col_workitem wt on wt.c_uri = l.fk_uri_workitem inner join col_module ms on ms.c_uri = ws.fk_uri_module inner join col_module mt on mt.c_uri = wt.fk_uri_module where l.c_role in (${roleSql}) and ms.c_uri <> mt.c_uri")
+  #set($srcSql = "select distinct ws.c_uri, ws.c_col_rev ${from}")
+  #set($tgtSql = "select distinct wt.c_uri, wt.c_col_rev ${from}")
+  <pre>$esc.html($srcSql)</pre>
+  <pre>$esc.html($tgtSql)</pre>
+  #set($t0 = $date.systemTime)
+  ## Targets: work item (project/id) -> document key of the collection revision.
+  #set($tgtDoc = $objectFactory.newMap())
+  #foreach($w in $transaction.objects().searchBySql($tgtSql).collection($colRef))
+    #ccsObj($w)
+    #if($ccsOld)
+      #set($tm = false)
+      #set($tm = $ccsOld.getModule())
+      #ccsKey($tm)
+      #set($tP = $ccsOld.getProjectId())
+      #set($tI = $ccsOld.getId())
+      #set($void = $tgtDoc.put("${tP}/${tI}", $ccsKeyOut))
+    #end
+  #end
+  #set($t1 = $date.systemTime)
+  #set($srcs = $transaction.objects().searchBySql($srcSql).collection($colRef))
+  #set($pairs = $objectFactory.newMap())
+  #set($rows = [])
+  #set($nSrc = 0)
+  #set($noOld = 0)
+  #set($notInCol = 0)
+  #set($headDiff = 0)
+  #set($linksUsed = 0)
+  #foreach($w in $srcs)
+    #set($nSrc = $nSrc + 1)
+    #ccsObj($w)
+    #if(!$ccsOld)
+      #set($noOld = $noOld + 1)
+    #else
+      #set($sm = false)
+      #set($sm = $ccsOld.getModule())
+      #ccsKey($sm)
+      #set($srcKey = $ccsKeyOut)
+      #set($srcId = $ccsOld.getId())
+      #set($row = "${srcId} @ ${ccsRev} in ${srcKey} @ ${ccsKeyRev}:")
+      #foreach($ls in $ccsOld.getLinkedWorkItemsStructsDirect())
+        #set($role = "")
+        #set($role = $ls.getLinkRole().getId())
+        #if($roleIds.contains("$role"))
+          #set($tgt = false)
+          #set($tgt = $ls.getLinkedItem())
+          #set($tUr = "unknown")
+          #if($tgt)
+            #set($tUr = $tgt.isUnresolvable())
+          #end
+          #if("$tUr" == "false")
+            #set($tP = $tgt.getProjectId())
+            #set($tI = $tgt.getId())
+            #set($tId = "${tP}/${tI}")
+            #set($lRev = "")
+            #set($lRev = $ls.getRevision())
+            #set($tHead = false)
+            #set($tHead = $tgt.getModule())
+            #ccsKey($tHead)
+            #set($tHeadKey = $ccsKeyOut)
+            #set($tKey = "")
+            #if($tgtDoc.containsKey($tId))
+              #set($tKey = $tgtDoc.get($tId))
+              #if($tKey != $tHeadKey)
+                #set($headDiff = $headDiff + 1)
+              #end
+            #else
+              #set($notInCol = $notInCol + 1)
+            #end
+            #set($row = "${row} ${role} &gt; ${tId} (link revision ${lRev}, doc ${tKey}, HEAD doc ${tHeadKey});")
+            #if($tKey != "" && $tKey != $srcKey)
+              #set($linksUsed = $linksUsed + 1)
+              #set($pk = "${tKey} | ${role} | ${srcKey}")
+              #set($pc = 0)
+              #if($pairs.containsKey($pk))
+                #set($pc = $pairs.get($pk))
+              #end
+              #set($pc = $pc + 1)
+              #set($void = $pairs.put($pk, $pc))
+            #end
+          #end
+        #end
+      #end
+      #if($rows.size() < $maxRows)
+        #set($void = $rows.add($row))
+      #end
+    #end
+  #end
+  #set($t2 = $date.systemTime)
+  <table>
+    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>Target items found by SQL (distinct)</td><td>$tgtDoc.size()</td></tr>
+    <tr><td>Source items found by SQL</td><td>$nSrc</td></tr>
+    <tr><td>Source items without getOldApi()</td><td>$noOld</td></tr>
+    <tr><td>Links counted (selected roles, target in another document of the collection)</td><td>$linksUsed</td></tr>
+    <tr><td>Links whose target is not among the SQL targets</td><td>$notInCol</td></tr>
+    <tr><td>Links whose target document differs between the collection and HEAD</td><td>$headDiff</td></tr>
+    <tr><td>Start / targets end / scan end (ms)</td><td>$t0 / $t1 / $t2</td></tr>
+  </table>
+  <table>
+    <tr><th>Target document | role | source document</th><th>Links</th></tr>
+    #foreach($k in $pairs.keySet())
+      <tr><td>$!esc.html($k)</td><td>$pairs.get($k)</td></tr>
+    #end
+  </table>
+  <p>Source items (first $maxRows): id @ revision in document @ revision, then the links read from getOldApi().getLinkedWorkItemsStructsDirect().</p>
+  <table>
+    #foreach($r in $rows)
+      <tr><td>$r</td></tr>
+    #end
+  </table>
+  ## HEAD for comparison: links between the same documents at HEAD (Open API, what docCoverage 0.2.1 reads), and
+  ## HEAD links from documents outside the collection into it.
+  #set($colKeys = [])
+  #set($colProj = [])
+  #foreach($d in $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+    #ccsObj($d)
+    #ccsKey($ccsOld)
+    #if($ccsKeyOut != "" && !$colKeys.contains($ccsKeyOut))
+      #set($void = $colKeys.add($ccsKeyOut))
+      #set($kpS = "$ccsKp")
+      #if($kpS.matches("[A-Za-z0-9_.-]+") && !$colProj.contains($kpS))
+        #set($void = $colProj.add($kpS))
+      #end
+    #end
+  #end
+  #set($projSql = "")
+  #foreach($pp in $colProj)
+    #if($projSql != "")
+      #set($projSql = "${projSql},")
+    #end
+    #set($projSql = "${projSql}'${pp}'")
+  #end
+  #set($headPairs = $objectFactory.newMap())
+  #set($headRows = [])
+  #set($headOutside = 0)
+  #set($outsideRows = [])
+  #if($projSql != "")
+    #set($headSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id IN (${projSql}) AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri")
+    <p>HEAD for comparison (projects of the collection, all link sources of these roles):</p>
+    <pre>$esc.html($headSql)</pre>
+    #set($h0 = $date.systemTime)
+    #foreach($w in $ds.sqlSearch($headSql))
+      #set($sm = false)
+      #set($sm = $w.getModule())
+      #ccsKey($sm)
+      #set($srcKey = $ccsKeyOut)
+      #set($srcId = $w.getId())
+      #foreach($ls in $w.getLinkedWorkItemsStructsDirect())
+        #set($role = "")
+        #set($role = $ls.getLinkRole().getId())
+        #if($roleIds.contains("$role"))
+          #set($tgt = false)
+          #set($tgt = $ls.getLinkedItem())
+          #set($tUr = "unknown")
+          #if($tgt)
+            #set($tUr = $tgt.isUnresolvable())
+          #end
+          #if("$tUr" == "false")
+            #set($tm = false)
+            #set($tm = $tgt.getModule())
+            #ccsKey($tm)
+            #set($tKey = $ccsKeyOut)
+            #set($tI = $tgt.getId())
+            #if($colKeys.contains($tKey) && $tKey != $srcKey)
+              #if($colKeys.contains($srcKey))
+                #set($pk = "${tKey} | ${role} | ${srcKey}")
+                #set($pc = 0)
+                #if($headPairs.containsKey($pk))
+                  #set($pc = $headPairs.get($pk))
+                #end
+                #set($pc = $pc + 1)
+                #set($void = $headPairs.put($pk, $pc))
+                #if($headRows.size() < $maxRows)
+                  #set($void = $headRows.add("${srcId} ${role} &gt; ${tI}"))
+                #end
+              #else
+                #set($headOutside = $headOutside + 1)
+                #if($outsideRows.size() < $maxRows)
+                  #set($void = $outsideRows.add("${srcId} in ${srcKey} ${role} &gt; ${tI}"))
+                #end
+              #end
+            #end
+          #end
+        #end
+      #end
+    #end
+    #set($h1 = $date.systemTime)
+    <table>
+      <tr><th>HEAD: target document | role | source document</th><th>Links</th></tr>
+      #foreach($k in $headPairs.keySet())
+        <tr><td>$!esc.html($k)</td><td>$headPairs.get($k)</td></tr>
+      #end
+    </table>
+    <p>HEAD links between the collection documents: #foreach($r in $headRows)$r; #end</p>
+    <p>HEAD links from documents outside the collection into it: <b>$headOutside</b>. #foreach($r in $outsideRows)$r; #end</p>
+    <p>HEAD start / end (ms): $h0 / $h1</p>
+  #end
+
+## ================================================================ K8 custom SQL
+#elseif($test == "sql")
+  <pre>$!esc.html($customSql)</pre>
+  #set($t0 = $date.systemTime)
+  #set($res = $transaction.objects().searchBySql($customSql).collection($colRef))
+  <table>
+    <tr><th>#</th><th>class</th><th>reference: project | id | revision</th><th>getOldApi()</th><th>getRevision()</th></tr>
+    #set($n = 0)
+    #foreach($o in $res)
+      #set($n = $n + 1)
+      #if($n <= $maxRows)
+        #ccsObj($o)
+        <tr><td>$n</td><td>$!esc.html($ccsCls)</td><td>$!esc.html("$ccsRefP") | $!esc.html("$ccsRefI") | $!esc.html("$ccsRefR")</td><td>$!esc.html("$ccsOld")</td><td>$!esc.html("$ccsRev")</td></tr>
+      #end
+    #end
+  </table>
+  #set($t1 = $date.systemTime)
+  <p><b>$n</b> row(s), start / end $t0 / $t1 ms.</p>
+#else
+  <p class="ko">Unknown test "$!esc.html($test)".</p>
+#end
+</div>

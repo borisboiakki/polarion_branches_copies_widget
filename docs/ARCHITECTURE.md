@@ -72,10 +72,10 @@ Both templates follow the same sequence. The shared snippets are shown in **bold
 |---|---|---|
 | CSS | **style.vm** (classes `bw-*`, used by both widgets) | same |
 | Common parameters | **params.vm**: projects and excluded types (selector values), spaces, documents shown, item counts, extra fields, height | same |
-| Own parameters | copy / branch / derived link role selectors, relation kinds shown, indirect relations, threshold | document selector, documents of other projects (text `project/space/document`), link role selector (1–5), limits (`maxRoles`, `uncCap` = 500, 30 samples per pair) |
+| Own parameters | copy / branch / derived link role selectors, relation kinds shown, indirect relations, threshold | collection context (`$colRef` from `$transaction.context().contextCollection()`, else the `@collection` parameter; mode ignore = none; `$colText`, `$colKey`), document selector, documents of other projects (text `project/space/document`), link role selector (1–5), limits (`maxRoles`, `uncCap` = 500, 30 samples per pair) |
 | Lists and projects | **common.vm**: macros `bwOptionIds` (enumeration selector → ids), `bwKey` (module → `project/space/name` and `$bwKeyProject`, guarded by `isUnresolvable()`) and `bwDocLabel` (table label, project prefix when several projects), `$excludedTypes`, `$typeSql`, `$spaceFilter`, `$projectId` (current project), `$projectIds` / `$projectSql` / `$projectsStr` (scope), `$multiProject`, `$scopeText`, `$scopeWarn`, `$isStatic` | same; additionally the selected documents → `$docOnly` keys, role names from `getWorkItemLinkRoleEnum()` of the current project |
-| Documents | **documents.vm**: one SQL query for the modules of the projects in scope, then one count query per document. Builds `$docList` / `$docByKey` maps (key, project, id, title, space, type, status, dates, `items`, `itemObjs`, `module`) | same; `$docOnly` limits the documents of the current project (the `@document` selector lists that project only), `$docOther` the documents of the other projects (text parameter "Documents of other projects", parsed in render.vm) |
-| Relations | (1) SQL: link-source items with a configured role whose target is in another document of a project in scope (cross-project links count). Velocity scans `getLinkedWorkItemsStructsDirect()`. Macro `bwEdge` groups by pair `orig>copy` and kind. (2) Document metadata `branchedFrom` / `derivedFrom`. (3) Threshold. (4) Transitive reduction: an edge is *indirect* when S>M>T exists | SQL: link-source items of the selected documents and roles, with the target in another selected document. Macro `cwEdge` groups by pair `up>down`: links per role, upstream items covered, downstream items with links |
+| Documents | **documents.vm**: one SQL query for the modules of the projects in scope, then one count query per document. Builds `$docList` / `$docByKey` maps (key, project, id, title, space, type, status, dates, `rev`, `items`, `itemObjs`, `module`; macro `bwDocMap`). When `$colRef` is set: `$transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef)` (documents of the collection and its upstream collections, `getOldApi()` = module at the collection revision, `rev` = that revision or `HEAD`), and one `col_workitem` query for all their items, grouped by `getModule()` | same (docBranches does not set `$colRef` yet); `$docOnly` limits the documents of the current project (the `@document` selector lists that project only), `$docOther` the documents of the other projects (text parameter "Documents of other projects", parsed in render.vm) |
+| Relations | (1) SQL: link-source items with a configured role whose target is in another document of a project in scope (cross-project links count). Velocity scans `getLinkedWorkItemsStructsDirect()`. Macro `bwEdge` groups by pair `orig>copy` and kind. (2) Document metadata `branchedFrom` / `derivedFrom`. (3) Threshold. (4) Transitive reduction: an edge is *indirect* when S>M>T exists | SQL: link-source items of the selected documents and roles, with the target in another selected document. In a collection: link sources and targets from `col_struct_workitem_linkedworkitems` (pinned revisions); the target's document comes from the target query (`project/id` → key), not from the current item. Macro `cwEdge` groups by pair `up>down`: links per role, upstream items covered, downstream items with links |
 | Computation | — | Coverage per upstream document: its counted items (`itemObjs`) against the items covered by any downstream document. The uncovered list is capped at `uncCap`; the full count is always kept |
 | Output | `#if($isStatic)`: static SVG + table. Otherwise: page model + script | same |
 
@@ -99,9 +99,9 @@ root holds a visible scope line (`Project: X` / `Projects: A, B`) and, if any, t
 |---|---|
 | root (both) | `data-project` (current project: fallback for links, file names), `data-projects` (scope, `A,B`), `data-mode` (`related`/`all`), `data-counts` (1/0), `data-extras` (`type,status,…`), `data-height`, `data-version` |
 | root, docBranches | `data-indirect`, `data-rel` (kinds shown by default) |
-| root, docCoverage | `data-roles` (`id|name;id|name`), `data-warn` |
+| root, docCoverage | `data-roles` (`id|name;id|name`), `data-warn`, `data-col` (collection `project/id`, empty outside a collection: links open in the collection) |
 | `bw-n` (both) | `data-k` (key `project/space/name`), `data-p` (project: links open in it), `data-id`, `data-title`, `data-space`, `data-type`, `data-status`, `data-created`, `data-updated`, `data-items` |
-| `bw-n`, docCoverage | `data-up` (is upstream), `data-cov`, `data-unc-n` (full count), `data-unc` (first 500 ids) |
+| `bw-n`, docCoverage | `data-rev` (collection revision, `HEAD` when none is pinned, empty outside a collection), `data-up` (is upstream), `data-cov`, `data-unc-n` (full count), `data-unc` (first 500 ids) |
 | `bw-e` (both) | `data-o`, `data-c`, `data-s` (samples `c|o|k;…`, at most 30) |
 | `bw-e`, docBranches | `data-kc`/`kb`/`kd` (items per kind), `data-mb`/`md` (metadata branch/derived), `data-oi`, `data-ci`, `data-n`, `data-ind` |
 | `bw-e`, docCoverage | `data-r` (`role:links;…`), `data-u` / `data-d` (`role:id id;…`: upstream items covered / downstream items with links) |
@@ -111,8 +111,11 @@ If you add a field, change both sides (render.vm output and `readModel` in graph
 ## 4. Client side: `core.js` + `graph.js`
 
 `shared/js/core.js` contains everything that does not depend on the widget:
-- **helpers**: `el`, `svg`, `toInt`, `pct`, `docUrl(node)` (in `node.project`), `itemUrl(project, id)` (the project of
-  the item's document: sample items take it from the edge's documents), `docSortKey`, `download`;
+- **helpers**: `el`, `svg`, `toInt`, `pct`, `docUrl(node)` (in `node.project`), `itemUrl(project, id, col)` (the project of
+  the item's document: sample items take it from the edge's documents); with a collection (`node.col` from root
+  `data-col`) both open in the collection: `…/project/P/collection/ID/…`, or `…/project/P/collection/CP//ID/…` for a
+  project other than the collection's (formats rendered by Polarion 2512); `docLabel` / box add `(HEAD)` when
+  `node.rev` is `HEAD`, `docSortKey`, `download`;
 - **model helpers**: `readNodes`, `parseSamples`, `restrictEdge`, `relFromData`, `kindsLabel`;
 - **`layout(model, state, edges)`**: a layered layout. Origin/upstream documents go on the left, using the longest
   path. Barycentre ordering reduces crossings. Documents without an edge go in a grid when `state.mode === 'all'`.

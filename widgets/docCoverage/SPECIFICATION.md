@@ -56,6 +56,7 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 | F14 | Chains (customer spec ← system reqs ← software reqs) are shown as layers; **no transitive reduction** (each link is a real relation) | Must |
 | F15 | Work item type filter for upstream items counted for coverage (e.g. only `customerRequirement`) | Could |
 | F16 | **Projects** parameter (`@project` multi-selector, 0.2.0), as docBranches F16: documents of the selected projects (none = current project); links between documents of two selected projects count. The `@document` selector lists the current project only, so the document selection limits the current project; the other selected projects keep all their documents (PO). Warning when documents are selected but the current project is not in scope. 0.2.1: text parameter **Documents of other projects** (`project/space/document`, comma separated, `project/document` = default space) limits the documents of the other selected projects; entries of the current project are added to the selection; bad / unselected / not found entries are reported (PO) | Should (done) |
+| F17 | **Collection context** (0.3.0): when the LiveReport is opened in a **collection**, the documents analysed are the documents of the collection at the revision the collection pins (items, links and coverage of that revision). The Projects, Documents and Documents-of-other-projects parameters are then ignored; the Spaces filter and the excluded types still apply. A parameter "Collection context" (use / ignore, default use) switches it off. A parameter **Collection** (`@collection`) is used when the page has no collection context: Polarion PDF export (which has none, spike K7/K9) or a report outside the collection pinned to it. **Upstream collections** are included (as Polarion's collection SQL does), each document at its pinned revision. A document added without a pinned revision is read at HEAD and **marked "HEAD"** (box, table, Excel revision column). The scope line shows the collection. Outside a collection: unchanged (PO, 2026-10-28). Spike K1–K9 done (`tests/docCoverage-v0.3.x/`) | Should (done) |
 
 ## 5. Non-functional requirements
 
@@ -97,6 +98,15 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 4. Should a document that is both upstream and downstream (middle of a chain) show its coverage %? Default: yes, for
    the links where it is the target.
 
+### Future improvement: Spaces selector (logged 2026-10-28, PO)
+
+"Spaces to include" stays a text parameter (comma separated). A selector, as for link roles and types, is not available
+out of the box: Polarion 2512 has no dynamic `@space` enumeration (guide §10.2). Possible approach: a `customEnum` built
+in `parameters.vm` from the spaces of the current project's documents (`sqlSearch` on `module` + `getModuleFolder()`),
+read with `bwOptionIds`. To verify first with a mini spike: whether `parameters.vm` can query Polarion (`$trackerService`,
+`$page`). The list would cover the current project only (like `@document`), so a text field for the spaces of the other
+projects would stay.
+
 ## 8. Spike (C1–C4) — see `tests/docCoverage-v0.1.x/spike-tests.md`
 
 | Test | Question | Result |
@@ -105,6 +115,17 @@ Same as docBranches (Velocity + inlined `shared/js/core.js` + widget `graph.js`;
 | C2 | How are the selected link roles read (id, name), and which roles does the project have (id, name, opposite name)? | ✅ `id()` = role id; project roles readable with name and opposite name |
 | C3 | Link direction of the coverage roles, link scan between the selected documents, timing on the large project | ✅ `satisfies` stored on the downstream item, target = customer spec; SQL with source + target document filter works; 3–4 ms SQL, ≤ 1 ms scan (small set). Large project not measured; PO: no performance concern |
 | C4 | Counted items per upstream document, coverage % and uncovered items, timing | ✅ 6 counted items (heading excluded), 5 covered = 83 %, 1 uncovered listed; ≤ 1 ms |
+
+## 8b. Spike K1–K8 (collection context) — see `tests/docCoverage-v0.3.x/spike-tests.md`
+
+| Test | Question | Result |
+|---|---|---|
+| K1 | Is `$transaction.context().contextCollection()` set in a page opened in a collection (null outside, PDF too)? Collection name and revision for the scope line | ✅ Browser view: `BaselineCollectionReference` (project, id); name via `get($transaction).fields().name().get()` or `getOldApi().getName()`; elements with pinned revisions. Null outside |
+| K2 | Does `searchBySql("select c_uri, c_col_rev from col_module").collection(ref)` return the collection documents at their revision (`getOldApi()`)? Link format with `openLinksInCollectionContext` | ✅ Yes, `Module` at the pinned revision; link `#/project/<p>/collection/<id>/wiki/<space>/<doc>` |
+| K3 | Which collection query gives the items of a document at its pinned revision (`col_workitem` by `fk_uri_module`, or `col_rel_module_workitem`)? Timing | ✅ Both work, same counts, 2–3 ms; item link `#/project/<p>/collection/<id>/workitem?id=<id>`. Round 2: collection 6 vs. HEAD 8 items after HEAD changed → pinned revision read ✅ |
+| K4 | Does `col_struct_workitem_linkedworkitems` give the links of the pinned revision, and does `getOldApi().getLinkedWorkItemsStructsDirect()` of a collection item return the links of that revision? | ✅ Query and link reading work (≈9 ms). Round 3 ✅ links of the pinned revision (collection 2 links vs. HEAD 3, removed link still counted in the collection), links from documents outside the collection ignored |
+| K6–K8 | Explicit collection reference (parameter), PDF export, custom SQL | K6 ✅ `@collection` parameter gives the same reference. **K7 ❌ no context in the Polarion PDF export** (only the parameter works); the browser's print to PDF keeps it. K8 ✅ |
+| K9 | Where is a page of a collection stored (can the PDF export find its collection)? | Ordinary rich page, no collection id in its location: the context comes from the URL used to open it. The Polarion PDF export needs the explicit "Collection" parameter |
 
 ## 9. Open checks for 0.1.0 on 2512
 
@@ -127,6 +148,17 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
    0.2.0: Projects parameter, as docBranches §10.2 k; in addition: a downstream document of another project counts in
    the coverage of an upstream document of the current project, and the document selection still limits the current
    project.
+
+i. ✅ (PO, 2026-10-28: everything works as expected) 0.3.0 collection context (F17), checked on 2512 with the spike collection (2 pinned documents, upstream collection,
+   document of another project without revision):
+   - page opened in the collection: scope line "Collection: … (with upstream: …)", only the collection documents (also
+     those of the upstream collection), counts of the pinned revisions (same as K3/K4: e.g. 6 items, 2 `refines` links),
+     the other-project document marked (HEAD); the Projects / Documents parameters reported as not used;
+   - links of boxes, tables, details and Excel open in the collection, including the other-project document (format
+     `…/collection/<collection project>//<id>/…`, seen for items only in the spike);
+   - Polarion PDF export with the parameter "Collection" set: same numbers; without it: current documents;
+   - "Collection context" = Ignore: current documents; the same page outside the collection: unchanged (0.2.1 behaviour);
+   - rendering time with a large collection; a collection opened at an older revision or baseline.
 
 ## 10. Decision log
 
@@ -151,3 +183,12 @@ h. ✅ (PO, 2026-10-28) Project selector works; with no document selected, data 
 | 2026-10-28 | PO test of 0.2.0 on 2512: project selector and multi-project data OK, rendering time good. The document selector lists the current project only (Polarion `@document` limitation, guide §10.2; expected, F16) | PO |
 | 2026-10-28 | Widget 0.2.1: text parameter "Documents of other projects" (`project/space/document`, comma separated), since the `@document` selector cannot list other projects (PO: keep the capability even if less comfortable). Shared `documents.vm` gets `docOther` (docBranches 0.4.1, no functional change). To check on 2512 | PO |
 | 2026-10-28 | PO test of 0.2.1 on 2512: "Documents of other projects" works with a valid project/space/document, the not-found warning is shown. Ready for release | PO |
+| 2026-10-28 | Collection context (F17) requested for docCoverage first (docBranches may follow). The collection replaces the Projects / Documents parameters; a parameter can ignore the context (default: use it); spike K1–K8 before the implementation (0.3.0) | PO |
+| 2026-10-28 | Spike round 1 on 2512 (collection with 2 documents, role `refines`): context, collection SQL, items, links and collection links work; the PDF export has **no** collection context (K7). Round 2: HEAD changed after pinning, a document outside the collection, K9 page location | PO tests |
+| 2026-10-28 | Spike round 2: items are read at the pinned revision (collection 6 vs. HEAD 8); Polarion PDF export confirmed without context, browser print to PDF keeps it. Round 3: K4 with HEAD comparison, K9 | PO tests |
+| 2026-10-28 | Spike round 3: links read at the pinned revision; documents outside the collection ignored; the page location has no collection id (K9). **Spike concluded**: 0.3.0 can be built. Proposal to confirm: besides "Collection context" (use / ignore), a "Collection" parameter (`@collection`) used when the page has no context, needed for the Polarion PDF export | PO tests |
+| 2026-10-28 | Extra spike round: documents of **upstream collections** are included by the collection SQL (at their pinned revisions); a document of another project added without a pinned revision comes at HEAD; links of other-project items carry the collection project (`#/project/<p>/collection/<collection project>//<id>/…`). Design for 0.3.0: one collection query for all items, grouped by document in Velocity (no space/name mix-up between projects); document and item links taken from Polarion rendering where possible | PO tests |
+| 2026-10-28 | 0.3.0 decisions: add the parameter "Collection" (used when the page has no context, e.g. Polarion PDF export); include upstream collections; mark documents without a pinned revision "HEAD" | PO |
+| 2026-10-28 | Widget 0.3.0: collection context (F17). Parameters "Collection context" and "Collection"; shared `documents.vm` reads the collection documents (and their items in one query) when `$colRef` is set; links from the collection tables; client links open in the collection; `(HEAD)` mark and Excel revision column. docBranches 0.4.2 = shared code only (no functional change). Open check §9 i | Implementation |
+| 2026-10-28 | PO test of 0.3.0 on 2512: collection context works as expected. Ready for release | PO |
+| 2026-10-28 | "Spaces to include" stays a text parameter; a spaces selector is logged as a future improvement (no `@space` enumeration in 2512) | PO |

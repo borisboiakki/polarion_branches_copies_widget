@@ -20,6 +20,8 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
 |---|---|---|
 | Projects | none = current project | Projects analysed (project selector, several allowed). Links between documents of two selected projects count |
 | Documents of the current project | none = all documents | The LiveDocs of the current project to analyse (the selector lists the current project only, Polarion limitation) |
+| Collection context | Use | Use: on a page opened in a collection, the documents of the collection and of its upstream collections at their collection revisions (Projects and document parameters not used). Ignore: current documents |
+| Collection | none | `@collection` selector, used when the page has no collection context: Polarion PDF export, or a page outside the collection |
 | Documents of other projects | empty = all | Text, comma separated: `project/space/document` (or `project/document` for the default space). When filled, only the listed documents of the other selected projects are analysed; entries of the current project are added to the selection. Bad, unknown or unselected entries are reported |
 | Link roles (1 to 5) | none | The link roles that count as coverage, e.g. `satisfies`, `verifies`. More than 5: the first 5 are used |
 | Work item types not counted | Heading | Selector of the project's work item types (none = all types counted). Not counted in the coverage, and links to them are ignored |
