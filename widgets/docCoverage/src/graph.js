@@ -139,9 +139,9 @@
     all.style.fontWeight = '600';
     var boxes = [];
     this.model.nodes.slice().sort(function (a, b) {
-      return (a.space + '/' + a.id).localeCompare(b.space + '/' + b.id);
+      return docSortKey(a).localeCompare(docSortKey(b));
     }).forEach(function (n) {
-      var lab = self.checkbox(panel, n.space + ' / ' + n.id, true, function (on) {
+      var lab = self.checkbox(panel, self.docLabel(n), true, function (on) {
         if (on) { delete self.state.hidden[n.key]; } else { self.state.hidden[n.key] = true; }
         update();
       });
@@ -257,7 +257,7 @@
     var self = this;
     this.detailDoc = n;
     var box = this.openDetails(n, null);
-    el('div', null, box, n.title + ' ' + DASH + ' ' + n.space);
+    el('div', null, box, n.title + ' ' + DASH + ' ' + (this.multi ? n.project + ' / ' : '') + n.space);
     var c = this.coverage(n);
     if (!c) {
       el('div', { 'class': 'bw-muted' }, box, 'No shown link points to this document (not upstream).');
@@ -267,7 +267,7 @@
         el('div', { 'class': 'bw-muted' }, box, 'Uncovered items:');
         var ul = el('ul', { 'class': 'bw-items' }, box);
         c.uncovered.forEach(function (id) {
-          el('a', { href: itemUrl(self.project, id), target: '_top' }, el('li', null, ul), id);
+          el('a', { href: itemUrl(n.project, id), target: '_top' }, el('li', null, ul), id);
         });
         if (c.uncoveredN > c.uncovered.length) {
           el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (c.uncoveredN - c.uncovered.length) + ' more');
@@ -291,9 +291,9 @@
       var o = self.model.byKey[e.o];
       var c = self.model.byKey[e.c];
       return [
-        { text: c.space + ' / ' + c.id, href: docUrl(self.project, c) },
+        { text: self.docLabel(c), href: docUrl(c) },
         kindsLabel(e, self.cats),
-        { text: o.space + ' / ' + o.id, href: docUrl(self.project, o) },
+        { text: self.docLabel(o), href: docUrl(o) },
         covText({ covered: size(e.downSet), total: c.items }),
         covText({ covered: size(e.upSet), total: o.items })
       ];
@@ -301,7 +301,7 @@
     this.htmlTable(['Downstream', 'Roles (links)', 'Upstream', 'Downstream items with links', 'Upstream items covered'], rows, 'No relation found.');
     var cov = this.shownDocs().filter(function (n) { return n.up; }).map(function (n) {
       var c = self.coverage(n);
-      return [{ text: n.space + ' / ' + n.id, href: docUrl(self.project, n) }, String(n.items), covText(c), String(c.uncoveredN)];
+      return [{ text: self.docLabel(n), href: docUrl(n) }, String(n.items), covText(c), String(c.uncoveredN)];
     });
     if (cov.length) {
       this.htmlTable(['Upstream document', 'Work items', 'Coverage', 'Uncovered items'], cov, '');
@@ -315,8 +315,8 @@
     var by = this.model.byKey;
     var cats = this.cats;
     var edges = this.sortedEdges();
-    var rel = [['Downstream space', 'Downstream document', 'Downstream title', 'Roles',
-      'Upstream space', 'Upstream document', 'Upstream title']
+    var rel = [['Downstream project', 'Downstream space', 'Downstream document', 'Downstream title', 'Roles',
+      'Upstream project', 'Upstream space', 'Upstream document', 'Upstream title']
       .concat(cats.map(function (c) { return c.name + ' links'; }))
       .concat(['Links', 'Downstream items with links', 'Downstream work items', 'Downstream with links (%)',
         'Upstream items covered', 'Upstream work items', 'Upstream covered (%)'])];
@@ -326,31 +326,31 @@
       var c = by[e.c];
       var pd = pct(size(e.downSet), c.items);
       var pu = pct(size(e.upSet), o.items);
-      rel.push([c.space, c.id, c.title, kindsLabel(e, cats), o.space, o.id, o.title]
+      rel.push([c.project, c.space, c.id, c.title, kindsLabel(e, cats), o.project, o.space, o.id, o.title]
         .concat(cats.map(function (k) { return e.kinds[k.id]; }))
         .concat([e.links, size(e.downSet), c.items < 0 ? '' : c.items, pd === null ? '' : pd,
           size(e.upSet), o.items < 0 ? '' : o.items, pu === null ? '' : pu]));
-      relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, c)) });
-      relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, o)) });
+      relLinks.push({ r: i + 1, c: 2, url: absUrl(docUrl(c)) });
+      relLinks.push({ r: i + 1, c: 7, url: absUrl(docUrl(o)) });
     });
-    var docs = [['Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
+    var docs = [['Project', 'Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
       'Upstream', 'Covered items', 'Coverage (%)', 'Uncovered items']];
     var shown = this.shownDocs();
     shown.forEach(function (n) {
       var c = self.coverage(n);
       var p = c ? pct(c.covered, c.total) : null;
-      docs.push([n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
+      docs.push([n.project, n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
         n.up ? 'yes' : 'no', c ? c.covered : '', p === null ? '' : p, c ? c.uncoveredN : '']);
     });
-    var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
+    var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 2, url: absUrl(docUrl(n)) }; });
     var unc = [['Upstream document', 'Uncovered item']];
     var uncLinks = [];
     shown.forEach(function (n) {
       var c = self.coverage(n);
       if (!c) { return; }
       c.uncovered.forEach(function (id) {
-        unc.push([n.space + ' / ' + n.id, id]);
-        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(self.project, id)) });
+        unc.push([self.docLabel(n), id]);
+        uncLinks.push({ r: unc.length - 1, c: 1, url: absUrl(itemUrl(n.project, id)) });
       });
     });
     var items = [['Downstream document', 'Upstream document', 'Downstream item', 'Upstream item', 'Role']];
@@ -360,15 +360,15 @@
       var c = by[e.c];
       e.samples.forEach(function (sm) {
         var cat = catById(cats, sm.k);
-        items.push([c.space + ' / ' + c.id, o.space + ' / ' + o.id, sm.c, sm.o, cat ? cat.name : sm.k]);
-        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(self.project, sm.c)) });
-        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(self.project, sm.o)) });
+        items.push([self.docLabel(c), self.docLabel(o), sm.c, sm.o, cat ? cat.name : sm.k]);
+        itemLinks.push({ r: items.length - 1, c: 2, url: absUrl(itemUrl(c.project, sm.c)) });
+        itemLinks.push({ r: items.length - 1, c: 3, url: absUrl(itemUrl(o.project, sm.o)) });
       });
     });
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
-        widths: [14, 28, 34, 24, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
-      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
+        widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8, 12, 12, 12, 12, 12, 12]) },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 9, 11, 11, 11] },
       { name: 'Uncovered items (max 500 each)', rows: unc, links: uncLinks, widths: [40, 16] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 16, 16, 16] }
     ]);

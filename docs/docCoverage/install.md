@@ -18,7 +18,8 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| Documents | none = all documents of the project | The LiveDocs to analyse (document selector) |
+| Projects | none = current project | Projects analysed (project selector, several allowed). Links between documents of two selected projects count |
+| Documents of the current project | none = all documents | The LiveDocs of the current project to analyse (the selector lists the current project only). The other selected projects keep all their documents |
 | Link roles (1 to 5) | none | The link roles that count as coverage, e.g. `satisfies`, `verifies`. More than 5: the first 5 are used |
 | Work item types not counted | Heading | Selector of the project's work item types (none = all types counted). Not counted in the coverage, and links to them are ignored |
 | Spaces to include | empty (all) | Comma-separated space names (default space: `_default`) |
@@ -51,7 +52,7 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
 
 ## Known limitations (0.1.0)
 
-- One project only; links to documents of other projects are ignored.
+- Projects: the current project by default, or the selected projects. Links to documents of projects that are not selected are ignored.
 - Documents are read through the Open API data service; permission filtering for viewers who cannot read some
   documents has not been checked (same open check as docBranches).
 - The linked item lists in the details and Excel are limited to 30 per document pair.

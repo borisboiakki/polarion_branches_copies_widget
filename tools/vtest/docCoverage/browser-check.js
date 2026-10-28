@@ -103,6 +103,16 @@ function expect(ok, what) {
 
   await p.goto('file://' + dir + '/pdf.html');
   await p.screenshot({ path: dir + '/shot-pdf.png', fullPage: true });
+
+  // Two projects in scope: scope line, project in the boxes, links into the document's own project.
+  await p.goto('file://' + dir + '/multi.html');
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: dir + '/shot-multi.png', fullPage: true });
+  expect((await p.textContent('.cw-root')).indexOf('Projects: VforIA, VforIB') >= 0, 'two projects: scope line shown');
+  const xText = await p.$$eval('a.bw-node', els => els.filter(a => a.textContent.indexOf('SysReq_X') >= 0).map(a => a.textContent + '|' + a.getAttribute('href')));
+  expect(xText.length === 1 && xText[0].indexOf('VforIB / _default') >= 0 && xText[0].indexOf('/project/VforIB/wiki/_default/SysReq_X') >= 0,
+    'two projects: box shows the project and opens the document in its project');
+  expect((await p.textContent('.cw-root')).indexOf('Coverage: 83% (5/6)') >= 0, 'two projects: cross-project coverage 5/6');
   console.log('errors:', JSON.stringify(errors));
   expect(errors.length === 0, 'no JavaScript errors');
   await b.close();

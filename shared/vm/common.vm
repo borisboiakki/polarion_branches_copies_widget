@@ -1,7 +1,8 @@
 ## Shared snippet common.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED common.vm".
-## Lists, project, output mode and the bwKey macro. Needs params.vm.
+## Lists, projects in scope, output mode and the bwKey / bwDocLabel macros. Needs params.vm.
 ## Option ids from the values() of an enumeration multi-selector: link roles (workitem-link-role, verified on 2512,
-## docCoverage spike C2: each value is a ProxyEnumOption, id() = role id) and work item types (workitem-type).
+## docCoverage spike C2: each value is a ProxyEnumOption, id() = role id), work item types (workitem-type, verified on
+## 2512) and projects (@project, id() expected to be the project id: not yet verified on 2512).
 ## Identifiers only, as they go into SQL.
 #macro(bwOptionIds $bwVals $bwOut)
   #if($bwVals)
@@ -36,12 +37,50 @@
   #set($typeSql = "${typeSql}'${t}'")
 #end
 
+## Current project (page) and projects in scope: the selected projects, or the current project when none is selected.
+## Project ids are identifiers only, as they go into SQL.
 #set($projectIdRaw = "")
 #set($projectIdRaw = $page.getReference().projectId())
 #set($projectId = "$projectIdRaw")
+#set($projectIds = [])
+#bwOptionIds($projectVals $projectIds)
+#set($scopeWarn = "")
+#if($projectIds.size() == 0 && $projectVals && $projectVals.size() > 0)
+  #set($scopeWarn = "The selected projects could not be read; the current project is used.")
+#end
+#if($projectIds.size() == 0 && $projectId.matches("[A-Za-z0-9_.-]+"))
+  #set($void = $projectIds.add($projectId))
+#end
+## On a page outside a project (repository level), the first selected project stands for the current project.
+#if(!$projectId.matches("[A-Za-z0-9_.-]+") && $projectIds.size() > 0)
+  #set($projectId = $projectIds.get(0))
+#end
 #set($projectOk = false)
-#if($projectId.matches("[A-Za-z0-9_.-]+"))
+#if($projectIds.size() > 0)
   #set($projectOk = true)
+#end
+#set($multiProject = false)
+#if($projectIds.size() > 1)
+  #set($multiProject = true)
+#end
+#if($projectIds.size() > 5)
+  #set($scopeWarn = "${scopeWarn} $projectIds.size() projects selected: the page may render slowly.")
+#end
+#set($projectSql = "")
+#set($projectsStr = "")
+#foreach($p in $projectIds)
+  #if($projectSql != "")
+    #set($projectSql = "${projectSql},")
+    #set($projectsStr = "${projectsStr},")
+  #end
+  #set($projectSql = "${projectSql}'${p}'")
+  #set($projectsStr = "${projectsStr}${p}")
+#end
+## Scope line of the main view and the PDF header
+#set($scopeText = "Project: ${projectsStr}")
+#if($multiProject)
+  #set($projectsTxt = $projectsStr.replace(",", ", "))
+  #set($scopeText = "Projects: ${projectsTxt}")
 #end
 
 #set($isStatic = false)
@@ -49,7 +88,7 @@
   #set($isStatic = true)
 #end
 
-## Document key used everywhere: "space/name"
+## Document key used everywhere: "project/space/name" (bwKeyProject = project of the document).
 ## Referenced objects (document of a link, "branched from" source) can be unresolvable (deleted, no access).
 ## Any access other than isUnresolvable() then throws, so they are only used when isUnresolvable() is false.
 #macro(bwKey $bwMod)
@@ -58,13 +97,31 @@
   #if($bwMod)
     #set($bwUr = $bwMod.isUnresolvable())
   #end
+  #set($bwKeyProject = "")
   #if("$bwUr" == "false")
+    #set($bwP = "")
+    #set($bwP = $bwMod.getProjectId())
+    #if("$bwP" == "")
+      #set($bwP = $projectId)
+    #end
     #set($bwF = "")
     #set($bwF = $bwMod.getModuleFolder())
     #set($bwN = "")
     #set($bwN = $bwMod.getId())
     #if("$bwN" != "")
-      #set($bwKeyOut = "${bwF}/${bwN}")
+      #set($bwKeyOut = "${bwP}/${bwF}/${bwN}")
+      #set($bwKeyProject = "$bwP")
     #end
+  #end
+#end
+
+## Document label for tables and lists: "space / name", prefixed with the project when several projects are in scope.
+#macro(bwDocLabel $bwD)
+  #set($bwLs = $bwD.get("space"))
+  #set($bwLn = $bwD.get("id"))
+  #set($bwDocLabelOut = "${bwLs} / ${bwLn}")
+  #if($multiProject)
+    #set($bwLp = $bwD.get("project"))
+    #set($bwDocLabelOut = "${bwLp} / ${bwDocLabelOut}")
   #end
 #end

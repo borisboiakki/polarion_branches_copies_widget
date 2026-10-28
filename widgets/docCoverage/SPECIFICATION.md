@@ -55,7 +55,7 @@ It reuses the code and the verified findings of docBranches (`widgets/docBranche
 | F13 | Links between items of the **same** document are ignored. Links to unresolvable items are ignored | Must |
 | F14 | Chains (customer spec ← system reqs ← software reqs) are shown as layers; **no transitive reduction** (each link is a real relation) | Must |
 | F15 | Work item type filter for upstream items counted for coverage (e.g. only `customerRequirement`) | Could |
-| F16 | Cross-project documents | Future |
+| F16 | **Projects** parameter (`@project` multi-selector, 0.2.0), as docBranches F16: documents of the selected projects (none = current project); links between documents of two selected projects count. The `@document` selector lists the current project only, so the document selection limits the current project; the other selected projects keep all their documents (PO). Warning when documents are selected but the current project is not in scope | Should (done) |
 
 ## 5. Non-functional requirements
 
@@ -119,6 +119,9 @@ d. ✅ (PO screenshot) Arrows downstream → upstream, upstream on the left, rol
 e. ✅ (PO) Fast rendering with many documents.
 f. Viewer permissions (as docBranches §10.2 a) — still open.
 g. 0.1.1: excluded types selector (`workitem-type`) lists the project's types, Heading preselected, coverage unchanged — ✅ (PO, 2026-10-27).
+h. 0.2.0: Projects parameter, as docBranches §10.2 k; in addition: a downstream document of another project counts in
+   the coverage of an upstream document of the current project, and the document selection still limits the current
+   project.
 
 ## 10. Decision log
 
@@ -139,3 +142,4 @@ g. 0.1.1: excluded types selector (`workitem-type`) lists the project's types, H
 | 2026-10-27 | Widget 0.1.1: the excluded work item types are chosen with a `workitem-type` multi-selector (default Heading, none selected = all types counted) instead of comma-separated text; shared macro `bwRoleIds` renamed `bwOptionIds`. Patch release (PO). To check on 2512: selector lists the types with Heading preselected; counts unchanged with Heading | PO |
 | 2026-10-27 | Widget 0.1.1: `icon.png` (608 x 405, white background) at the package root, as in a widget used by the PO; no reference in other files. Display in the widget list to check on 2512 | PO |
 | 2026-10-27 | PO test of 0.1.1 on 2512: type selector (Heading preselected, counts as before) and widget icon OK. Ready for release | PO |
+| 2026-10-28 | Widget 0.2.0: **Projects** parameter (`@project`, none = current project), shared with docBranches 0.4.0. Document selection limits the current project only (the selector lists only that project); other selected projects keep all their documents (PO). Cross-project links count (PO). Minor release (PO). Open check §9 h | PO |

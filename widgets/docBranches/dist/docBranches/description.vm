@@ -1,8 +1,9 @@
-<p><b>Document Branches and Copies</b> shows the LiveDocs of the current project as a graph. A line goes from an original document to each document that was copied, branched or derived from it.</p>
+<p><b>Document Branches and Copies</b> shows the LiveDocs of the current project, or of the selected projects, as a graph. A line goes from an original document to each document that was copied, branched or derived from it.</p>
 <ul>
   <li><b>copy</b>: work items linked with the copy roles (default <code>duplicates</code>)</li>
   <li><b>branch</b>: document "branched from" metadata, plus work items linked with the branch roles (default <code>branched_from</code>, overwritten items only)</li>
   <li><b>derived</b>: document "derived from" metadata, plus work items linked with the derived roles (default <code>derived_from</code>)</li>
 </ul>
 <p>Copying a copy keeps the links of the copied items, which creates indirect relations (for example original to copy of a copy). They are hidden by default and can be shown with the <i>Indirect relations</i> option.</p>
+<p>With several projects, relations between documents of two selected projects are shown too, and each document box shows its project.</p>
 <p>Work items of the excluded types (default <code>heading</code>) are not counted. In PDF export, the widget renders a static graph and a relations table.</p>

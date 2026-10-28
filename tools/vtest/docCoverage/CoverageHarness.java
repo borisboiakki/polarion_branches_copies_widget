@@ -10,6 +10,7 @@ import java.util.*;
  *   _default/SwReq_C    VIA-31..32: 31 satisfies 11, 32 satisfies 12   (chain C -> A -> CustomerSpec)
  *   _default/Other      VIA-41: 41 satisfies 5                         (not selected)
  *   CustomerSpec        VIA-1 satisfies 2                              (same document, ignored)
+ *   VforIB: _default/SysReq_X  VIB-1 satisfies VIA-5                   (other project, only with both projects selected)
  *
  * Expected with CustomerSpec, SysReq_A, SysReq_B, SwReq_C selected and roles satisfies + verifies:
  *   CustomerSpec covered {1,2,3,4} = 4/6 (67%), uncovered VIA-5, VIA-6; SysReq_A covered {11,12} = 2/4 (50%).
@@ -24,7 +25,7 @@ public class CoverageHarness {
         return m;
     }
 
-    static WidgetHarness.Module spec, a, b, c, other;
+    static WidgetHarness.Module spec, a, b, c, other, x;
 
     static void buildTestSet() {
         spec = mod("Specs", "CustomerSpec");
@@ -55,6 +56,8 @@ public class CoverageHarness {
         WidgetHarness.link(41, "satisfies", 5);
         WidgetHarness.link(1, "satisfies", 2);
         WidgetHarness.link(12, "parent", 11);
+        x = WidgetHarness.doc("VforIB", "_default", "SysReq_X");
+        WidgetHarness.wi("VIB-1", "systemRequirement", x).links.add(new WidgetHarness.Link("satisfies", WidgetHarness.ITEMS.get("VIA-5")));
     }
 
     static Map<String, WidgetHarness.Param> params(List<Object> docs, List<Object> roles) {
@@ -82,11 +85,12 @@ public class CoverageHarness {
         String br = WidgetHarness.render(dir, params(docs, roles), false, out + "/velocity-browser.log");
         WidgetHarness.write(out + "/browser-fragment.html", br);
         WidgetHarness.check(br.contains("data-roles=\"satisfies|satisfies;verifies|verifies\""), "roles and their names are passed to the page");
-        WidgetHarness.check(br.contains("data-k=\"Specs/CustomerSpec\"") && !br.contains("data-k=\"_default/Other\""), "only the selected documents are listed");
-        WidgetHarness.check(br.contains("data-o=\"Specs/CustomerSpec\" data-c=\"_default/SysReq_A\" data-r=\"satisfies:3;verifies:1\""), "SysReq_A -> CustomerSpec: 3 satisfies + 1 verifies (heading target ignored)");
-        WidgetHarness.check(br.contains("data-o=\"Specs/CustomerSpec\" data-c=\"_default/SysReq_B\" data-r=\"satisfies:3;verifies:0\""), "SysReq_B -> CustomerSpec: 3 links (unresolvable target ignored)");
-        WidgetHarness.check(br.contains("data-o=\"_default/SysReq_A\" data-c=\"_default/SwReq_C\""), "chain SwReq_C -> SysReq_A found");
-        WidgetHarness.check(!br.contains("data-o=\"Specs/CustomerSpec\" data-c=\"Specs/CustomerSpec\""), "links inside one document ignored");
+        WidgetHarness.check(br.contains("data-k=\"VforIA/Specs/CustomerSpec\"") && !br.contains("data-k=\"VforIA/_default/Other\"")
+            && !br.contains("VforIB"), "only the selected documents of the current project are listed");
+        WidgetHarness.check(br.contains("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/_default/SysReq_A\" data-r=\"satisfies:3;verifies:1\""), "SysReq_A -> CustomerSpec: 3 satisfies + 1 verifies (heading target ignored)");
+        WidgetHarness.check(br.contains("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/_default/SysReq_B\" data-r=\"satisfies:3;verifies:0\""), "SysReq_B -> CustomerSpec: 3 links (unresolvable target ignored)");
+        WidgetHarness.check(br.contains("data-o=\"VforIA/_default/SysReq_A\" data-c=\"VforIA/_default/SwReq_C\""), "chain SwReq_C -> SysReq_A found");
+        WidgetHarness.check(!br.contains("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIA/Specs/CustomerSpec\""), "links inside one document ignored");
         WidgetHarness.check(br.contains("data-items=\"6\" data-up=\"1\" data-cov=\"4\" data-unc-n=\"2\" data-unc=\"VIA-5 VIA-6\""), "CustomerSpec coverage 4/6, uncovered VIA-5 VIA-6");
         WidgetHarness.check(br.contains("data-items=\"4\" data-up=\"1\" data-cov=\"2\""), "SysReq_A coverage 2/4");
 
@@ -99,11 +103,26 @@ public class CoverageHarness {
         Map<String, WidgetHarness.Param> allTypes = params(docs, roles);
         allTypes.put("excludedTypes", new WidgetHarness.Param(null, list()));
         String typesAll = WidgetHarness.render(dir, allTypes, false, out + "/velocity-alltypes.log");
-        WidgetHarness.check(typesAll.contains("data-c=\"_default/SysReq_A\" data-r=\"satisfies:4;verifies:1\"") && typesAll.contains("data-items=\"7\""),
+        WidgetHarness.check(typesAll.contains("data-c=\"VforIA/_default/SysReq_A\" data-r=\"satisfies:4;verifies:1\"") && typesAll.contains("data-items=\"7\""),
             "no excluded type selected: headings counted");
+        // Two projects: the document selection limits the current project only; SysReq_X of VforIB covers VIA-5 (5/6).
+        Map<String, WidgetHarness.Param> two = params(docs, roles);
+        two.put("projects", new WidgetHarness.Param(null, list(new WidgetHarness.RoleOpt("VforIA"), new WidgetHarness.RoleOpt("VforIB"))));
+        String multi = WidgetHarness.render(dir, two, false, out + "/velocity-multi.log");
+        WidgetHarness.write(out + "/multi-fragment.html", multi);
+        WidgetHarness.check(multi.contains("data-o=\"VforIA/Specs/CustomerSpec\" data-c=\"VforIB/_default/SysReq_X\" data-r=\"satisfies:1;verifies:0\"")
+            && !multi.contains("data-k=\"VforIA/_default/Other\""), "two projects: cross-project coverage, selection kept for the current project");
+        WidgetHarness.check(multi.contains("data-cov=\"5\" data-unc-n=\"1\" data-unc=\"VIA-6\"") && multi.contains(">Projects: VforIA, VforIB<"),
+            "two projects: CustomerSpec coverage 5/6, scope shown");
+        String multiPdf = WidgetHarness.render(dir, two, true, out + "/velocity-multipdf.log");
+        WidgetHarness.check(multiPdf.contains("<td>VforIB / _default / SysReq_X</td>") && multiPdf.contains("Projects: VforIA, VforIB &mdash;"),
+            "two projects, PDF: project in labels and header");
+        two.put("projects", new WidgetHarness.Param(null, list(new WidgetHarness.RoleOpt("VforIB"))));
+        String notCur = WidgetHarness.render(dir, two, false, out + "/velocity-notcur.log");
+        WidgetHarness.check(notCur.contains("which is not in the selected projects: they are ignored."), "selected documents outside the scope: warning");
         // No document selected = all documents (Other appears).
         String all = WidgetHarness.render(dir, params(list(), list(new WidgetHarness.RoleOpt("satisfies"))), false, out + "/velocity-all.log");
-        WidgetHarness.check(all.contains("data-c=\"_default/Other\""), "no document selected: all documents");
+        WidgetHarness.check(all.contains("data-c=\"VforIA/_default/Other\""), "no document selected: all documents");
         // More than 5 roles: first 5 used, warning.
         List<Object> six = list(new WidgetHarness.RoleOpt("satisfies"), new WidgetHarness.RoleOpt("verifies"), new WidgetHarness.RoleOpt("parent"),
             new WidgetHarness.RoleOpt("duplicates"), new WidgetHarness.RoleOpt("derived_from"), new WidgetHarness.RoleOpt("branched_from"));

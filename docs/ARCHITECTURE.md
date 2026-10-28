@@ -23,9 +23,9 @@ produces one of two outputs:
                                                                     └─────────────────────────────┘
 ```
 
-- **Server side (Velocity):** all data access happens here. SQL queries are scoped to the current project, and the
-  results are then grouped into documents and edges in Velocity. The heavy filtering is done in SQL; Velocity never
-  loops over all work items of the project.
+- **Server side (Velocity):** all data access happens here. SQL queries are scoped to the projects in scope (the
+  *Projects* parameter, or the current project when it is empty), and the results are then grouped into documents and
+  edges in Velocity. The heavy filtering is done in SQL; Velocity never loops over all work items of a project.
 - **Static view (PDF/print):** the same template draws a server-side SVG with integer geometry, plus HTML tables. It
   contains no JavaScript, because the PDF export does not run scripts.
 - **Interactive view (browser):** the template writes the computed data as hidden `<i>` elements (the *page model*)
@@ -71,11 +71,11 @@ Both templates follow the same sequence. The shared snippets are shown in **bold
 | Step | docBranches | docCoverage |
 |---|---|---|
 | CSS | **style.vm** (classes `bw-*`, used by both widgets) | same |
-| Common parameters | **params.vm**: excluded types (selector values), spaces, documents shown, item counts, extra fields, height | same |
+| Common parameters | **params.vm**: projects and excluded types (selector values), spaces, documents shown, item counts, extra fields, height | same |
 | Own parameters | copy / branch / derived link role selectors, relation kinds shown, indirect relations, threshold | document selector, link role selector (1–5), limits (`maxRoles`, `uncCap` = 500, 30 samples per pair) |
-| Lists and project | **common.vm**: macros `bwOptionIds` (enumeration selector → ids) and `bwKey` (module → `space/name`, guarded by `isUnresolvable()`), `$excludedTypes`, `$typeSql`, `$spaceFilter`, `$projectId`, `$isStatic` | same; additionally the selected documents → `$docOnly` keys, role names from `getWorkItemLinkRoleEnum()` |
-| Documents | **documents.vm**: one SQL query for the project's modules, then one count query per document. Builds `$docList` / `$docByKey` maps (key, id, title, space, type, status, dates, `items`, `itemObjs`, `module`) | same, limited to `$docOnly` |
-| Relations | (1) SQL: link-source items with a configured role whose target is in another document. Velocity scans `getLinkedWorkItemsStructsDirect()`. Macro `bwEdge` groups by pair `orig>copy` and kind. (2) Document metadata `branchedFrom` / `derivedFrom`. (3) Threshold. (4) Transitive reduction: an edge is *indirect* when S>M>T exists | SQL: link-source items of the selected documents and roles, with the target in another selected document. Macro `cwEdge` groups by pair `up>down`: links per role, upstream items covered, downstream items with links |
+| Lists and projects | **common.vm**: macros `bwOptionIds` (enumeration selector → ids), `bwKey` (module → `project/space/name` and `$bwKeyProject`, guarded by `isUnresolvable()`) and `bwDocLabel` (table label, project prefix when several projects), `$excludedTypes`, `$typeSql`, `$spaceFilter`, `$projectId` (current project), `$projectIds` / `$projectSql` / `$projectsStr` (scope), `$multiProject`, `$scopeText`, `$scopeWarn`, `$isStatic` | same; additionally the selected documents → `$docOnly` keys, role names from `getWorkItemLinkRoleEnum()` of the current project |
+| Documents | **documents.vm**: one SQL query for the modules of the projects in scope, then one count query per document. Builds `$docList` / `$docByKey` maps (key, project, id, title, space, type, status, dates, `items`, `itemObjs`, `module`) | same; `$docOnly` limits the documents of the current project only (the `@document` selector lists that project only) |
+| Relations | (1) SQL: link-source items with a configured role whose target is in another document of a project in scope (cross-project links count). Velocity scans `getLinkedWorkItemsStructsDirect()`. Macro `bwEdge` groups by pair `orig>copy` and kind. (2) Document metadata `branchedFrom` / `derivedFrom`. (3) Threshold. (4) Transitive reduction: an edge is *indirect* when S>M>T exists | SQL: link-source items of the selected documents and roles, with the target in another selected document. Macro `cwEdge` groups by pair `up>down`: links per role, upstream items covered, downstream items with links |
 | Computation | — | Coverage per upstream document: its counted items (`itemObjs`) against the items covered by any downstream document. The uncovered list is capped at `uncCap`; the full count is always kept |
 | Output | `#if($isStatic)`: static SVG + table. Otherwise: page model + script | same |
 
@@ -92,14 +92,15 @@ Both widgets write:
   attributes carry the settings;
 - a hidden `<div class="bw-model">` with one `<i class="bw-n">` per document and one `<i class="bw-e">` per edge.
 
-Each widget has its own root class, so two widgets on one page do not read each other's model.
+Each widget has its own root class, so two widgets on one page do not read each other's model. Before the model, the
+root holds a visible scope line (`Project: X` / `Projects: A, B`) and, if any, the scope warning.
 
 | Element | Attributes |
 |---|---|
-| root (both) | `data-project`, `data-mode` (`related`/`all`), `data-counts` (1/0), `data-extras` (`type,status,…`), `data-height`, `data-version` |
+| root (both) | `data-project` (current project: fallback for links, file names), `data-projects` (scope, `A,B`), `data-mode` (`related`/`all`), `data-counts` (1/0), `data-extras` (`type,status,…`), `data-height`, `data-version` |
 | root, docBranches | `data-indirect`, `data-rel` (kinds shown by default) |
 | root, docCoverage | `data-roles` (`id|name;id|name`), `data-warn` |
-| `bw-n` (both) | `data-k` (key `space/name`), `data-id`, `data-title`, `data-space`, `data-type`, `data-status`, `data-created`, `data-updated`, `data-items` |
+| `bw-n` (both) | `data-k` (key `project/space/name`), `data-p` (project: links open in it), `data-id`, `data-title`, `data-space`, `data-type`, `data-status`, `data-created`, `data-updated`, `data-items` |
 | `bw-n`, docCoverage | `data-up` (is upstream), `data-cov`, `data-unc-n` (full count), `data-unc` (first 500 ids) |
 | `bw-e` (both) | `data-o`, `data-c`, `data-s` (samples `c|o|k;…`, at most 30) |
 | `bw-e`, docBranches | `data-kc`/`kb`/`kd` (items per kind), `data-mb`/`md` (metadata branch/derived), `data-oi`, `data-ci`, `data-n`, `data-ind` |
@@ -110,13 +111,15 @@ If you add a field, change both sides (render.vm output and `readModel` in graph
 ## 4. Client side: `core.js` + `graph.js`
 
 `shared/js/core.js` contains everything that does not depend on the widget:
-- **helpers**: `el`, `svg`, `toInt`, `pct`, `docUrl`, `itemUrl`, `download`;
+- **helpers**: `el`, `svg`, `toInt`, `pct`, `docUrl(node)` (in `node.project`), `itemUrl(project, id)` (the project of
+  the item's document: sample items take it from the edge's documents), `docSortKey`, `download`;
 - **model helpers**: `readNodes`, `parseSamples`, `restrictEdge`, `relFromData`, `kindsLabel`;
 - **`layout(model, state, edges)`**: a layered layout. Origin/upstream documents go on the left, using the longest
   path. Barycentre ordering reduces crossings. Documents without an edge go in a grid when `state.mode === 'all'`.
   Documents in `state.hidden` are skipped.
 - **`Base` mixin**: toolbar parts (`kindChecks`, `countsCheck`, `fieldChecks`, `searchBox`, `viewButtons`),
-  `buildAreas`, `layoutAndDraw`, `drawGraph`, `nodeLines`, tooltip, details box, `htmlTable`, zoom/fit, SVG export,
+  `buildAreas`, `layoutAndDraw`, `drawGraph`, `nodeLines`, `docLabel` (`space / name`, with the project first when
+  `multi`, i.e. several projects in scope), tooltip, details box, `htmlTable`, zoom/fit, SVG export,
   and `exportWorkbook` (Excel through `XLSX`, with a CSV fallback when the library is missing);
 - **`startWidgets(rootClass, Ctor, name)`**: starts one widget per root and marks the root `data-bw-ready`, so a
   second script on the page does not start it twice. Errors are shown in the widget.
@@ -223,8 +226,11 @@ each widget whose package changes.
 - **`isUnresolvable()` first:** a referenced object (link target, `branchedFrom` source, selected document) can be
   unresolvable. Any other call on it then throws.
 - **SQL:** only identifiers (checked with a regex) go into SQL; document names are quoted with `''`. Space names are
-  compared in Velocity only.
+  compared in Velocity only. Projects go into SQL as `p.c_id IN (…)` (`$projectSql`).
+- **Several projects:** the document key always carries the project (two projects can hold the same space/name).
+  Links and Excel hyperlinks open in the project of the document or item, never in a fixed project.
 - **Budget:** the interactive render must stay well within the 10 s scripting budget. Page model sizes are capped
-  (30 samples per pair, 500 uncovered items per document).
+  (30 samples per pair, 500 uncovered items per document). The work grows with the number of projects in scope; a
+  warning is shown above 5 projects.
 - **No project-specific values** (types, roles, statuses) in code: they are parameters or are read from the project
   configuration.

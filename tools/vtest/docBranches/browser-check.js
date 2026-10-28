@@ -64,6 +64,22 @@ const { chromium } = require('playwright');
   console.log('downloads:', d3.suggestedFilename(), '(fallback)');
   await p.goto('file://' + dir + '/pdf.html');
   await p.screenshot({ path: dir + '/shot-pdf.png', fullPage: true });
+  // Two projects in scope: scope line, project in the boxes, links into the document's own project.
+  await p.goto('file://' + dir + '/multi.html');
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: dir + '/shot-multi.png', fullPage: true });
+  if ((await p.textContent('.bw-root')).indexOf('Projects: VforIA, VforIB') < 0) { throw new Error('two projects: scope line missing'); }
+  const hrefs = await p.$$eval('a.bw-node', els => els.map(a => a.getAttribute('href')));
+  if (hrefs.filter(h => h.indexOf('/project/VforIB/wiki/Requirements/SRS_Test') >= 0).length !== 1 ||
+      hrefs.filter(h => h.indexOf('/project/VforIA/wiki/Requirements/SRS_Test') >= 0).length < 1) {
+    throw new Error('two projects: documents do not open in their own project: ' + JSON.stringify(hrefs));
+  }
+  const boxes = await p.$$eval('a.bw-node', els => els.map(a => a.textContent));
+  if (!boxes.some(t => t.indexOf('VforIB / Requirements') >= 0)) { throw new Error('two projects: project not shown in the boxes'); }
+  await p.click('button:has-text("Table")');
+  const tbl = await p.textContent('.bw-table-wrap');
+  if (tbl.indexOf('VforIA / Requirements / SRS_Test') < 0 || tbl.indexOf('VforIB / Requirements / SRS_Test') < 0) { throw new Error('two projects: table labels'); }
+  console.log('two projects: scope line, boxes, links and table ok');
   console.log('errors:', JSON.stringify(errors));
   await b.close();
 })();

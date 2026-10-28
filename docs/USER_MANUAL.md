@@ -7,7 +7,8 @@ This manual is for Polarion users who want to show these widgets on a LiveReport
 | <img src="docBranches/icon.svg" width="32" alt=""> **Document Branches and Copies** | Which LiveDocs of the project are copies, branches or derived documents of which? |
 | <img src="docCoverage/icon.svg" width="32" alt=""> **Document Coverage** | For the documents I choose and the link roles I choose (e.g. *satisfies*), which document covers which, how much (%), and which items are not covered? |
 
-Both widgets work on the documents of the **current project**. They look the same and have the same toolbar.
+Both widgets work on the documents of the **current project**, or of the projects chosen in the *Projects* parameter.
+The projects analysed are shown at the top of the widget. Both widgets look the same and have the same toolbar.
 
 ---
 
@@ -72,6 +73,7 @@ The number on a line is the number of work items linked between the two document
 
 | Parameter | Default | What it does | Live |
 |---|---|---|---|
+| Projects | none = current project | Projects to analyse (choose in the list, several allowed). Relations between documents of two chosen projects are shown, and each document box shows its project | — |
 | Copy link roles | `duplicates` | Link roles that mean "copy" (choose in the list, several allowed) | — |
 | Branch link roles | `branched_from` | Link roles that mean "branch" | — |
 | Derived link roles | `derived_from` | Link roles that mean "derived" | — |
@@ -111,7 +113,8 @@ system or software specifications.
 
 | Parameter | Default | What it does | Live |
 |---|---|---|---|
-| Documents | none = all documents of the project | The LiveDocs to analyse. Select at least the upstream document and its downstream documents | Hide/show with the **Documents** button |
+| Projects | none = current project | Projects to analyse (choose in the list, several allowed). Links between documents of two chosen projects count, e.g. a system specification in another project that satisfies the customer specification | — |
+| Documents of the current project | none = all documents | The LiveDocs to analyse. Select at least the upstream document and its downstream documents. The list shows the documents of the current project only: the other chosen projects keep all their documents (use *Spaces to include* or the **Documents** button to narrow them) | Hide/show with the **Documents** button |
 | Link roles (1 to 5) | none, **must be set** | The link roles that count as coverage, e.g. `satisfies`, `verifies`. If more than 5 are selected, only the first 5 are used and a warning is shown | Each role can be hidden or shown |
 | Work item types not counted | Heading | These types are not counted in the coverage, and links to them are ignored. Choose none to count all types | — |
 | Spaces to include | empty = all | Limit the documents to some spaces, comma separated (the default space is `_default`) | — |
@@ -172,7 +175,12 @@ there; the PDF uses the **parameter defaults** of the widget.
 
 ## 7. Good to know
 
-- The widgets analyse **one project**. Links to documents of other projects are ignored.
+- The widgets analyse the **current project**, or the projects chosen in *Projects*. Links to documents of other
+  projects are ignored. The scope line at the top says which projects are analysed.
+- With several projects, every document shows its project (box, table, Excel), and links open the document or work
+  item in its own project. Each extra project adds rendering time: a warning is shown above 5 projects.
+- Link roles and work item types are chosen from the current project's configuration. Other projects must use the
+  same role and type ids for their links and items to be found.
 - Links between items of the same document and links to items you cannot read are ignored.
 - The analysis runs when the page opens. Use **Refresh** after changing links.
 - The version of a widget is shown in the PDF header. Give it when reporting a problem.

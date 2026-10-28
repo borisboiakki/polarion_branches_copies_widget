@@ -131,9 +131,9 @@
       var c = self.model.byKey[e.c];
       var pc = pct(e.ci, c.items);
       return [
-        { text: o.space + ' / ' + o.id, href: docUrl(self.project, o) },
+        { text: self.docLabel(o), href: docUrl(o) },
         kindsLabel(e, CATS) + (e.indirect ? ' (indirect)' : ''),
-        { text: c.space + ' / ' + c.id, href: docUrl(self.project, c) },
+        { text: self.docLabel(c), href: docUrl(c) },
         String(e.total),
         pc === null ? DASH : pc + '% (' + e.ci + '/' + c.items + ')'
       ];
@@ -145,15 +145,16 @@
 
   Widget.prototype.relationRows = function () {
     var self = this;
-    var rows = [['Original space', 'Original document', 'Original title', 'Relation',
-      'Copy / branch / derived space', 'Copy / branch / derived document', 'Copy / branch / derived title',
+    var rows = [['Original project', 'Original space', 'Original document', 'Original title', 'Relation',
+      'Copy / branch / derived project', 'Copy / branch / derived space', 'Copy / branch / derived document',
+      'Copy / branch / derived title',
       'Copy items', 'Branch items', 'Derived items', 'Branch metadata', 'Derived metadata', 'Indirect',
       'Linked items', 'Work items in copy', 'Coverage of copy (%)']];
     this.sortedEdges().forEach(function (e) {
       var o = self.model.byKey[e.o];
       var c = self.model.byKey[e.c];
       var pc = pct(e.ci, c.items);
-      rows.push([o.space, o.id, o.title, kindsLabel(e, CATS), c.space, c.id, c.title,
+      rows.push([o.project, o.space, o.id, o.title, kindsLabel(e, CATS), c.project, c.space, c.id, c.title,
         e.kinds.copy, e.kinds.branch, e.kinds.derived, e.meta.branch ? 'yes' : 'no', e.meta.derived ? 'yes' : 'no',
         e.indirect ? 'yes' : 'no', e.total, c.items < 0 ? '' : c.items, pc === null ? '' : pc]);
     });
@@ -163,9 +164,9 @@
   Widget.prototype.documentRows = function () {
     var deg = {};
     this.edges.forEach(function (e) { deg[e.o] = (deg[e.o] || 0) + 1; deg[e.c] = (deg[e.c] || 0) + 1; });
-    var rows = [['Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items', 'Relations shown']];
+    var rows = [['Project', 'Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items', 'Relations shown']];
     this.shownDocs().forEach(function (n) {
-      rows.push([n.space, n.id, n.title, n.type, n.status, n.created, n.updated,
+      rows.push([n.project, n.space, n.id, n.title, n.type, n.status, n.created, n.updated,
         n.items < 0 ? '' : n.items, deg[n.key] || 0]);
     });
     return rows;
@@ -178,7 +179,7 @@
       var o = self.model.byKey[e.o];
       var c = self.model.byKey[e.c];
       e.samples.forEach(function (sm) {
-        rows.push([o.space + ' / ' + o.id, c.space + ' / ' + c.id, sm.c, sm.o, sm.k]);
+        rows.push([self.docLabel(o), self.docLabel(c), sm.c, sm.o, sm.k]);
       });
     });
     return rows;
@@ -188,21 +189,24 @@
     var self = this;
     var by = this.model.byKey;
     var relLinks = [];
-    this.sortedEdges().forEach(function (e, i) {
-      relLinks.push({ r: i + 1, c: 1, url: absUrl(docUrl(self.project, by[e.o])) });
-      relLinks.push({ r: i + 1, c: 5, url: absUrl(docUrl(self.project, by[e.c])) });
-    });
-    var docLinks = this.shownDocs().map(function (n, i) { return { r: i + 1, c: 1, url: absUrl(docUrl(self.project, n)) }; });
-    var items = this.itemRows();
     var itemLinks = [];
-    for (var r = 1; r < items.length; r++) {
-      itemLinks.push({ r: r, c: 2, url: absUrl(itemUrl(this.project, items[r][2])) });
-      itemLinks.push({ r: r, c: 3, url: absUrl(itemUrl(this.project, items[r][3])) });
-    }
+    var r = 1;
+    this.sortedEdges().forEach(function (e, i) {
+      relLinks.push({ r: i + 1, c: 2, url: absUrl(docUrl(by[e.o])) });
+      relLinks.push({ r: i + 1, c: 7, url: absUrl(docUrl(by[e.c])) });
+      // Item rows follow the same edge order (itemRows): the copy item is in e.c, the original item in e.o.
+      e.samples.forEach(function (sm) {
+        itemLinks.push({ r: r, c: 2, url: absUrl(itemUrl(by[e.c].project, sm.c)) });
+        itemLinks.push({ r: r, c: 3, url: absUrl(itemUrl(by[e.o].project, sm.o)) });
+        r++;
+      });
+    });
+    var docLinks = this.shownDocs().map(function (n, i) { return { r: i + 1, c: 2, url: absUrl(docUrl(n)) }; });
+    var items = this.itemRows();
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: this.relationRows(), links: relLinks,
-        widths: [14, 28, 34, 22, 14, 28, 34, 10, 10, 10, 10, 10, 9, 11, 12, 12] },
-      { name: 'Documents', rows: this.documentRows(), links: docLinks, widths: [14, 28, 40, 14, 14, 18, 18, 11, 11] },
+        widths: [14, 14, 28, 34, 22, 14, 14, 28, 34, 10, 10, 10, 10, 10, 9, 11, 12, 12] },
+      { name: 'Documents', rows: this.documentRows(), links: docLinks, widths: [14, 14, 28, 40, 14, 14, 18, 18, 11, 11] },
       { name: 'Linked items (max 30 per pair)', rows: items, links: itemLinks, widths: [34, 34, 14, 14, 10] }
     ]);
   };

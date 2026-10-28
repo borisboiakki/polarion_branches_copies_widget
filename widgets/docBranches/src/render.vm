@@ -142,13 +142,13 @@
   #set($bwE = $edges.get($bwPk))
 #end
 
-## 1) Work item links. SQL returns the link-source items of the configured roles whose target is
-## in another document of the same project; the Velocity scan reads their links (spike V4).
+## 1) Work item links. SQL returns the link-source items of the configured roles whose target is in another
+## document of a project in scope (links between two projects in scope count); the Velocity scan reads their links (spike V4).
 #set($srcTypeSql = "")
 #if($typeSql != "")
   #set($srcTypeSql = " AND ws.c_type NOT IN (${typeSql})")
 #end
-#set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectId}' AND wt.fk_uri_project = ws.fk_uri_project AND l.c_role IN (${roleSql}) AND ws.fk_uri_module IS NOT NULL AND wt.fk_uri_module IS NOT NULL AND ws.fk_uri_module <> wt.fk_uri_module${srcTypeSql}")
+#set($linkSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = ws.fk_uri_project INNER JOIN project pt ON pt.c_uri = wt.fk_uri_project WHERE p.c_id IN (${projectSql}) AND pt.c_id IN (${projectSql}) AND l.c_role IN (${roleSql}) AND ws.fk_uri_module IS NOT NULL AND wt.fk_uri_module IS NOT NULL AND ws.fk_uri_module <> wt.fk_uri_module${srcTypeSql}")
 #foreach($wi in $ds.sqlSearch($linkSql))
   #set($srcMod = false)
   #set($srcMod = $wi.getModule())
@@ -357,7 +357,10 @@
   #set($outH = $ch * 700 / $cw)
 #end
 <div class="bw-root">
-<div><b>Document Branches and Copies</b> &mdash; project $esc.html($projectId) &mdash; $drawEdges.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
+<div><b>Document Branches and Copies</b> &mdash; $esc.html($scopeText) &mdash; $drawEdges.size() relations <span class="bw-muted">(widget v$bwVersion)</span></div>
+#if($scopeWarn != "")
+<div class="bw-warn">$esc.html($scopeWarn)</div>
+#end
 <div class="bw-muted">Arrow: original &rarr; copy / branch / derived. Line style: copy solid blue, branch dashed red, derived dotted green, indirect dashed grey.</div>
 #if($drawEdges.size() == 0)
 <p>No relation found between the documents with the current settings.</p>
@@ -445,7 +448,13 @@
     #set($lines = [])
     #set($void = $lines.add($d.get("id")))
     #set($void = $lines.add($d.get("title")))
-    #set($void = $lines.add($d.get("space")))
+    #if($multiProject)
+      #set($dPs = $d.get("project"))
+      #set($dSs = $d.get("space"))
+      #set($void = $lines.add("${dPs} / ${dSs}"))
+    #else
+      #set($void = $lines.add($d.get("space")))
+    #end
     #foreach($f in $extraList)
       #set($fv = "$d.get($f)")
       #if($f == "items" && $fv == "-1")
@@ -518,7 +527,10 @@
     #set($pctv = $n * 100 / $items)
     #set($cov = "${pctv}% (${n}/${items})")
   #end
-<tr><td>$esc.html($o.get("space")) / $esc.html($o.get("id"))</td><td>$esc.html($rel)</td><td>$esc.html($c.get("space")) / $esc.html($c.get("id"))</td><td>$n</td><td>$esc.html($cov)</td></tr>
+  #bwDocLabel($o)
+  #set($oLabel = $bwDocLabelOut)
+  #bwDocLabel($c)
+<tr><td>$esc.html($oLabel)</td><td>$esc.html($rel)</td><td>$esc.html($bwDocLabelOut)</td><td>$n</td><td>$esc.html($cov)</td></tr>
 #end
 </table>
 #if($showMode == "all")
@@ -528,9 +540,8 @@
       #if($unrelated != "")
         #set($unrelated = "${unrelated}, ")
       #end
-      #set($dSp = $d.get("space"))
-      #set($dId = $d.get("id"))
-      #set($unrelated = "${unrelated}${dSp} / ${dId}")
+      #bwDocLabel($d)
+      #set($unrelated = "${unrelated}${bwDocLabelOut}")
     #end
   #end
   #if($unrelated != "")
@@ -547,10 +558,14 @@
 #if($showIndirect)
 #set($indFlag = "1")
 #end
-<div class="bw-root" data-project="$esc.html($projectId)" data-mode="$showMode" data-indirect="$indFlag" data-rel="$relStr" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
+<div class="bw-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-mode="$showMode" data-indirect="$indFlag" data-rel="$relStr" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion">
+  <div class="bw-muted">$esc.html($scopeText)</div>
+#if($scopeWarn != "")
+  <div class="bw-warn">$esc.html($scopeWarn)</div>
+#end
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
 #end
 #foreach($e in $kept)
 #set($mbFlag = "0")
