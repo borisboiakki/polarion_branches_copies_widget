@@ -161,7 +161,7 @@ i. ✅ (PO, 2026-10-28: everything works as expected) 0.3.0 collection context (
    - "Collection context" = Ignore: current documents; the same page outside the collection: unchanged (0.2.1 behaviour);
    - rendering time with a large collection; a collection opened at an older revision or baseline.
 
-j. 0.4.0 traceability matrix (F18), to check on 2512:
+j. ✅ (PO, 2026-10-28: everything works) 0.4.0 traceability matrix (F18), checked on 2512:
    - click SysReqCollectionTest_Upstream (CollectionTests): 8 items, the 3 covered ones with their refining items and
      "is refined by", 5 "uncovered"; click a downstream document: "refines", "not linked"; click a line: 2 sheets;
    - titles correct, also in the collection (pinned revision) and with several projects; item links open in Polarion;
@@ -202,3 +202,4 @@ j. 0.4.0 traceability matrix (F18), to check on 2512:
 | 2026-10-28 | PO test of 0.3.0 on 2512: collection context works as expected. Ready for release | PO |
 | 2026-10-28 | "Spaces to include" stays a text parameter; a spaces selector is logged as a future improvement (no `@space` enumeration in 2512) | PO |
 | 2026-10-28 | Traceability matrix export (F18): data embedded in the page at render (all link pairs, item titles of the related documents); document matrix with links in both directions; "uncovered" for an upstream document, "not linked" for a document only downstream; line matrix = upstream items with their links from that downstream document + downstream items with their links. An extra "Linked document" column in the document matrix (to confirm). Minor release 0.4.0; the Linked items Excel sheet now lists all links instead of 30 per pair. docBranches 0.4.3 = shared code only (`exportWorkbook` file name) | PO |
+| 2026-10-28 | PO test of 0.4.0 on 2512: traceability matrix works as expected. Ready for release | PO |

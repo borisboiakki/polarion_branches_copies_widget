@@ -126,6 +126,8 @@ Verified through web search (2026-10-27):
   `getRevision()` empty for a document added without revision = HEAD). Links in the collection:
   `#/project/P/collection/ID/wiki/<space>/<doc>`, `…/workitem?id=`, other project `#/project/P/collection/CP//ID/…`.
   docCoverage 0.3.0 implements it (verified by the PO on 2512).
+- **Verified by the PO on 2512 with docCoverage 0.4.0**: traceability matrix export (item titles via `getTitle()`, link role
+  opposite names via `getOppositeName()`, all link pairs in the page model).
 
 NOT verified (sandbox could not reach the SDK/extension sites; confirm on a real instance or SDK Javadoc):
 - That the `MODULE` columns above exist unchanged in 2606.
