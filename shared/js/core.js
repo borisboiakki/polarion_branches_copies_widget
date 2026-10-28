@@ -718,7 +718,7 @@
 
   // ------------------------------------------------------------------ Excel export
   // Uses the XLSX library (xlsx-js-style) loaded from the widget resources with loadWidgetJs.
-  // sheets: [{ name, rows (first row = header), widths, links: [{ r, c, url }] }].
+  // sheets: [{ name, rows (first row = header), widths, links: [{ r, c, url }] }]; name = file name (default fileName).
   // Falls back to a CSV of the first sheet when the library is not available.
 
   function sheetFromRows(X, rows, widths, links) {
@@ -744,7 +744,7 @@
     return /[",;]|[^ -~]/.test(t) ? '"' + t.split('"').join('""') + '"' : t;
   }
 
-  Base.exportWorkbook = function (sheets) {
+  Base.exportWorkbook = function (sheets, name) {
     var X = window.XLSX;
     if (!X || !X.utils || !X.write) { this.exportCsv(sheets[0].rows, sheets[0].what); return; }
     var wb = X.utils.book_new();
@@ -752,7 +752,7 @@
       X.utils.book_append_sheet(wb, sheetFromRows(X, sh.rows, sh.widths, sh.links), sh.name);
     });
     var data = X.write(wb, { bookType: 'xlsx', type: 'array' });
-    download(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), this.fileName('xlsx'));
+    download(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name || this.fileName('xlsx'));
   };
 
   Base.exportCsv = function (rows, what) {

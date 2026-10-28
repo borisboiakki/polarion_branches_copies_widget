@@ -105,6 +105,8 @@
 | `velocityWidgets.maxNumberOfEntries` | 30 |
 | `velocityWidgets.entrySizeLimitMB` | 30 MB |
 
+> **Verified on 2512 (widget icon)**: an `icon.png` at the package root, next to `render.vm`, is shown in the widget list (tested with a 608 x 405 PNG). No other file needs to reference it.
+
 Additional constraints: the `.zip` must not be a symlink; only **Stored** or **Deflated** compression is accepted (no BZIP2 / LZMA / PPMd); total size is also bound by `maxAttachmentSize`.
 
 ### 1.4 widget.properties Format
@@ -222,6 +224,10 @@ $parameters.put("myMultiSeverity", $factory.enumeration("MyMultiSeverity", "seve
 $parameters.put("linkRole", $factory.enumeration("Link Role", "workitem-link-role").dependencyTarget(true).build())
 ```
 
+> **Verified on 2512**: multi-value `workitem-link-role` and `workitem-type` selectors preselect their defaults with
+> `.values(["duplicates"])` / `.values(["heading"])` and list the project's roles / types. Read them with `values()`:
+> each value is a `ProxyEnumOption` whose `id()` is the role / type id. Write the chain on **one line** (§3.1.9).
+
 #### Document / Collection / Page selectors
 ```velocity
 $parameters.put("documentListParameter",   $factory.enumeration("Document(s)",   "@document").allowNoValue(true).allowMultipleValues(true).dependencyTarget(true).build())
@@ -254,6 +260,17 @@ To process active Work Items that actually belong to the selected LiveDoc, in do
 ```
 
 `Document.items().contained()` returns the active contained Work Items in document order. This is preferable to reconstructing a document query when the document originated from an `@document` selector.
+
+> **Verified on 2512 (selector objects)**:
+> - `@document` (multi): `values()` → `ProxyEnumOption`; `getModelObject()` → `ProxyDocument` (check `isUnresolvable()`
+>   first); `getOldApi()` → Open API `Module` with `getModuleFolder()` (`_default` for the default space) and `getId()`.
+>   `getModelObject().getReference().spaceId()` is **empty**: take space and name from `getOldApi()`.
+> - `@document` lists the **current project's documents only**, also when a `@project` parameter selects other projects.
+>   For documents of other projects, add a text parameter (e.g. `project/space/document`, comma separated).
+> - `@project` (multi): `values()` → options whose `id()` is the project id.
+> - `@collection`: `getModelObject().getReference()` → `BaselineCollectionReference`, the same object as the collection
+>   context (§2.8). Use it when the page has no collection context (Polarion PDF export).
+> - There is **no `@space`** dynamic enumeration (§10.2): a "spaces" parameter stays a text field, or needs a custom list.
 
 #### Date (relative or absolute)
 ```velocity
@@ -444,6 +461,22 @@ To make a script widget truly Collection-aware:
 - You may pass an explicit Collection reference to query a hierarchy from outside its context.
 - See *SQL Query Examples for Collections* in the Polarion SDK.
 
+> **Verified on 2512 (collection spike, uploaded Velocity widget)**:
+> - `$transaction.context().contextCollection()` returns a `BaselineCollectionReference`: `projectId()`, `id()`,
+>   `get($transaction).getOldApi()` → `getName()`, `getUpstreamCollections()`.
+> - It is **null outside a collection and in the Polarion PDF export** (browser print keeps it). The page location does
+>   not carry the collection id either. A widget that must export to PDF needs an `@collection` parameter as fallback
+>   (`getModelObject().getReference()`, §2.1).
+> - `searchBySql(sql).collection($ref)` works on `col_module`, `col_workitem` and `col_struct_workitem_linkedworkitems`
+>   (always select `c_uri, c_col_rev`). Each result's `getOldApi()` is the Open API object **at the pinned revision**.
+>   Documents of **upstream collections** are included. `IModule.getRevision()` is empty for a document added without a
+>   pinned revision (read at HEAD: mark it as such). Documents outside the collection, and their items, are never returned.
+> - **Pitfall**: `getLinkedItem()` on a pinned item returns the **current (HEAD)** target. Resolve the target's document
+>   and fields through a collection query on the link tables (map `project/id` → object), not through the link.
+> - Links that open objects in the collection: `#/project/<P>/collection/<ID>/wiki/<space>/<document>`,
+>   `#/project/<P>/collection/<ID>/workitem?id=<item>`; for an object of another project:
+>   `#/project/<other>/collection/<collection project>//<ID>/…`.
+
 ### 2.9 Activity Stream Query Fields
 
 The Activity Stream widget's `Query` parameter indexes source-specific prefixed fields:
@@ -592,6 +625,14 @@ Also verified on 2512:
 - Arithmetic on `Long` values does not compute: `#set($d = $t1 - $t0)` with `$date.systemTime` values leaves `$d` unset. Velocity 1.4 arithmetic is defined for `Integer`. Print the raw values, or compute in JavaScript.
 - `#include("resources/x")` and `#parse("resources/x.vm")` fail with *"Unable to find resource"*: Velocity cannot load files from an uploaded widget's `resources/` folder. Inline small JS/CSS in `render.vm` (Velocity-safe). For a large third-party script, ship it in `resources/` and load it with the Widget SDK directive `#loadWidgetJs("resources/x.js")` (verified on 2512 with a 425 KB library; keep the zip entry name, e.g. `widget/resources/x.js`, within 30 characters).
 - Multi-value `customEnum` parameters (`allowMultipleValues(true)`) are read with `$parameters.<id>.values()`; each value's `id()` (or its string form) is the option id.
+
+Velocity 1.4 behaviours to design around (seen with `velocity-1.4.jar`; the widgets rely on the first one on 2512):
+- `#set($x = $obj.get())` with a **null** result keeps the previous value of `$x`. Reset first: `#set($x = "")`, then
+  `#set($x = $obj.get())`.
+- `#foreach` iterates Lists, Collections and arrays; an object that is only an `Iterator`/`Iterable` was not iterated.
+- An inline `#set` after a reference on the same line (`$a$b#set($s = ";")#end` inside a one-line `#foreach`) was
+  emitted as text. To join a list on one line, write the separator after each entry
+  (`#foreach($x in $list)$esc.html($x);#end`) and ignore the empty last part when reading it.
 
 Hex colour codes (`#c62828`) are safe: hex digits cannot spell a directive name.
 
@@ -2220,6 +2261,9 @@ These `@…` IDs produce lists from live Polarion data and are what you pass as 
 
 Whenever a Query is used (including none), values are restricted to the current project — except for inherently global objects (`@role`, `@project`, `@projectGroup`).
 
+There is no `@space` type: spaces cannot be offered as a dynamic enumeration (checked against the 2512 list). Verified
+selector behaviour (`@document` current project only, object classes) is in §2.1.
+
 Tip: build the query in the relevant topic's Query Builder, use **Convert to text**, and paste the result into the Query field.
 
 ### 10.3 Default Enumeration Configuration Files (repository scope)
@@ -2253,6 +2297,12 @@ Configured in `workitem-link-role-enum.xml` (Administration → Work Items → E
 | **Default** | The role pre-selected in the Linked Work Items section |
 | **Parent** | Marks the role as defining the parent/child hierarchy. This drives **Calculated Field aggregation** (sum, multiply, average, min, max are *always* computed over this hierarchy) and makes children move with the parent into a Document |
 | **Description** | Free text |
+
+> **Verified on 2512**: read the roles in a widget with
+> `$trackerService.getTrackerProject($projectId).getWorkItemLinkRoleEnum().getAllOptions()` → `getId()`, `getName()`,
+> `getOppositeName()` (e.g. `satisfies` / `satisfies` / `is satisfied by`). Label a link with the **name** from the source
+> item's side and the **opposite name** from the target item's side (e.g. a traceability matrix of the target document).
+> `satisfies` links are stored on the downstream item (source) and point to the specification item (target).
 
 **Rules** on each role restrict which Work Item types may be linked with it (e.g. `verifies` only from Test Case to Requirement). Defining rules is important — they drive the UI and prevent users from creating traceability that is wrong but looks valid in dashboards.
 
@@ -2454,6 +2504,10 @@ Caveats: the limited list sorts differently from the full Linked Work Items sect
 4. **Limit result sizes** with `queryWorkItemsLimited()` or equivalent.
 5. **Avoid `PLAN:(*)` and other unbounded wildcard queries.**
 6. **Do the heavy lifting once in a Page Script** and share it via `$pageContext` (thread-safe objects only).
+7. **Do not grow a large string in a loop** (`#set($s = "${s};${x}")` in a `#foreach` is quadratic): collect values in a
+   list and print them with a `#foreach` directly in the output (practice).
+8. **Pass data to inline JavaScript as hidden `data-*` attributes**, escaped with `$esc.html`, with separators replaced
+   inside values. Cap what is written per page and show a warning when the cap is reached (practice).
 
 ### 11.6 CSS & Export
 
@@ -2703,6 +2757,29 @@ WHERE w.c_deleted IS NOT TRUE
 #end
 ```
 
+#### Collection Documents and Items at the Collection Revision (verified on 2512)
+```velocity
+#set($colRef = false)
+#set($ctx = $transaction.context())
+#if($ctx)
+  #set($colRef = $ctx.contextCollection())
+#end
+## No context (PDF export, page outside the collection): fall back to an @collection parameter
+#if(!$colRef && $parameters.collection.values().size() > 0)
+  #set($colRef = $parameters.collection.values().get(0).getModelObject().getReference())
+#end
+#if($colRef)
+  #set($docs = $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+  #set($itemSql = "select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module")
+  #foreach($cw in $transaction.objects().searchBySql($itemSql).collection($colRef))
+    #set($wi = $cw.getOldApi())
+    ## group $wi by $wi.getModule() (document at the collection revision)
+  #end
+#end
+```
+One query for all items, grouped in Velocity, is faster than one query per document. Check `isUnresolvable()` on the
+selected collection's model object before using it.
+
 #### Filtering by Collection
 ```velocity
 #foreach($wi in $allWorkItems)
@@ -2733,6 +2810,7 @@ WHERE w.c_deleted IS NOT TRUE
 12. [ ] PDF/Print branch avoids JavaScript and external stylesheets
 13. [ ] Velocity 1.4 dialect only (§3.1.9): single-line method chains, no `{}` map literals, no backslashes in string literals, no directive names in plain text; `#[[ ]]#`, `#break` and `$foreach` do nothing
 14. [ ] Every `.vm` file parses with `velocity-1.4.jar` before upload
+15. [ ] Collection-aware widgets: fallback `@collection` parameter for the PDF export (no context there); link targets resolved through the collection tables, not `getLinkedItem()` (HEAD)
 
 ### 13.2 Pre-Submission Checklist — Polarion Scripting
 
@@ -2834,6 +2912,9 @@ WHERE w.c_deleted IS NOT TRUE
   than erroring — it looks like "no methods matched" when it actually means "reflection is
   blocked here"; `.getClass().getName()` still works and is the reliable way to identify a class
 
+- Collection context is null in the Polarion PDF export; `getLinkedItem()` returns the HEAD target even for an item read at a collection revision (§2.8)
+- The `@document` selector lists the current project only, even with other projects in scope (§2.1)
+
 #### Polarion Scripting
 - Wrong terminal expression (Save Hook returning a number → save always fails)
 - Assuming `return` works at top level (it does not)
@@ -2868,7 +2949,7 @@ WHERE w.c_deleted IS NOT TRUE
 | Variable | Type | Description |
 |---|---|---|
 | `$page` | LiveReport page | `$page.getReference().projectId()` for the current project |
-| `$transaction` | ReadOnlyTransaction | Rendering API entry point; `$transaction.context.contextCollection` for Collection context |
+| `$transaction` | ReadOnlyTransaction | Rendering API entry point; `$transaction.context().contextCollection()` for Collection context (null outside a collection and in the PDF export, verified on 2512) |
 | `$trackerService` | `ITrackerService` | Open API entry point |
 | `$projectService` | `IProjectService` | Project operations |
 | `$securityService` | `ISecurityService` | `getCurrentUser()` |

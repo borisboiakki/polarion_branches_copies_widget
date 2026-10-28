@@ -93,9 +93,11 @@ public class WidgetHarness {
     public static class WorkItem {
         final String id, type; final Module module;
         boolean unresolvable;
+        String title;
         final List<Link> links = new ArrayList<Link>();
         public WorkItem(String id, String type, Module module) { this.id = id; this.type = type; this.module = module; module.items.add(this); }
         public String getId() { return id; }
+        public String getTitle() { return title != null ? title : "Title " + id; }
         public Opt getType() { return new Opt(type, type); }
         public Module getModule() { return module; }
         public boolean isUnresolvable() { return unresolvable; }
