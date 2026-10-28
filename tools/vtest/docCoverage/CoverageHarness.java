@@ -11,6 +11,7 @@ import java.util.*;
  *   _default/Other      VIA-41: 41 satisfies 5                         (not selected)
  *   CustomerSpec        VIA-1 satisfies 2                              (same document, ignored)
  *   VforIB: _default/SysReq_X  VIB-1 satisfies VIA-5                   (other project, only with both projects selected)
+ *   VforIB: _default/SysReq_Y  VIB-2 satisfies VIA-1                   (other project, left out by "Documents of other projects")
  *
  * Expected with CustomerSpec, SysReq_A, SysReq_B, SwReq_C selected and roles satisfies + verifies:
  *   CustomerSpec covered {1,2,3,4} = 4/6 (67%), uncovered VIA-5, VIA-6; SysReq_A covered {11,12} = 2/4 (50%).
@@ -58,6 +59,8 @@ public class CoverageHarness {
         WidgetHarness.link(12, "parent", 11);
         x = WidgetHarness.doc("VforIB", "_default", "SysReq_X");
         WidgetHarness.wi("VIB-1", "systemRequirement", x).links.add(new WidgetHarness.Link("satisfies", WidgetHarness.ITEMS.get("VIA-5")));
+        WidgetHarness.Module y = WidgetHarness.doc("VforIB", "_default", "SysReq_Y");
+        WidgetHarness.wi("VIB-2", "systemRequirement", y).links.add(new WidgetHarness.Link("satisfies", WidgetHarness.ITEMS.get("VIA-1")));
     }
 
     static Map<String, WidgetHarness.Param> params(List<Object> docs, List<Object> roles) {
@@ -117,6 +120,21 @@ public class CoverageHarness {
         String multiPdf = WidgetHarness.render(dir, two, true, out + "/velocity-multipdf.log");
         WidgetHarness.check(multiPdf.contains("<td>VforIB / _default / SysReq_X</td>") && multiPdf.contains("Projects: VforIA, VforIB &mdash;"),
             "two projects, PDF: project in labels and header");
+        WidgetHarness.check(multi.contains("data-c=\"VforIB/_default/SysReq_Y\""), "two projects, no other documents listed: all documents of VforIB");
+        // Documents of other projects: only SysReq_X of VforIB; the short form project/document means the default space.
+        two.put("otherDocs", new WidgetHarness.Param(" VforIB / SysReq_X ", null));
+        String listed = WidgetHarness.render(dir, two, false, out + "/velocity-otherdocs.log");
+        WidgetHarness.check(listed.contains("data-c=\"VforIB/_default/SysReq_X\"") && !listed.contains("SysReq_Y") && listed.contains("data-cov=\"5\""),
+            "documents of other projects: only the listed document of VforIB");
+        // An entry of the current project adds to the selection; bad, unselected and unknown entries are reported.
+        two.put("otherDocs", new WidgetHarness.Param("VforIA/_default/Other, nonsense, VforIC/_default/Z, VforIB/_default/Nope, VforIB/_default/SysReq_X", null));
+        String mixed = WidgetHarness.render(dir, two, false, out + "/velocity-othermixed.log");
+        WidgetHarness.check(mixed.contains("data-k=\"VforIA/_default/Other\"") && !mixed.contains("SysReq_Y")
+            && mixed.contains("1 entries of Documents of other projects could not be read")
+            && mixed.contains("Documents of other projects ignored, project not selected: VforIC.")
+            && mixed.contains("Documents of other projects not found: VforIB/_default/Nope."),
+            "documents of other projects: current-project entry added, bad / unselected / unknown entries reported");
+        two.remove("otherDocs");
         two.put("projects", new WidgetHarness.Param(null, list(new WidgetHarness.RoleOpt("VforIB"))));
         String notCur = WidgetHarness.render(dir, two, false, out + "/velocity-notcur.log");
         WidgetHarness.check(notCur.contains("which is not in the selected projects: they are ignored."), "selected documents outside the scope: warning");

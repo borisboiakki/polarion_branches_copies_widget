@@ -210,3 +210,4 @@ context (F15), non-LiveDoc documents.
 | 2026-10-27 | PO test of 0.3.1 on 2512: type selector (Heading preselected, counts as before) and widget icon OK. Ready for release | PO |
 | 2026-10-28 | Widget 0.4.0: **Projects** parameter (`@project` multi-selector, none = current project). Document key `project/space/name`; SQL on `p.c_id IN (…)`; cross-project links between selected projects count (PO); scope line in the main view and the PDF header; project column in Excel; links open in the project of the document/item; warning above 5 projects. Minor release (PO). Open check §10.2 k | PO |
 | 2026-10-28 | PO test of 0.4.0 on 2512: project selector works, documents and cross-project links of two projects shown, rendering time good. Open check §10.2 k closed. Ready for release | PO |
+| 2026-10-28 | Widget 0.4.1: no functional change; the shared `documents.vm` accepts a list of documents of other projects (`docOther`, used by docCoverage 0.2.1) | |

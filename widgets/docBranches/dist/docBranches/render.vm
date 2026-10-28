@@ -3,7 +3,7 @@
 ## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
 ## Velocity 1.4 and writes widgets/docBranches/dist/docBranches.zip.
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
-#set($bwVersion = "0.4.0")
+#set($bwVersion = "0.4.1")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -343,10 +343,14 @@
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the projects in scope into docList / docByKey (maps with key, project, id, title, space,
 ## type, status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
-## (project/space/name) to keep among the documents of the current project; empty or unset = all documents.
+## (project/space/name) to keep among the documents of the current project; docOther = the same for the documents of
+## the other projects in scope. Empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
   #set($docOnly = [])
+#end
+#if(!$docOther)
+  #set($docOther = [])
 #end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
@@ -369,6 +373,9 @@
     #set($keep = false)
   #end
   #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+    #set($keep = false)
+  #end
+  #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
     #set($keep = false)
   #end
   #if($keep)

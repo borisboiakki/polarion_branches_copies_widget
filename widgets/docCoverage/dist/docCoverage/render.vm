@@ -5,7 +5,7 @@
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
 ## Terms: upstream document = document of the link targets (e.g. customer specification), downstream document =
 ## document of the link sources. Verified for "satisfies" on 2512 (spike C3). Edge "up>down": o = upstream, c = downstream.
-#set($bwVersion = "0.2.0")
+#set($bwVersion = "0.2.1")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -285,6 +285,70 @@
   #end
 #end
 
+## Documents of other projects: text "project/space/document, ..." (the @document selector lists the current project
+## only). "project/document" means the default space. Entries of the current project are added to the selection
+## (docOnly); entries of another selected project limit that project's documents (docOther, documents.vm).
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.otherDocs.value)
+#set($tmp = $parameters.otherDocs.value())
+#set($otherDocsStr = "")
+#if("$tmp" != $bwUnset)
+  #set($otherDocsStr = "$tmp")
+#end
+#set($docOther = [])
+#set($otherBad = 0)
+#set($otherOut = [])
+#foreach($oEntry in $otherDocsStr.split(","))
+  #set($oEntryT = $oEntry.trim())
+  #if($oEntryT != "")
+    #set($oParts = [])
+    #foreach($oX in $oEntryT.split("/"))
+      #set($void = $oParts.add($oX.trim()))
+    #end
+    #set($oProj = "")
+    #set($oSpace = "")
+    #set($oName = "")
+    #if($oParts.size() == 2)
+      #set($oProj = $oParts.get(0))
+      #set($oSpace = "_default")
+      #set($oName = $oParts.get(1))
+    #elseif($oParts.size() == 3)
+      #set($oProj = $oParts.get(0))
+      #set($oSpace = $oParts.get(1))
+      #set($oName = $oParts.get(2))
+    #end
+    #if(!$oProj.matches("[A-Za-z0-9_.-]+") || $oSpace == "" || $oName == "")
+      #set($otherBad = $otherBad + 1)
+    #else
+      #set($oKey = "${oProj}/${oSpace}/${oName}")
+      #if($oProj == $projectId)
+        #if(!$docOnly.contains($oKey))
+          #set($void = $docOnly.add($oKey))
+        #end
+      #elseif($projectIds.contains($oProj))
+        #if(!$docOther.contains($oKey))
+          #set($void = $docOther.add($oKey))
+        #end
+      #elseif(!$otherOut.contains($oProj))
+        #set($void = $otherOut.add($oProj))
+      #end
+    #end
+  #end
+#end
+#if($otherBad > 0)
+  #set($scopeWarn = "${scopeWarn} $otherBad entries of Documents of other projects could not be read (write project/space/document).")
+#end
+#if($otherOut.size() > 0)
+  #set($otherOutStr = "")
+  #foreach($oP in $otherOut)
+    #if($otherOutStr != "")
+      #set($otherOutStr = "${otherOutStr}, ")
+    #end
+    #set($otherOutStr = "${otherOutStr}${oP}")
+  #end
+  #set($scopeWarn = "${scopeWarn} Documents of other projects ignored, project not selected: ${otherOutStr}.")
+#end
+
 ## Link roles: selector values (id() = role id, spike C2; verified with 2 roles by the PO on 2512). At most maxRoles.
 #set($roleAll = [])
 #set($roleVals = false)
@@ -350,10 +414,14 @@
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the projects in scope into docList / docByKey (maps with key, project, id, title, space,
 ## type, status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
-## (project/space/name) to keep among the documents of the current project; empty or unset = all documents.
+## (project/space/name) to keep among the documents of the current project; docOther = the same for the documents of
+## the other projects in scope. Empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
   #set($docOnly = [])
+#end
+#if(!$docOther)
+  #set($docOther = [])
 #end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
@@ -376,6 +444,9 @@
     #set($keep = false)
   #end
   #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+    #set($keep = false)
+  #end
+  #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
     #set($keep = false)
   #end
   #if($keep)
@@ -440,6 +511,17 @@
     #set($void = $docList.add($d))
     #set($void = $docByKey.put($dKey, $d))
   #end
+#end
+
+## Listed documents of other projects that were not found (or are excluded by Spaces to include).
+#set($otherMissing = "")
+#foreach($oKey in $docOther)
+  #if(!$docByKey.containsKey($oKey))
+    #set($otherMissing = "${otherMissing} ${oKey}")
+  #end
+#end
+#if($otherMissing != "")
+  #set($scopeWarn = "${scopeWarn} Documents of other projects not found:${otherMissing}.")
 #end
 
 ## ======================================================================= links

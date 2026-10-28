@@ -1,10 +1,14 @@
 ## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
 ## Collects the documents of the projects in scope into docList / docByKey (maps with key, project, id, title, space,
 ## type, status, created, updated, items, itemObjs, module). Needs common.vm. Optional: docOnly = list of keys
-## (project/space/name) to keep among the documents of the current project; empty or unset = all documents.
+## (project/space/name) to keep among the documents of the current project; docOther = the same for the documents of
+## the other projects in scope. Empty or unset = all documents.
 #set($ds = $trackerService.getDataService())
 #if(!$docOnly)
   #set($docOnly = [])
+#end
+#if(!$docOther)
+  #set($docOther = [])
 #end
 #set($docList = [])
 #set($docByKey = $objectFactory.newMap())
@@ -27,6 +31,9 @@
     #set($keep = false)
   #end
   #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+    #set($keep = false)
+  #end
+  #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
     #set($keep = false)
   #end
   #if($keep)
