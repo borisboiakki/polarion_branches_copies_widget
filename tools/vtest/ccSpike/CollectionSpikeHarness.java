@@ -191,7 +191,10 @@ public class CollectionSpikeHarness {
         h = run(dir, out, "links", true, false);
         WidgetHarness.check(h.contains("VforIA/Requirements/SRS_Test | duplicates | VforIA/Requirements/SRS_Test_Reuse_TestB"), "links: copy pair found");
         WidgetHarness.check(h.contains("VforIA/Requirements/SRS_Test | derived_from | VforIA/Requirements/SRS_Test_TestD_Derived"), "links: derived pair found");
-        WidgetHarness.check(!h.contains("SRS_Test_Copy_of_B_TestE"), "links: documents outside the collection ignored");
+        WidgetHarness.check(!h.contains("SRS_Test_Copy_of_B_TestE</td>"), "links: documents outside the collection ignored");
+        WidgetHarness.check(h.contains("<td>VforIA/Requirements/SRS_Test | duplicates | VforIA/Requirements/SRS_Test_Reuse_TestB</td><td>6</td>")
+            && java.util.regex.Pattern.compile("from documents outside the collection into it: <b>[1-9]").matcher(h).find(),
+            "links: HEAD comparison, links from outside the collection counted");
         h = run(dir, out, "sql", true, false);
         WidgetHarness.check(h.contains("<b>3</b> row(s)"), "sql: custom SQL");
         h = run(dir, out, "page", false, false);

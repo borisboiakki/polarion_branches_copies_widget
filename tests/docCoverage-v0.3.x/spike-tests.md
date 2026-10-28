@@ -75,6 +75,22 @@ show that the widget reads the **pinned revision** rather than HEAD. And the PDF
 6. Optional: if your instance allows it, add a document of **another project** to the collection and re-run K2/K4; open
    the page from an older revision / baseline of the collection and re-run K1 (is a revision shown in the reference?).
 
+## Round 3 (after round 2, 2026-10-28)
+
+Round 2 showed that items are read at the pinned revision. Still open: whether the **links** are read at the pinned
+revision (K4 showed the same 2 links; it is not known whether HEAD changed them), the document outside the collection,
+and K9 (not in the results).
+
+1. Upload the new `spike-widget/ccSpike.zip`: K4 now also lists the **HEAD links** between the same documents and the
+   HEAD links coming from documents outside the collection, so one K4 run shows both sides.
+2. If not done yet: in HEAD, remove the link VIA-560 → VIA-554, add a `refines` link from an unlinked downstream item,
+   and create a third document outside the collection that `refines` the upstream document.
+3. Re-run **K4** on the page in the collection (browser view). Expected: collection part = VIA-560 → VIA-554 and
+   VIA-561 → VIA-552; HEAD part = the new set; "HEAD links from documents outside the collection" > 0, and that document
+   absent from the collection pairs.
+4. Run **K9** (new option "K9 Page location (PDF export)") on the page in the collection in the browser view **and** in
+   the Polarion PDF export, and on a page outside the collection.
+
 ## Findings
 
 Round 1, 2026-10-28, project `VforIA`, collection id 3 with 2 documents (upstream system requirements, downstream
@@ -89,3 +105,7 @@ software requirements), role `refines`. Raw results sent in the chat, not commit
 | K6 | 2026-10-28 | ✅ Outside the collection, the parameter "Collection" (`@collection`, `ProxyEnumOption` id = collection id) → `getModelObject().getReference()` gives the same reference; K1/K2 identical to the context |
 | K7 | 2026-10-28 | ❌ **PDF export: `contextCollection()` is null** (same class `ServerUiContext`), also for the page in the collection; only the "Collection" parameter worked there. To find another way: K9 (round 2); otherwise the PDF of a collection report needs the "Collection" parameter |
 | K8 | 2026-10-28 | ✅ Custom SQL in the collection works (default query) |
+| K2/K3 round 2 | 2026-10-28 | ✅ **Pinned revision read**: after HEAD changed (items added), K2 `getContainedWorkItems()` 7 vs. HEAD 9 (upstream) and 4 vs. 5 (downstream); K3a and K3b 6 vs. HEAD 8 and 3 vs. 4 (headings excluded). Same counts with the context (browser view) and with the "Collection" parameter (Polarion PDF export) |
+| K4 round 2 | 2026-10-28 | ⚠️ Same 2 links as round 1 (VIA-560 → VIA-554, VIA-561 → VIA-552), nothing from outside; whether HEAD links had changed is not visible → K4 now prints the HEAD side too (round 3) |
+| K7 round 2 | 2026-10-28 | ❌ confirmed: Polarion PDF export of the page in the collection: no context (only the parameter works). ✅ **Browser print to PDF** of the page opened in the collection keeps the context (it prints the browser view) |
+| K9 | — | Not in the round 2 results → round 3 |

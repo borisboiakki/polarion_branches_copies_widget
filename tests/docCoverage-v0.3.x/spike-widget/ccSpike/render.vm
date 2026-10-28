@@ -550,6 +550,93 @@
       <tr><td>$r</td></tr>
     #end
   </table>
+  ## HEAD for comparison: links between the same documents at HEAD (Open API, what docCoverage 0.2.1 reads), and
+  ## HEAD links from documents outside the collection into it.
+  #set($colKeys = [])
+  #set($colProj = [])
+  #foreach($d in $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+    #ccsObj($d)
+    #ccsKey($ccsOld)
+    #if($ccsKeyOut != "" && !$colKeys.contains($ccsKeyOut))
+      #set($void = $colKeys.add($ccsKeyOut))
+      #set($kpS = "$ccsKp")
+      #if($kpS.matches("[A-Za-z0-9_.-]+") && !$colProj.contains($kpS))
+        #set($void = $colProj.add($kpS))
+      #end
+    #end
+  #end
+  #set($projSql = "")
+  #foreach($pp in $colProj)
+    #if($projSql != "")
+      #set($projSql = "${projSql},")
+    #end
+    #set($projSql = "${projSql}'${pp}'")
+  #end
+  #set($headPairs = $objectFactory.newMap())
+  #set($headRows = [])
+  #set($headOutside = 0)
+  #set($outsideRows = [])
+  #if($projSql != "")
+    #set($headSql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN module ms ON ms.c_uri = ws.fk_uri_module INNER JOIN module mt ON mt.c_uri = wt.fk_uri_module INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id IN (${projSql}) AND l.c_role IN (${roleSql}) AND ms.c_uri <> mt.c_uri")
+    <p>HEAD for comparison (projects of the collection, all link sources of these roles):</p>
+    <pre>$esc.html($headSql)</pre>
+    #set($h0 = $date.systemTime)
+    #foreach($w in $ds.sqlSearch($headSql))
+      #set($sm = false)
+      #set($sm = $w.getModule())
+      #ccsKey($sm)
+      #set($srcKey = $ccsKeyOut)
+      #set($srcId = $w.getId())
+      #foreach($ls in $w.getLinkedWorkItemsStructsDirect())
+        #set($role = "")
+        #set($role = $ls.getLinkRole().getId())
+        #if($roleIds.contains("$role"))
+          #set($tgt = false)
+          #set($tgt = $ls.getLinkedItem())
+          #set($tUr = "unknown")
+          #if($tgt)
+            #set($tUr = $tgt.isUnresolvable())
+          #end
+          #if("$tUr" == "false")
+            #set($tm = false)
+            #set($tm = $tgt.getModule())
+            #ccsKey($tm)
+            #set($tKey = $ccsKeyOut)
+            #set($tI = $tgt.getId())
+            #if($colKeys.contains($tKey) && $tKey != $srcKey)
+              #if($colKeys.contains($srcKey))
+                #set($pk = "${tKey} | ${role} | ${srcKey}")
+                #set($pc = 0)
+                #if($headPairs.containsKey($pk))
+                  #set($pc = $headPairs.get($pk))
+                #end
+                #set($pc = $pc + 1)
+                #set($void = $headPairs.put($pk, $pc))
+                #if($headRows.size() < $maxRows)
+                  #set($void = $headRows.add("${srcId} ${role} &gt; ${tI}"))
+                #end
+              #else
+                #set($headOutside = $headOutside + 1)
+                #if($outsideRows.size() < $maxRows)
+                  #set($void = $outsideRows.add("${srcId} in ${srcKey} ${role} &gt; ${tI}"))
+                #end
+              #end
+            #end
+          #end
+        #end
+      #end
+    #end
+    #set($h1 = $date.systemTime)
+    <table>
+      <tr><th>HEAD: target document | role | source document</th><th>Links</th></tr>
+      #foreach($k in $headPairs.keySet())
+        <tr><td>$!esc.html($k)</td><td>$headPairs.get($k)</td></tr>
+      #end
+    </table>
+    <p>HEAD links between the collection documents: #foreach($r in $headRows)$r; #end</p>
+    <p>HEAD links from documents outside the collection into it: <b>$headOutside</b>. #foreach($r in $outsideRows)$r; #end</p>
+    <p>HEAD start / end (ms): $h0 / $h1</p>
+  #end
 
 ## ================================================================ K8 custom SQL
 #elseif($test == "sql")
