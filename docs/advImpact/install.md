@@ -30,6 +30,8 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
 | Link counts on the lines by default | Shown | Or *Hidden*. Viewers can toggle it |
 | Extra document fields shown by default | none | Type, status, created, updated, work item count. Viewers can toggle them |
 | Graph height in pixels | 600 | Height of the scrollable graph area |
+| Collection context | Use | Use: on a page opened in a collection, the work items and links of the collection documents and of its upstream collections, at their collection revisions (the start document must be in the collection). Ignore: current work items |
+| Collection | none | `@collection` selector, used when the page has no collection context: Polarion PDF export, or a page outside the collection |
 
 ## How the analysis works
 
@@ -41,6 +43,10 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
   downstream levels on the right. A line between two documents counts the links along the analysis paths.
 - Safety limits: an analysis direction stops after a level with more than 5 000 new work items, or when more than
   20 000 work items are reached; a warning is shown. The page holds at most 40 000 links.
+- **In a collection** (0.3.0): the items of the collection documents and the links of the selected roles between them
+  are read once from the collection tables, at the revisions the collection pins (queries verified by the docCoverage
+  spike); the levels are then followed on them. The start query runs on the current items of the start document, and
+  the matching items are taken at the collection revision. Documents without a pinned revision are marked (HEAD).
 
 ## Using the widget
 
@@ -53,17 +59,19 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
   **Traceability matrix (Excel)** in the details: each reached work item of the document with its links (role name for
   outgoing links, opposite name for incoming ones), the linked document and the linked item's level.
 - **Hover / click a line** for the links between the two documents.
-- **Excel**: sheets Relations, Documents (position, level, impacted items), Impacted items (with "reached from"),
+- **Excel**: sheets Relations, Documents (position, level, impacted items, collection revision), Impacted items (with "reached from"),
   Impact paths (one path from a start item to each impacted item, with the links along it), Start items. CSV fallback when the Excel
   library is not loaded.
 - **PDF export / print**: static graph, documents table, relations table and the first 200 impacted work items (no JavaScript).
 
 ![PDF view](preview-pdf.png)
 
-## Known limitations (0.2.0)
+## Known limitations (0.3.0)
 
-- Current project only: links to work items of other projects are not followed (later version, SPEC F15).
-- No collection context yet (later version, SPEC F15).
+- Current project only: links to work items of other projects are not followed (later version, SPEC F15); in a
+  collection, documents of other projects are not reached either.
+- Collection context (0.3.0) not yet checked on 2512 (SPEC §8 lists the checks). In a collection the start query is
+  evaluated on the current items, not on the collection revision.
 - The **Start items** picker narrows the start items of the page (whole document or query); it cannot add other items
   without changing the query. The PDF export uses all start items.
 - Work items outside a LiveDoc are followed but not drawn (they have no document).

@@ -1,0 +1,88 @@
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.collectionMode.singleValue)
+#set($tmp = $parameters.collectionMode.singleValue())
+#set($colMode = "use")
+#if("$tmp" == "ignore")
+  #set($colMode = "ignore")
+#end
+#set($colRef = false)
+#set($colFrom = "")
+#set($colParamN = 0)
+#if($colMode == "use")
+  #set($colCtx = false)
+  #set($colCtx = $transaction.context())
+  #if($colCtx)
+    #set($colRef = $colCtx.contextCollection())
+  #end
+  #if($colRef)
+    #set($colFrom = "context")
+  #else
+    #set($colVals = false)
+    #set($colVals = $parameters.collection.values)
+    #set($colVals = $parameters.collection.values())
+    #if($colVals)
+      #foreach($v in $colVals)
+        #set($colParamN = $colParamN + 1)
+        #if(!$colRef)
+          #set($colMo = false)
+          #set($colMo = $v.getModelObject())
+          #set($colMoUr = "unknown")
+          #if($colMo)
+            #set($colMoUr = $colMo.isUnresolvable())
+          #end
+          #if("$colMoUr" == "false")
+            #set($colRef = $colMo.getReference())
+            #set($colFrom = "parameter")
+          #end
+        #end
+      #end
+    #end
+  #end
+#end
+## Collection name and upstream collections for the scope line.
+#set($colText = "")
+#set($colKey = "")
+#if($colRef)
+  #set($colP = "")
+  #set($colP = $colRef.projectId())
+  #set($colI = "")
+  #set($colI = $colRef.id())
+  #set($colKey = "${colP}/${colI}")
+  #set($colName = "")
+  #set($colOld = false)
+  #set($colObj = false)
+  #set($colObj = $colRef.get($transaction))
+  #if($colObj)
+    #set($colOld = $colObj.getOldApi())
+  #end
+  #if($colOld)
+    #set($colName = $colOld.getName())
+  #end
+  #if("$colName" == "")
+    #set($colName = "$colKey")
+  #end
+  #set($colText = "Collection: ${colName}")
+  #set($colUps = "")
+  #if($colOld)
+    #set($colUpList = false)
+    #set($colUpList = $colOld.getUpstreamCollections())
+    #if($colUpList)
+      #foreach($u in $colUpList)
+        #set($uName = "")
+        #set($uName = $u.getName())
+        #if("$uName" != "")
+          #if($colUps != "")
+            #set($colUps = "${colUps}, ")
+          #end
+          #set($colUps = "${colUps}${uName}")
+        #end
+      #end
+    #end
+  #end
+  #if($colUps != "")
+    #set($colText = "${colText} (with upstream: ${colUps})")
+  #end
+  #if($colParamN > 1)
+    #set($scopeWarn = "${scopeWarn} Several collections selected: the first one is used.")
+  #end
+#end

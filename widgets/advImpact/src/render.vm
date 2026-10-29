@@ -8,6 +8,9 @@
 ## visited set ("both" = a downstream and an upstream analysis, combined: a path never changes direction). Then the links of
 ## the selected roles between the reached items (Open API, getLinkedWorkItemsStructsDirect): the browser recomputes the
 ## levels from them for the toggles (roles, direction, levels).
+## In a collection (F18): the same traversal on the items and links of the collection at the revisions it pins, read once
+## from the collection tables (col_workitem, col_struct_workitem_linkedworkitems; docCoverage spike K3/K4), then followed in
+## Velocity instead of one SQL query per level.
 ## Terms: a link is stored on its source item and points to its target (verified on 2512). Downstream = items whose link
 ## points to the frontier (link sources); upstream = targets of the links of the frontier.
 #set($bwVersion = "0.1.0")
@@ -38,6 +41,13 @@
 
 ## ======================================================================= lists
 ## BW_SHARED common.vm
+
+## ======================================================================= collection
+## Collection context as docCoverage F17 (verified on 2512, spike tests/docCoverage-v0.3.x K1/K6/K7): the page opened in a
+## collection gives its reference through the transaction context; the PDF export has none, so the parameter "Collection"
+## is used then (and on pages outside the collection). Mode "ignore": always the current items (HEAD). Sets colRef, colKey
+## (project/id) and colText (scope line).
+## BW_SHARED collection.vm
 
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.direction.singleValue)
@@ -117,6 +127,20 @@
   #set($sdFolder = "$sdFolder")
   #set($sdName = $sdMod.getId())
   #set($sdName = "$sdName")
+#end
+
+## In a collection the start document must be one of its documents (or of its upstream collections): the selector gives
+## the current document, matched by its key.
+#set($aicStartIn = false)
+#if($colRef && $startKey != "")
+  #foreach($cd in $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+    #set($m = false)
+    #set($m = $cd.getOldApi())
+    #bwKey($m)
+    #if($bwKeyOut == $startKey)
+      #set($aicStartIn = true)
+    #end
+  #end
 #end
 
 ## Link roles: selector values (id() = role id). At most maxRoles. Names and opposite names from the project's
@@ -211,6 +235,9 @@
   #end
 #elseif($roleIds.size() == 0)
   <div class="bw-warn">Advanced Impact Analysis: select at least one link role in the widget parameters.</div>
+#elseif($colRef && !$aicStartIn)
+  #set($aicMsg = "Advanced Impact Analysis: the start document ${sdFolder} / ${sdName} is not in the collection ${colName} (nor in its upstream collections). Select a document of the collection, or set Collection context to Ignore.")
+  <div class="bw-warn">$esc.html($aicMsg)</div>
 #else
 #set($ds = $trackerService.getDataService())
 #set($warn = "")
@@ -233,7 +260,98 @@
 #end
 #set($startSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'${startTypeSql}")
 #set($startCand = [])
-#if($startQuery != "")
+#if($colRef)
+  ## ---------------------------------------------------------------- collection
+  ## aicItems: id -> work item at the collection revision (items of the collection documents, current project, excluded
+  ## types left out), in query order in aicOrder; aicDoc: id -> document key. One query for all items, grouped in Velocity (as documents.vm).
+  #set($aicItems = $objectFactory.newMap())
+  #set($aicDoc = $objectFactory.newMap())
+  #set($aicOrder = [])
+  #set($aicSql = "select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module")
+  #if($typeSql != "")
+    #set($aicSql = "${aicSql} where w.c_type not in (${typeSql})")
+  #end
+  #foreach($cw in $transaction.objects().searchBySql($aicSql).collection($colRef))
+    #set($cwi = false)
+    #set($cwi = $cw.getOldApi())
+    #aiItem($cwi)
+    #if($aiOk && !$aicItems.containsKey($aiId))
+      #set($cwm = false)
+      #set($cwm = $cwi.getModule())
+      #bwKey($cwm)
+      #if($bwKeyOut != "")
+        #set($void = $aicItems.put($aiId, $cwi))
+        #set($void = $aicDoc.put($aiId, $bwKeyOut))
+        #set($void = $aicOrder.add($aiId))
+      #end
+    #end
+  #end
+  ## Start query: evaluated by Polarion on the current items (HEAD), restricted to the start document; the matching items
+  ## are then taken at the collection revision.
+  #set($aicQIds = $objectFactory.newMap())
+  #if($startQuery != "")
+    #set($startLucene = "project.id:${projectId} AND SQL:(${startSql}) AND (${startQuery})")
+    #foreach($w in $trackerService.queryWorkItems($startLucene, "id"))
+      #set($void = $aicQIds.put("$w.getId()", true))
+    #end
+  #end
+  #foreach($aicId in $aicOrder)
+    #if($aicDoc.get($aicId) == $startKey && ($startQuery == "" || $aicQIds.containsKey($aicId)))
+      #set($void = $startCand.add($aicItems.get($aicId)))
+    #end
+  #end
+  ## Links of the selected roles between collection items, read at the collection revision (spike K4): link sources from
+  ## col_struct_workitem_linkedworkitems, links from getLinkedWorkItemsStructsDirect() of each source. The target object
+  ## of a link is the current item: it is matched by id with the collection items. aicDown: target id -> source ids,
+  ## aicUp: source id -> target ids, aicLinks: [source, target, role].
+  #set($aicDown = $objectFactory.newMap())
+  #set($aicUp = $objectFactory.newMap())
+  #set($aicLinks = [])
+  #set($aicLinkSql = "select distinct ws.c_uri, ws.c_col_rev from col_struct_workitem_linkedworkitems l inner join col_workitem ws on ws.c_uri = l.fk_uri_p_workitem inner join col_workitem wt on wt.c_uri = l.fk_uri_workitem where l.c_role in (${roleSql})")
+  #if($typeSql != "")
+    #set($aicLinkSql = "${aicLinkSql} and ws.c_type not in (${typeSql}) and wt.c_type not in (${typeSql})")
+  #end
+  #foreach($cs in $transaction.objects().searchBySql($aicLinkSql).collection($colRef))
+    #set($csi = false)
+    #set($csi = $cs.getOldApi())
+    #aiItem($csi)
+    #set($aicS = $aiId)
+    #if($aiOk && $aicItems.containsKey($aicS))
+      #foreach($ls in $csi.getLinkedWorkItemsStructsDirect())
+        #set($role = "")
+        #set($roleObj = false)
+        #set($roleObj = $ls.getLinkRole())
+        #if($roleObj)
+          #set($role = "$roleObj.getId()")
+        #end
+        #if($roleIds.contains($role))
+          #set($tgt = false)
+          #set($tgt = $ls.getLinkedItem())
+          #set($tUr = "unknown")
+          #if($tgt)
+            #set($tUr = $tgt.isUnresolvable())
+          #end
+          #if("$tUr" == "false")
+            #set($tid = "$tgt.getId()")
+            #set($tProj = "$tgt.getProjectId()")
+            #if($tid != $aicS && $tProj == $projectId && $aicItems.containsKey($tid))
+              #set($trip = [$aicS, $tid, $role])
+              #set($void = $aicLinks.add($trip))
+              #if(!$aicDown.containsKey($tid))
+                #set($void = $aicDown.put($tid, []))
+              #end
+              #set($void = $aicDown.get($tid).add($aicS))
+              #if(!$aicUp.containsKey($aicS))
+                #set($void = $aicUp.put($aicS, []))
+              #end
+              #set($void = $aicUp.get($aicS).add($tid))
+            #end
+          #end
+        #end
+      #end
+    #end
+  #end
+#elseif($startQuery != "")
   #set($startLucene = "project.id:${projectId} AND SQL:(${startSql}) AND (${startQuery})")
   #set($startCand = $trackerService.queryWorkItems($startLucene, "id"))
 #else
@@ -284,6 +402,29 @@
   #set($stop = false)
   #foreach($lv in [1..7])
     #if($lv <= $levels && $frontier.size() > 0 && !$stop)
+      #set($next = [])
+      #if($colRef)
+        ## Collection: neighbours from the link maps read above.
+        #set($adj = $aicDown)
+        #if($pass == "up")
+          #set($adj = $aicUp)
+        #end
+        #foreach($fid in $frontier)
+          #if($adj.containsKey($fid))
+            #foreach($rid in $adj.get($fid))
+              #if(!$visited.containsKey($rid))
+                #set($void = $visited.put($rid, $lv))
+                #set($void = $next.add($rid))
+                #if(!$items.containsKey($rid))
+                  #set($void = $items.put($rid, $aicItems.get($rid)))
+                  #set($void = $itemOrder.add($rid))
+                  #set($void = $itemDoc.put($rid, $aicDoc.get($rid)))
+                #end
+              #end
+            #end
+          #end
+        #end
+      #else
       ## IN lists of at most chunkSize ids (ids are identifiers: checked before going into SQL)
       #set($chunks = [])
       #set($cur = [])
@@ -299,7 +440,6 @@
       #if($cur.size() > 0)
         #set($void = $chunks.add($cur))
       #end
-      #set($next = [])
       #foreach($chunk in $chunks)
         #set($inSql = "")
         #foreach($q in $chunk)
@@ -324,6 +464,7 @@
             #end
           #end
         #end
+      #end
       #end
       #if($lv > $reachedMax && $next.size() > 0)
         #set($reachedMax = $lv)
@@ -363,6 +504,19 @@
   #set($void = $docOnly.add($startKey))
 #end
 ## BW_SHARED documents.vm
+## In a collection documents.vm lists every document of the collection: only the documents of the reached items are kept.
+#if($colRef)
+  #set($aicDocList = [])
+  #set($docByKey = $objectFactory.newMap())
+  #foreach($d in $docList)
+    #if($docOnly.contains($d.get("key")))
+      #set($void = $aicDocList.add($d))
+      #set($void = $docByKey.put($d.get("key"), $d))
+    #end
+  #end
+  #set($docList = $aicDocList)
+  #set($scopeText = $colText)
+#end
 ## Items outside any document (not in a LiveDoc) are grouped under a pseudo document key "".
 
 ## ======================================================================= links between the reached items
@@ -370,6 +524,16 @@
 ## them, SPEC 6.2). Ids are written as is: Polarion ids contain no "|" or ";".
 #set($links = [])
 #set($linkN = 0)
+#if($colRef)
+  #foreach($ln in $aicLinks)
+    #if($items.containsKey($ln.get(0)) && $items.containsKey($ln.get(1)))
+      #if($linkN < $linkCap)
+        #set($void = $links.add($ln))
+      #end
+      #set($linkN = $linkN + 1)
+    #end
+  #end
+#else
 #foreach($id in $itemOrder)
   #set($w = $items.get($id))
   #foreach($ls in $w.getLinkedWorkItemsStructsDirect())
@@ -399,6 +563,7 @@
       #end
     #end
   #end
+#end
 #end
 #if($linkN > $linkCap)
   #set($warn = "${warn} Large page: only the first ${linkCap} links are written to the page (${linkN} found).")
@@ -831,11 +996,11 @@
 #set($void = $docIdx.put($d.get("key"), $di))
 #set($di = $di + 1)
 #end
-<div class="ai-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-mode="all" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-dir="$direction" data-levels="$levels" data-start="$esc.html($startKey)" data-query="$esc.html($startQuery)" data-warn="$esc.html($warn.trim())">
+<div class="ai-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-col="$esc.html($colKey)" data-mode="all" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-dir="$direction" data-levels="$levels" data-start="$esc.html($startKey)" data-query="$esc.html($startQuery)" data-warn="$esc.html($warn.trim())">
   <div class="bw-muted">$esc.html($scopeText)</div>
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
-    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-rev="$esc.html($d.get('rev'))"></i>
 #end
 ## Type names of the reached items, filled by the item loop: "id|name;" (start item picker).
 #set($typeNames = $objectFactory.newMap())

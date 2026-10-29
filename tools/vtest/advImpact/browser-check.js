@@ -182,6 +182,27 @@ async function clickDoc(p, name) {
   await d3.saveAs(dir + '/export.csv');
   expect(d3.suggestedFilename().endsWith('.csv') && fs.readFileSync(dir + '/export.csv', 'utf8').indexOf('Source space') >= 0, 'CSV fallback');
 
+  // Collection context: documents and items open in the collection, revision in the Excel Documents sheet.
+  await p.goto('file://' + dir + '/collection.html');
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: dir + '/shot-collection.png', fullPage: true });
+  const colText = await p.textContent('.ai-root');
+  expect(colText.indexOf('Collection: Release 1 (with upstream: Base)') >= 0 && (await status()).indexOf('3 start items, 4 impacted work items in 2 documents') >= 0,
+    'collection: scope line, start items and impacted items of the pinned revisions');
+  const colLinks = await p.$$eval('a.bw-node', els => els.map(a => a.getAttribute('href')));
+  expect(colLinks.some(h => h.indexOf('/project/VforIA/collection/7/wiki/_default/SwReq_C') >= 0),
+    'collection: document opens in the collection');
+  await clickDoc(p, 'SysReq_A');
+  const colItems = await p.$$eval('.bw-details a', els => els.map(a => a.textContent + '|' + a.getAttribute('href')));
+  expect(colItems.some(t => t.indexOf('VIA-11|') === 0 && t.indexOf('/project/VforIA/collection/7/workitem?id=VIA-11') >= 0),
+    'collection: impacted item opens in the collection');
+  await p.click('.bw-details button:text-is("Close")');
+  const [dc] = await Promise.all([p.waitForEvent('download'), p.click('.bw-toolbar button:text-is("Excel")')]);
+  await dc.saveAs(dir + '/export-collection.xlsx');
+  const colDocs = (await readBook(p, dir + '/export-collection.xlsx'))[1].rows;
+  const revCol = colDocs[0].indexOf('Revision');
+  expect(revCol >= 0 && colDocs.slice(1).map(r => r[2] + '@' + r[revCol]).sort().join(',') === 'CustomerSpec@100,SwReq_C@90,SysReq_A@101',
+    'collection: Excel Documents sheet with the revisions');
   await p.goto('file://' + dir + '/pdf.html');
   await p.screenshot({ path: dir + '/shot-pdf.png', fullPage: true });
   expect((await p.$$('script')).length === 0 && (await p.textContent('body')).indexOf('Downstream level 3') >= 0, 'PDF view: static, no script');

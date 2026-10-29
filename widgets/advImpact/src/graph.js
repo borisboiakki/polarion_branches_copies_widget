@@ -601,11 +601,11 @@
     });
     var shown = this.shownDocInfo();
     var docs = [['Project', 'Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
-      'Position', 'Direction', 'Level', 'Impacted work items', 'Start items']];
+      'Position', 'Direction', 'Level', 'Impacted work items', 'Start items', 'Revision']];
     shown.forEach(function (n) {
       var info = res.docs[n.key];
       docs.push([n.project, n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
-        posLabel(info), info.side === 'start' ? '' : dirLabel(info.side), info.level, info.items.length, info.starts]);
+        posLabel(info), info.side === 'start' ? '' : dirLabel(info.side), info.level, info.items.length, info.starts, n.rev]);
     });
     var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 2, url: absUrl(docUrl(n)) }; });
     var items = [['Work item', 'Title', 'Type', 'Document', 'Direction', 'Level', 'Reached from']];
@@ -634,7 +634,7 @@
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
         widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8]) },
-      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 12, 12, 11, 20, 12, 7, 12, 10] },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 12, 12, 11, 20, 12, 7, 12, 10, 12] },
       { name: 'Impacted items', rows: items, links: itemLinks, widths: [16, 50, 16, 34, 12, 7, 40] },
       { name: 'Impact paths', rows: paths, links: pathLinks, widths: [16, 50, 34, 12, 7, 50, 50] },
       { name: 'Start items', rows: starts, links: startLinks, widths: [16, 50, 20, 34] }

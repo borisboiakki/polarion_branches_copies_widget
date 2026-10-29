@@ -217,6 +217,90 @@ public class ImpactHarness {
         gone.unresolvable = true;
         WidgetHarness.check(WidgetHarness.render(dir, params(gone, "down", 3, "satisfies"), false, out + "/velocity-gone.log").contains("the start document cannot be read"),
             "unreadable start document: message");
+        collectionChecks(dir, out);
         System.out.println("Rendered: browser " + br.length() + " chars, pdf " + pdf.length() + " chars");
+    }
+
+    /**
+     * Collection "Release 1" (VforIA/7), upstream collection "Base" (CollectionMocks, as observed on 2512):
+     *   CustomerSpec @100  VIA-1, VIA-2 customerRequirement, VIA-3 customerNote, VIA-5 heading (VIA-4 only in HEAD)
+     *   SysReq_A @101      VIA-11 satisfies 1 (title "Pinned title 11"), 12 satisfies 2, 13 satisfies 1 (HEAD: 13 satisfies 2),
+     *                      12 satisfies 11 (same document)
+     *   SwReq_C @90        (upstream collection) VIA-31 satisfies 11
+     * Test_T, SysReq_B and Deep_D are not in the collection. Downstream from CustomerSpec: level 1 = 11, 12, 13,
+     * level 2 = 31; Test_T (VIA-41 verifies 31 in HEAD) not reached.
+     */
+    static void collectionChecks(String dir, String out) throws Exception {
+        CollectionMocks.Collection col = new CollectionMocks.Collection("VforIA", "7", "Release 1");
+        CollectionMocks.Collection base = new CollectionMocks.Collection("VforIA", "2", "Base");
+        col.upstream.add(base);
+        CollectionMocks.RevModule specR = new CollectionMocks.RevModule("VforIA", "Specs", "CustomerSpec", "100");
+        CollectionMocks.RevModule aR = new CollectionMocks.RevModule("VforIA", "_default", "SysReq_A", "101");
+        CollectionMocks.RevModule cR = new CollectionMocks.RevModule("VforIA", "_default", "SwReq_C", "90");
+        Map<Integer, WidgetHarness.WorkItem> r = new HashMap<Integer, WidgetHarness.WorkItem>();
+        r.put(1, new WidgetHarness.WorkItem("VIA-1", "customerRequirement", specR));
+        r.put(2, new WidgetHarness.WorkItem("VIA-2", "customerRequirement", specR));
+        r.put(3, new WidgetHarness.WorkItem("VIA-3", "customerNote", specR));
+        r.put(5, new WidgetHarness.WorkItem("VIA-5", "heading", specR));
+        for (int i = 11; i <= 13; i++) { r.put(i, new WidgetHarness.WorkItem("VIA-" + i, "systemRequirement", aR)); }
+        r.put(31, new WidgetHarness.WorkItem("VIA-31", "softwareRequirement", cR));
+        r.get(11).title = "Pinned title 11";
+        r.get(11).links.add(new WidgetHarness.Link("satisfies", r.get(1)));
+        r.get(12).links.add(new WidgetHarness.Link("satisfies", r.get(2)));
+        r.get(12).links.add(new WidgetHarness.Link("satisfies", r.get(11)));
+        r.get(13).links.add(new WidgetHarness.Link("satisfies", r.get(1)));
+        r.get(13).links.add(new WidgetHarness.Link("satisfies", r.get(5)));
+        r.get(31).links.add(new WidgetHarness.Link("satisfies", r.get(11)));
+        col.docs.add(specR);
+        col.docs.add(aR);
+        base.docs.add(cR);
+        int queries = SQL_LOG.size();
+
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
+        String cb = WidgetHarness.render(dir, params(spec, "down", 3, "satisfies", "verifies"), false, out + "/velocity-collection.log");
+        WidgetHarness.write(out + "/collection-fragment.html", cb);
+        WidgetHarness.check(cb.contains("data-col=\"VforIA/7\"") && cb.contains(">Collection: Release 1 (with upstream: Base)<"),
+            "collection: context read, collection and upstream on the scope line");
+        WidgetHarness.check(itemIds(cb).equals("VIA-1,VIA-11,VIA-12,VIA-13,VIA-2,VIA-3,VIA-31"),
+            "collection: start items and reached items of the pinned revisions, Test_T not in the collection: " + itemIds(cb));
+        WidgetHarness.check(SQL_LOG.size() == queries, "collection: no traversal query on the current tables");
+        String cl = attr(cb, "ai-ln");
+        WidgetHarness.check(cl.contains("VIA-13|VIA-1|satisfies;") && !cl.contains("VIA-13|VIA-2|") && cl.contains("VIA-12|VIA-11|satisfies;")
+            && cl.contains("VIA-31|VIA-11|satisfies;") && !cl.contains("VIA-5"), "collection: links of the pinned revision, same-document link kept, heading left out");
+        WidgetHarness.check(attr(cb, "ai-it").contains("VIA-11|1|systemRequirement|0|Pinned title 11;"), "collection: titles of the pinned revision");
+        WidgetHarness.check(cb.contains("data-items=\"3\" data-rev=\"100\"") && cb.contains("data-rev=\"90\"")
+            && !cb.contains("Test_T") && !cb.contains("SysReq_B"), "collection: documents at their revision, upstream collection included, others ignored");
+
+        // Upstream from SwReq_C (in the upstream collection): VIA-11, then VIA-1.
+        String cu = WidgetHarness.render(dir, params(c, "up", 3, "satisfies"), false, out + "/velocity-collectionup.log");
+        WidgetHarness.check(itemIds(cu).equals("VIA-1,VIA-11,VIA-31"), "collection, upstream: SysReq_A then CustomerSpec: " + itemIds(cu));
+
+        // Start query: evaluated on the current items (customerNote = VIA-3, VIA-4), kept when in the collection (VIA-3).
+        Map<String, WidgetHarness.Param> q = params(spec, "down", 3, "satisfies", "verifies");
+        q.put("startQuery", new WidgetHarness.Param("type:customerNote", null));
+        String cq = WidgetHarness.render(dir, q, false, out + "/velocity-collectionquery.log");
+        WidgetHarness.check(attr(cq, "ai-it").startsWith("VIA-3|0|customerNote|1|") && !cq.contains("VIA-4|"), "collection: start query intersected with the collection items");
+
+        // Start document outside the collection.
+        String out1 = WidgetHarness.render(dir, params(d, "down", 3, "satisfies"), false, out + "/velocity-collectionout.log");
+        WidgetHarness.check(out1.contains("the start document _default / Deep_D is not in the collection Release 1"), "collection: start document not in the collection");
+
+        // PDF export: no context, the parameter "Collection" gives the collection.
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(null);
+        Map<String, WidgetHarness.Param> pp = params(spec, "down", 3, "satisfies", "verifies");
+        pp.put("collection", new WidgetHarness.Param(null, list(new CollectionMocks.ColOpt(col))));
+        String cp = WidgetHarness.render(dir, pp, true, out + "/velocity-collectionpdf.log");
+        WidgetHarness.check(cp.contains("Collection: Release 1 (with upstream: Base) &mdash; downstream, 3 levels, 4 impacted work items in 2 documents")
+            && cp.contains("<td>_default / SwReq_C</td><td>Downstream level 2</td><td>1</td><td>1</td>")
+            && cp.contains("<td>VIA-11</td><td>Pinned title 11</td>"), "collection PDF: collection from the parameter, pinned items and titles");
+
+        // Mode "ignore": current items even in a collection.
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
+        Map<String, WidgetHarness.Param> ig = params(spec, "down", 3, "satisfies", "verifies");
+        ig.put("collectionMode", new WidgetHarness.Param("ignore", null));
+        String ign = WidgetHarness.render(dir, ig, false, out + "/velocity-collectionignore.log");
+        WidgetHarness.check(ign.contains("data-col=\"\"") && itemIds(ign).equals("VIA-1,VIA-11,VIA-12,VIA-13,VIA-2,VIA-21,VIA-22,VIA-3,VIA-31,VIA-32,VIA-4,VIA-41"),
+            "collection context ignored: current items (HEAD)");
+        WidgetHarness.TRANSACTION = null;
     }
 }

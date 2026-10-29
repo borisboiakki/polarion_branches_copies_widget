@@ -178,6 +178,8 @@ depends on them, level after level.
 | Link counts on the lines by default | Shown | Or *Hidden* | yes |
 | Extra document fields shown by default | none | Type, status, created, updated, work item count | yes |
 | Graph height in pixels | 600 | Height of the graph area | — |
+| Collection context | Use | *Use*: when the page is opened in a **collection**, the analysis follows the work items and links of the collection documents (and of its upstream collections), each at the revision the collection pins. *Ignore*: always the current work items | — |
+| Collection | none | Used only when the page is **not** opened in a collection, e.g. for the **PDF export**. Choose the same collection as the page | — |
 
 When you hide a role or a direction, or choose fewer levels, the analysis is **recalculated**: items reached only
 through the hidden links disappear, and the others can move to a higher level. Hiding a document with the **Documents**
@@ -188,6 +190,13 @@ query. Search on id or title, filter by type, tick the items to start from (*Sel
 items the search and the filter show): the analysis is recalculated at once. You can only narrow the start items of
 the page: to choose freely in the whole document, leave the query empty. The Excel workbook lists the chosen items in
 its *Start items* sheet; the PDF export always uses all start items.
+
+**In a collection** the scope line shows the collection. The start document must be a document of the collection,
+otherwise the widget says so. Work items, titles and links are those of the revision each document has in the
+collection: a link added after that revision is not followed, a removed one still is. Documents outside the collection
+are never reached. The start query is run on the current work items of the start document; of the matching items, those
+in the collection revision are kept. Documents without a fixed revision are marked **(HEAD)**, and documents and work
+items open in the collection. The Excel *Documents* sheet gives each document's collection revision.
 
 For very large analyses a direction stops after a level with more than 5 000 new work items, or when 20 000 work
 items are reached; a warning in the status line says so.
@@ -262,7 +271,7 @@ The workbook follows the current toolbar choices, and every item and document ha
 |---|---|
 | Branches and Copies | Relations, Documents, Linked items (up to 30 per document pair) |
 | Coverage | Relations, Documents (with coverage and the collection revision), Uncovered items (up to 500 per document), Linked items (all links of the shown lines) |
-| Impact | Relations, Documents (position, level, impacted items), Impacted items (direction, level, reached from), Impact paths (one path from a start item to each impacted item, with the links along it), Start items (the chosen start items and the query) |
+| Impact | Relations, Documents (position, level, impacted items, collection revision), Impacted items (direction, level, reached from), Impact paths (one path from a start item to each impacted item, with the links along it), Start items (the chosen start items and the query) |
 
 If the browser blocks the Excel library, the button downloads the relations as a CSV file instead, and the status line
 says so.
@@ -278,8 +287,8 @@ there; the PDF uses the **parameter defaults** of the widget.
   documents of other projects are ignored. Advanced Impact Analysis follows links inside the current project only. The scope line at the top says which projects are analysed.
 - With several projects, every document shows its project (box, table, Excel), and links open the document or work
   item in its own project. Each extra project adds rendering time: a warning is shown above 5 projects.
-- Document Coverage in a collection: Polarion's PDF export of the page has no collection, so it shows the current
-  documents unless the *Collection* parameter is set (see section 5).
+- Document Coverage and Advanced Impact Analysis in a collection: Polarion's PDF export of the page has no collection, so
+  it shows the current documents unless the *Collection* parameter is set (see sections 5 and 6).
 - Link roles and work item types are chosen from the current project's configuration. Other projects must use the
   same role and type ids for their links and items to be found.
 - Links between items of the same document and links to items you cannot read are ignored.
