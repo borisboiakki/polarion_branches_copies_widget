@@ -2,7 +2,7 @@ import java.util.*;
 import java.util.regex.*;
 
 /**
- * Rendering API collection mocks for the docCoverage harness, as observed on 2512 (spike tests/docCoverage-v0.3.x):
+ * Rendering API collection mocks for the docCoverage and advImpact harnesses, as observed on 2512 (spike tests/docCoverage-v0.3.x):
  * $transaction.context().contextCollection() (null outside a collection and in the PDF export), the reference
  * (projectId(), id(), get(transaction).getOldApi() with getName() / getUpstreamCollections()), and
  * $transaction.objects().searchBySql(sql).collection(ref) on the col_* tables, returning objects whose getOldApi() is
@@ -85,6 +85,7 @@ public class CollectionMocks {
             if (sql.contains("col_struct_workitem_linkedworkitems")) {
                 Set<String> roles = WidgetHarness.listAfter(sql, "l.c_role in (");
                 boolean targets = sql.startsWith("select distinct wt.");
+                boolean otherDoc = sql.contains("ms.c_uri <> mt.c_uri");
                 Set<String> exT = WidgetHarness.listAfter(sql, "wt.c_type not in (");
                 Set<String> exS = WidgetHarness.listAfter(sql, "ws.c_type not in (");
                 Set<String> seen = new HashSet<String>();
@@ -93,7 +94,7 @@ public class CollectionMocks {
                         for (WidgetHarness.Link l : w.getLinkedWorkItemsStructsDirect()) {
                             WidgetHarness.WorkItem t = l.getLinkedItem();
                             if (!roles.contains(l.getLinkRole().getId()) || t.isUnresolvable() || !docs.contains(t.getModule())
-                                || t.getModule() == m || exT.contains(t.getType().getId()) || exS.contains(w.getType().getId())) { continue; }
+                                || (otherDoc && t.getModule() == m) || exT.contains(t.getType().getId()) || exS.contains(w.getType().getId())) { continue; }
                             WidgetHarness.WorkItem o = targets ? t : w;
                             if (seen.add(o.getProjectId() + "/" + o.getId())) { out.add(new Proxy(o)); }
                         }

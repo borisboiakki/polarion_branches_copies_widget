@@ -59,9 +59,10 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | F12 | **Excel export** similar to docCoverage (sheets Relations, Documents, Impacted items, Impact paths) and **traceability matrix**-style export per document (Q10); SVG export; CSV fallback | Must |
 | F13 | Excluded work item types (default `heading`) are neither start items nor followed | Must |
 | F14 | Links to unresolvable items ignored; `isUnresolvable()` guard on every referenced object | Must |
-| F15 | **Projects** parameter and **collection context** as docCoverage F16/F17 | Later versions (Q8/Q9) |
+| F15 | **Projects** parameter as docCoverage F16 (collection context: F18) | Later version (Q8) |
 | F16 | Warning in the widget when a traversal was cut off (level cap, item cap per level, Q11). After a cut-off the browser recomputation of F9 is incomplete: the warning stays shown | Must |
 | F17 | **Start item picker** (0.2.0): toolbar panel *Start items (k/N)* listing the server start items (F2), with a search on id or title, a filter by type, *Select shown* / *Clear shown*; the analysis is recomputed in the browser from the selected items (as F9). It can only narrow the server start set: the server reached everything reachable from it, so the result is exact (except after a cut-off, F16). Excel adds a *Start items* sheet (selected items, start query). The PDF view uses the server start set | Must |
+| F18 | **Collection context** (0.3.0), as docCoverage F17: when the LiveReport is opened in a **collection** (or the parameter **Collection** is set, needed for the Polarion PDF export, which has no context), the analysis runs on the work items and links of the collection documents, each at the revision the collection pins, **upstream collections** included; documents without a pinned revision are read at HEAD and marked "HEAD". The start document (selector) must be a document of the collection, matched by project, space and name; otherwise a message. The **start query** is evaluated by Polarion on the current items (HEAD) of the start document; the matching items are taken at the collection revision (items not in the pinned revision are dropped). Items, links and documents outside the collection are not followed. A parameter "Collection context" (use / ignore, default use) switches it off. Links, details and Excel open in the collection; Excel *Documents* sheet with a *Revision* column; scope line shows the collection. Outside a collection: unchanged | Should (done, validated on 2512) |
 
 ## 5. Non-functional requirements
 
@@ -96,7 +97,14 @@ docCoverage (`pairCap`, `itemCap`).
 3. **Client**: `widgets/advImpact/src/graph.js` on top of `shared/js/core.js` (layered layout by level, categories = roles,
    level toggle). New root class `ai-root`.
 4. **Excel**: same xlsx library; sheets built from the page model.
-5. Shared macros extended only when needed; any change in `shared/` rebuilds and retests all widgets (CLAUDE.md).
+5. **Collection context (F18, 0.3.0)**: the collection's tables are read once instead of one SQL query per level, with the
+   queries verified by the docCoverage spike K2–K4: the items of all collection documents (`col_workitem` joined with
+   `col_module`, one query) and the link sources (`col_struct_workitem_linkedworkitems` joined with `col_workitem`, selected
+   roles); the links come from `getLinkedWorkItemsStructsDirect()` of each source at its pinned revision, their targets
+   matched by id with the collection items (the target object of a link is the current item). The traversal (same levels,
+   visited sets and caps) then runs in Velocity on these link maps. The collection-context reading (parameters, context,
+   name and upstream collections) is the shared snippet `shared/vm/collection.vm`, moved unchanged from docCoverage.
+6. Shared macros extended only when needed; any change in `shared/` rebuilds and retests all widgets (CLAUDE.md).
 
 ## 7. Risks
 
@@ -108,6 +116,7 @@ docCoverage (`pairCap`, `itemCap`).
 | R4 | Page model too large for 7 levels | store items once, cap detail lists, counts only beyond the cap |
 | R5 | "Impact" semantic differs per role (direction) | explicit direction parameter + viewer toggle |
 | R6 | "Both" doubles the queries (two analyses) | each analysis is bounded by the levels and the item cap per level |
+| R7 | Collection context (F18) reads the items of every collection document and the links of every link source, not only the reached ones | one query each, a few ms per document in the docCoverage spike (K3/K4); render time with a large collection to check on 2512 |
 
 ## 8. Open questions for the PO
 
@@ -121,6 +130,20 @@ matrix, PDF export, rendering time on the largest chain.
 
 Checks on 2512 for 0.2.0 (PO, 2026-10-29: the picker works as expected). Still worth watching: type names in the picker (`ITypeOpt.getName()`, the id is shown when it is missing), picker
 speed with a start document of several thousand items (the list renders at most 300 entries; the search narrows it).
+
+Checks on 2512 for 0.3.0 (collection context, F18; PO, 2026-10-29: everything works as expected), e.g. with the docCoverage spike
+collection (pinned documents, upstream collection, a document changed after pinning):
+- page opened in the collection: scope line "Collection: … (with upstream: …)", impacted items and links of the pinned
+  revisions (an item or link added or removed after pinning makes the difference with the same page outside the
+  collection), documents of the upstream collection reached, documents outside the collection not reached;
+- the link sources query without `col_module` joins (`col_struct_workitem_linkedworkitems` joined with `col_workitem` only)
+  and links inside one document of the collection (not covered by the docCoverage spike, which looked at links between
+  documents);
+- start query in a collection (evaluated on HEAD, kept for the items of the pinned start document);
+- start document not in the collection: message; Polarion PDF export with the parameter "Collection": same numbers;
+  "Collection context" = Ignore: current items;
+- links of boxes, details, picker and Excel open in the collection; Excel *Revision* column; rendering time with a large
+  collection.
 
 ## 9. Decisions log
 
@@ -144,3 +167,5 @@ speed with a start document of several thousand items (the list renders at most 
 | 2026-10-29 | 0.1.1 (PO test of 0.1.0 on 2512): the Levels select did not react: replaced by one button per level, status line shows levels shown and the deepest level reached. Refresh renamed **Reload page** in all widgets: a widget cannot be re-rendered alone in view mode (PO) | PO, Dev |
 | 2026-10-29 | In-widget start item picker (Q1 follow-up, 0.2.0): a **browser picker** that narrows the server start set (whole document or query subset), with a search on id or title and a filter by type; no page reload. A page parameter with reload (any query) is not planned. To pick from the whole document, leave the start query empty | PO |
 | 2026-10-29 | 0.2.0 validated on 2512: the start item picker works as expected | PO |
+| 2026-10-29 | Collection context (F18, 0.3.0) built as docCoverage F17 (same parameters, upstream collections, HEAD mark), reusing the collection queries verified by its spike: items and links of the collection read once, traversal in Velocity. Start document matched by key (must be in the collection); start query evaluated on HEAD and intersected with the pinned items. The collection-context block moved to `shared/vm/collection.vm` (docCoverage package unchanged) and the collection mocks to `tools/vtest/docBranches/` | Dev (user request) |
+| 2026-10-29 | 0.3.0 validated on 2512: the collection context works as expected | PO |

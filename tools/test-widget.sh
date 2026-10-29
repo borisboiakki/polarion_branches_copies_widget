@@ -5,7 +5,8 @@
 # Per widget: tools/vtest/<widget>/*Harness.java (render on mocks; main class = that file) and tools/vtest/<widget>/browser-check.js.
 # The harness writes browser-fragment.html, pdf-fragment.html, (two projects in scope) multi-fragment.html and (docCoverage,
 # collection context) collection-fragment.html.
-# The mock Polarion objects live in tools/vtest/docBranches/WidgetHarness.java and are compiled with every harness.
+# The mock Polarion objects live in tools/vtest/docBranches/WidgetHarness.java (collection mocks: CollectionMocks.java there)
+# and are compiled with every harness.
 # Output of each widget goes to <outDir>/<widget>/.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,8 +24,8 @@ for w in "${widgets[@]}"; do
   out="$base/$w"
   mkdir -p "$out/cls"
   python3 "$root/tools/build-widget.py" --widget "$w"
-  srcs=("$root/tools/vtest/docBranches/WidgetHarness.java")
-  for f in "$root/tools/vtest/$w/"*.java; do [ "$f" = "${srcs[0]}" ] || srcs+=("$f"); done
+  srcs=("$root/tools/vtest/docBranches/WidgetHarness.java" "$root/tools/vtest/docBranches/CollectionMocks.java")
+  for f in "$root/tools/vtest/$w/"*.java; do [ "$f" = "${srcs[0]}" ] || [ "$f" = "${srcs[1]}" ] || srcs+=("$f"); done
   main="$(cd "$root/tools/vtest/$w" && ls *Harness.java | head -1)"
   javac -nowarn -cp "$cp" -d "$out/cls" "${srcs[@]}" 2>&1 | grep -v '^Picked up\|^Note:' || true
   java -cp "$out/cls:$cp" "${main%.java}" "$root/widgets/$w/dist/$w" "$out" related 2>&1 | grep -v '^Picked up'
@@ -35,7 +36,9 @@ for w in "${widgets[@]}"; do
   done
   # Polarion turns the directive into a script tag; emulate it (the Velocity 1.4 harness leaves it as text).
   mkdir -p "$out/resources" && cp "$root/widgets/$w/dist/$w/resources/xlsx.js" "$out/resources/"
-  sed -i 's|#loadWidgetJs("resources/xlsx.js")|<script src="resources/xlsx.js"></script>|' "$out/browser.html"
+  for f in browser collection; do
+    [ -f "$out/$f.html" ] && sed -i 's|#loadWidgetJs("resources/xlsx.js")|<script src="resources/xlsx.js"></script>|' "$out/$f.html"
+  done
   grep -q '<script src="resources/xlsx.js">' "$out/browser.html" || { echo "loadWidgetJs directive not found in the output"; exit 1; }
   node "$root/tools/vtest/$w/browser-check.js" "$out"
   echo "Screenshots and exports in $out"
