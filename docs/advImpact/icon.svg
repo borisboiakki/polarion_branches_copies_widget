@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- upstream document (left) -->
+  <path d="M2 24h10l4 4v14H2z" fill="#e6f4ea" stroke="#1a7f37" stroke-width="2.2" stroke-linejoin="round"/>
+  <!-- start document (middle) with impact rings -->
+  <path d="M22 18h14l5 5v24H22z" fill="#fff3e0" stroke="#b06000" stroke-width="2.6" stroke-linejoin="round"/>
+  <circle cx="31" cy="34" r="3" fill="#b06000"/>
+  <circle cx="31" cy="34" r="7" fill="none" stroke="#b06000" stroke-width="1.6" stroke-dasharray="3,2"/>
+  <!-- downstream documents, levels 1 and 2 (right) -->
+  <path d="M47 4h10l4 4v14H47z" fill="#e8effc" stroke="#3367d6" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M47 42h10l4 4v14H47z" fill="#e8effc" stroke="#3367d6" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="4,2"/>
+  <!-- links (arrows follow the link direction, towards the upstream side) -->
+  <path d="M46 13C42 13 44 24 42 26" fill="none" stroke="#3367d6" stroke-width="2.6"/>
+  <path d="M46 51C42 51 44 42 42 40" fill="none" stroke="#3367d6" stroke-width="2.6" stroke-dasharray="4,2"/>
+  <path d="M21 33H17" fill="none" stroke="#1a7f37" stroke-width="2.6"/>
+  <path d="M16 33l5-4v8z" fill="#1a7f37"/>
+</svg>

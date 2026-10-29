@@ -1,8 +1,9 @@
 # Specification — Advanced Impact Analysis widget (advImpact)
 
 **Status:** v0.3, 2026-10-29: PO answers Q1–Q12 recorded (§9), reviewed against the dev guide, **spike closed** on 2512
-(`tests/advImpact-v0.1.x/spike-tests.md`, conclusion at its end). **Nothing is implemented**; the folder holds the scaffold
-(parameters, properties, VERSION 0.0.0). Next: implementation of 0.1.0.
+(`tests/advImpact-v0.1.x/spike-tests.md`, conclusion at its end). **0.1.0 implemented** (`widgets/advImpact/src`), tested
+with Velocity 1.4 on mocks and in Chromium (`tools/vtest/advImpact/`); to be validated on 2512. Install guide:
+`docs/advImpact/install.md`.
 
 ## 1. Goal
 
@@ -113,6 +114,10 @@ Q1–Q12 answered on 2026-10-29 (decisions log).
 
 Open: the in-widget picker design (later version). The spike is closed (§6.1 decision).
 
+Checks on 2512 for 0.1.0 (not possible in the sandbox): upload and parameters (single-select start document, query,
+direction, levels), numbers against the spike results (run 1 / part A sets), toggles, details, Excel and traceability
+matrix, PDF export, rendering time on the largest chain.
+
 ## 9. Decisions log
 
 | Date | Decision | By |
@@ -131,3 +136,4 @@ Open: the in-widget picker design (later version). The spike is closed (§6.1 de
 | 2026-10-29 | Q10: Excel sheets Relations, Documents, Impacted items, Impact paths, plus traceability matrix per document | PO |
 | 2026-10-29 | Q11: sizing as the other widgets (~100 docs / 20k items); **cap of items per level** (about 5,000, to tune in spike I6) with a visible warning | PO |
 | 2026-10-29 | Spike closed: all methods agree, very fast up to 7 levels (PO, part C). Method: SQL per level + Open API links; levels 1–7, default 3; cap 5000 new items per level | Dev, PO results |
+| 2026-10-29 | 0.1.0 implemented as specified: F1–F14 and F16 (F15 projects / collection later). Item paths in the browser = one path per item (first parent at each step); the details list every parent | Dev |

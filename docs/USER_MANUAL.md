@@ -1,4 +1,4 @@
-# User manual — Document Branches and Copies, Document Coverage
+# User manual — Document Branches and Copies, Document Coverage, Advanced Impact Analysis
 
 This manual is for Polarion users who want to show these widgets on a LiveReport page.
 
@@ -6,9 +6,11 @@ This manual is for Polarion users who want to show these widgets on a LiveReport
 |---|---|
 | <img src="docBranches/icon.svg" width="32" alt=""> **Document Branches and Copies** | Which LiveDocs of the project are copies, branches or derived documents of which? |
 | <img src="docCoverage/icon.svg" width="32" alt=""> **Document Coverage** | For the documents I choose and the link roles I choose (e.g. *satisfies*), which document covers which, how much (%), and which items are not covered? |
+| <img src="advImpact/icon.svg" width="32" alt=""> **Advanced Impact Analysis** | If the work items of this document (or some of them) change, which documents and work items are impacted, following the links over several levels? |
 
-Both widgets work on the documents of the **current project**, or of the projects chosen in the *Projects* parameter.
-The projects analysed are shown at the top of the widget. Both widgets look the same and have the same toolbar.
+Document Branches and Copies and Document Coverage work on the documents of the **current project**, or of the projects
+chosen in the *Projects* parameter; Advanced Impact Analysis works on the current project. The projects analysed are
+shown at the top of the widget. The widgets look the same and share most of the toolbar.
 
 ---
 
@@ -21,7 +23,8 @@ team to deploy the widgets**, and give them this section.
 For administrators:
 1. Download the packages from the [releases page](../../../releases):
    - `docBranches-N.N.N.zip` for Document Branches and Copies;
-   - `docCoverage-N.N.N.zip` for Document Coverage.
+   - `docCoverage-N.N.N.zip` for Document Coverage;
+   - `advImpact-N.N.N.zip` for Advanced Impact Analysis.
 2. In Polarion, open **Administration → Documents and Pages → Velocity Widgets** and click **Upload**. Upload each
    zip as it is; do not unzip it. Then choose where the widget is available:
    - in **one project**, by uploading from that project's administration (good for a first try);
@@ -30,13 +33,14 @@ For administrators:
    pages that use the widget keep working.
 
 Technical details for administrators are in the install guides: [docBranches](docBranches/install.md),
-[docCoverage](docCoverage/install.md).
+[docCoverage](docCoverage/install.md), [advImpact](advImpact/install.md).
 
 ## 2. Adding a widget to a page
 
 Add the widget to a **LiveReport** page like any other Polarion widget. Open the page in edit mode, find
-**Document Branches and Copies** or **Document Coverage** in the widget list (category *Work Items* / *Traceability*),
-add it, set its parameters (see below), click **Apply** and save the page. You can put both widgets on the same page.
+**Document Branches and Copies**, **Document Coverage** or **Advanced Impact Analysis** in the widget list (category
+*Work Items* / *Traceability*), add it, set its parameters (see below), click **Apply** and save the page. You can put
+several widgets on the same page.
 
 ## 3. What you can set, and where
 
@@ -138,16 +142,64 @@ lines then appear as uncovered.
 
 ---
 
-## 6. Using the widgets (both)
+## 6. <img src="advImpact/icon.svg" width="28" alt=""> Advanced Impact Analysis
+
+![Advanced Impact Analysis](advImpact/preview-graph.png)
+
+### What it shows
+
+Typical use: before changing customer requirements, find every system requirement, software requirement and test that
+depends on them, level after level.
+
+- The analysis starts from the **start items**: the work items of one document, or those selected by a query.
+- **Downstream**: the work items that link to the start items (e.g. the system requirements that *satisfy* them), then
+  the items that link to those (e.g. the tests that *verify* the system requirements), and so on.
+- **Upstream**: the work items the start items link to, then the items those link to, and so on.
+- **Both**: the downstream and the upstream analyses, shown together. A path never changes direction: going down to a
+  system requirement does not continue up to the other customer requirements it satisfies.
+- One step along a link is one **level**. Each work item is counted once, at its lowest level. Each document is drawn
+  at the level of its lowest impacted item: upstream levels on the **left**, the start document, downstream levels on
+  the **right**. The box shows the position (e.g. *Downstream level 2*) and the impacted items (e.g. *Impacted: 12 / 40*).
+- Each line shows the **link roles and the number of links** between the two documents along the analysis paths.
+  Arrows follow the link direction.
+
+![Both directions](advImpact/preview-both.png)
+
+### Parameters
+
+| Parameter | Default | What it does | Live |
+|---|---|---|---|
+| Start document | none, **must be set** | The LiveDoc the analysis starts from (documents of the current project) | — |
+| Start items: work item query | empty = all items | A Polarion query (Lucene) to start from some work items of the start document only, e.g. `type:stakeholderrequirement AND status:in_analysis`. Use the type and status **ids** of your project. If no item matches, the widget says so | — |
+| Link roles (1 to 5) | none, **must be set** | The link roles followed, e.g. `satisfies`, `verifies` | Each role can be hidden or shown |
+| Direction | Downstream | Downstream, Upstream or Both (see above) | With *Both*: each direction can be hidden or shown |
+| Levels of analysis (1 to 7) | 3 | How many link steps are followed | **Levels** list: fewer levels, not more |
+| Work item types not followed | Heading | Items of these types are neither start items nor followed | — |
+| Link counts on the lines by default | Shown | Or *Hidden* | yes |
+| Extra document fields shown by default | none | Type, status, created, updated, work item count | yes |
+| Graph height in pixels | 600 | Height of the graph area | — |
+
+When you hide a role or a direction, or choose fewer levels, the analysis is **recalculated**: items reached only
+through the hidden links disappear, and the others can move to a higher level. Hiding a document with the **Documents**
+button only hides its box: the analysis still goes through its items.
+
+For very large analyses a direction stops after a level with more than 5 000 new work items, or when 20 000 work
+items are reached; a warning in the status line says so.
+
+---
+
+## 7. Using the widgets (all)
 
 ### Toolbar
 
 | Control | What it does |
 |---|---|
 | *Only documents with relations* / *All documents* | Show only the connected documents, or every analysed document (unconnected ones in a grid below) |
-| **Documents (n/m)** (Coverage only) | Choose which of the analysed documents are shown |
+| **Documents (n/m)** (Coverage, Impact) | Choose which of the analysed documents are shown |
 | **Indirect relations** (Branches only) | Show the relations inherited through an intermediate copy |
 | **Relations:** Copies / Branches / Derived (Branches), **Roles:** one per role (Coverage) | Show or hide each kind of line |
+| **Direction:** Downstream / Upstream (Impact, parameter *Both*) | Show or hide each direction of the analysis |
+| **Levels** (Impact) | Number of levels shown (up to the parameter) |
 | **Item counts** | Show or hide the numbers on the lines |
 | **Fields:** Type, Status, Created, Updated, Work items | Extra lines in the document boxes |
 | **Highlight documents…** | Type part of a document name or title to highlight it |
@@ -164,6 +216,8 @@ lines then appear as uncovered.
 - **Click a document**:
   - *Branches and Copies*: opens the document.
   - *Coverage*: shows its coverage and the list of **uncovered items**, with a link that opens the document.
+  - *Impact*: shows its **impacted work items** (first 200), each with its direction, level and the item it was
+    reached from (e.g. `from REQ-11 (is satisfied by)`), with a link that opens the document.
 
 ### Traceability matrix (Coverage)
 
@@ -189,6 +243,10 @@ An item with several links is repeated on several lines. Items are sorted by id.
 In a collection, ids and titles are those of the collection revision. Very large pages are capped (20 000 links and
 20 000 work items per page); the status line then says that the matrix is truncated.
 
+**Advanced Impact Analysis** has the same button in the details of a document: one line per link of each reached work
+item of the document to another reached item (shown roles), with the linked document and the **level** of the linked
+item; *not linked* when it has no such link.
+
 ### Excel export
 
 The workbook follows the current toolbar choices, and every item and document has a link back to Polarion.
@@ -197,6 +255,7 @@ The workbook follows the current toolbar choices, and every item and document ha
 |---|---|
 | Branches and Copies | Relations, Documents, Linked items (up to 30 per document pair) |
 | Coverage | Relations, Documents (with coverage and the collection revision), Uncovered items (up to 500 per document), Linked items (all links of the shown lines) |
+| Impact | Relations, Documents (position, level, impacted items), Impacted items (direction, level, reached from), Impact paths (one path from a start item to each impacted item, with the links along it) |
 
 If the browser blocks the Excel library, the button downloads the relations as a CSV file instead, and the status line
 says so.
@@ -206,10 +265,10 @@ says so.
 When the page is exported to PDF or printed, the widgets show a static graph and tables. The toolbar does not apply
 there; the PDF uses the **parameter defaults** of the widget.
 
-## 7. Good to know
+## 8. Good to know
 
-- The widgets analyse the **current project**, or the projects chosen in *Projects*. Links to documents of other
-  projects are ignored. The scope line at the top says which projects are analysed.
+- The widgets analyse the **current project**, or the projects chosen in *Projects* (Branches, Coverage). Links to
+  documents of other projects are ignored. Advanced Impact Analysis follows links inside the current project only. The scope line at the top says which projects are analysed.
 - With several projects, every document shows its project (box, table, Excel), and links open the document or work
   item in its own project. Each extra project adds rendering time: a warning is shown above 5 projects.
 - Document Coverage in a collection: Polarion's PDF export of the page has no collection, so it shows the current

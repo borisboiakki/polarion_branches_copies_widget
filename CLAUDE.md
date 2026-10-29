@@ -5,16 +5,16 @@ Guidance for Claude Code when working in this repository.
 ## Project in one paragraph
 
 Polarion LiveReport widgets that display the LiveDocs of a project and the **relations between them**,
-deduced from **work item links** (and document metadata where available). Two widgets share one client core,
+deduced from **work item links** (and document metadata where available). The widgets share one client core,
 one build and one test setup:
 - **docBranches** (`widgets/docBranches/`): which document is a branch / copy / derived document of which.
 - **docCoverage** (`widgets/docCoverage/`): for selected documents and 1–5 link roles, which document
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
   (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done and validated on 2512).
-- **advImpact** (`widgets/advImpact/`, **in preparation**, branch `claude/advimpact-widget-spec-7zkne9`): multi-level impact analysis from one
+- **advImpact** (`widgets/advImpact/`, branch `claude/advimpact-widget-spec-7zkne9`): multi-level impact analysis from one
   document or item subset along 1–5 link roles (default 3 levels, up to 7). Spike on 2512 **closed** (method: SQL per level + Open API
-  links, SPEC §6.1). Only a scaffold exists (no `render.vm`, so the build ignores it);
+  links, SPEC §6.1). **0.1.0 implemented** (tested on mocks and in Chromium, not yet on 2512; harness `tools/vtest/advImpact/`);
   the spec (PO answers Q1–Q12 recorded; "both" = downstream and upstream analyses combined) is in its `SPECIFICATION.md`, the spike plan and the diagnostic widget `aiSpike` in `tests/advImpact-v0.1.x/`
   (`tools/vtest/aiSpike/` smoke-tests it; rebuild `aiSpike.zip` after edits).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
@@ -182,7 +182,7 @@ test-data/                     anonymised sample structures for manual verificat
 - Update the widget's `SPECIFICATION.md` (open questions / decisions log) whenever a requirement is clarified.
 - **Shared code**: a change in `shared/` affects every widget. Rebuild and test all of them (`tools/test-widget.sh all`),
   and bump the version of each widget whose package changes. Keep widget-specific logic in `widgets/<w>/src/`.
-  Each widget has its own root class (`bw-root` for docBranches, `cw-root` for docCoverage) so that two widgets on one
+  Each widget has its own root class (`bw-root` for docBranches, `cw-root` for docCoverage, `ai-root` for advImpact) so that two widgets on one
   page never pick up each other's roots. The mock Polarion objects live in `tools/vtest/docBranches/WidgetHarness.java`
   and are compiled with every harness (`tools/vtest/<w>/*Harness.java`).
 - No customer or project-specific data in the repo. Exception agreed with the PO: the spike test set on the sandbox
