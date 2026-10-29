@@ -98,7 +98,7 @@ docCoverage (`pairCap`, `itemCap`).
 |---|---|---|
 | R1 | Frontier `IN (...)` lists grow large at levels 4-7 (fan-out) | chunks of 500 ids; nested sub-selects or `linkedWorkItemsOf`; item cap per level with warning (spike I1/I2/I6/I8) |
 | R2 | Recursive SQL not accepted by `sqlSearch` (guide §7.1: single SELECT only) | BFS (default design) |
-| R3 | Inherited links of copies (spike R2) add links to items already reached | visited set (F7): an item is counted once, at its lowest level; reuse roles only when selected (Q7) |
+| R3 | Inherited links of copies (spike R2) add links to items already reached | visited set (F7): an item is counted once, at its lowest level; reuse roles only when selected (Q7). Verified (spike B1): no double count; a copy of a copy is at level 1 because its items link directly to the original |
 | R4 | Page model too large for 7 levels | store items once, cap detail lists, counts only beyond the cap |
 | R5 | "Impact" semantic differs per role (direction) | explicit direction parameter + viewer toggle |
 | R6 | "Both" doubles the queries (two analyses) | each analysis is bounded by the levels and the item cap per level |
