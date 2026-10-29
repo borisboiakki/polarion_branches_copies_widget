@@ -1,1 +1,1 @@
-Shows how the selected LiveDocs cover each other through work item links of the selected roles: link counts, coverage % and uncovered items.
+Starts from one LiveDoc, or a subset of its work items, and follows the work item links of the selected roles over several levels to the documents that contain impacted work items.

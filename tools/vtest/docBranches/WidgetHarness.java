@@ -336,8 +336,10 @@ public class WidgetHarness {
         private final DataService ds = new DataService();
         public DataService getDataService() { return ds; }
         public TrackerProject getTrackerProject(String projectId) { return new TrackerProject(); }
-        /** Mock of queryWorkItems(query, sort): returns every work item (the query text is not evaluated). */
-        public List<WorkItem> queryWorkItems(String query, String sort) { return new ArrayList<WorkItem>(ITEMS.values()); }
+        /** Mock of queryWorkItems(query, sort): the query text is not evaluated; every work item is returned (none for linkedWorkItemsOf). */
+        public List<WorkItem> queryWorkItems(String query, String sort) {
+            return query.contains("linkedWorkItemsOf") ? new ArrayList<WorkItem>() : new ArrayList<WorkItem>(ITEMS.values());
+        }
     }
 
     public static class ObjectFactory {

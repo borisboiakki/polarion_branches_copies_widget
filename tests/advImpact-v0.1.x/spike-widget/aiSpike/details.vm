@@ -1,1 +1,1 @@
-Shows how the selected LiveDocs cover each other through work item links of the selected roles: link counts, coverage % and uncovered items.
+Diagnostic widget for the Advanced Impact Analysis widget: multi-level link traversal from one document (SQL, Lucene linkedWorkItemsOf, Open API), with timings. Each instance runs one test selected in its parameters. Read-only.

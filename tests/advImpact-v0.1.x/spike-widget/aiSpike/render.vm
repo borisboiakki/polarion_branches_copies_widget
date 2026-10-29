@@ -1,4 +1,4 @@
-## Advanced Impact - spike I1-I8. Read-only diagnostics, one test per widget instance.
+## Advanced Impact - spike I1-I8 (no I8b: per guide 7.2 widget SQL returns objects, not rows). Read-only diagnostics, one test per widget instance.
 ## See tests/advImpact-v0.1.x/spike-tests.md for what each test checks and what to report.
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
 ## An exception stops the render: for a failing SQL the error text of the page IS the finding (report it).
@@ -93,6 +93,10 @@
 #set($tmp = $parameters.startQuery.value())
 #set($startQuery = "$tmp")
 #set($tmp = "")
+#set($tmp = $parameters.customLucene.value)
+#set($tmp = $parameters.customLucene.value())
+#set($customLucene = "$tmp")
+#set($tmp = "")
 #set($tmp = $parameters.customSql.value)
 #set($tmp = $parameters.customSql.value())
 #set($customSql = "$tmp")
@@ -139,10 +143,18 @@
 #set($isPdf = "")
 #set($isPdf = $widgetContext.target().isPdf())
 
-## ---------------------------------------------------------------- start document (first selected, current project)
-#set($docVals = false)
-#set($docVals = $parameters.doc.values)
-#set($docVals = $parameters.doc.values())
+## ---------------------------------------------------------------- start document (single select, current project)
+## singleValue() of an @document parameter is a model-backed EnumOption (guide 2.1); values() is tried as a fallback.
+#set($docVals = [])
+#set($docOpt = false)
+#set($docOpt = $parameters.doc.singleValue())
+#set($docRead = "singleValue()")
+#if($docOpt)
+  #set($void = $docVals.add($docOpt))
+#else
+  #set($docRead = "values()")
+  #set($docVals = $parameters.doc.values())
+#end
 #set($sdMod = false)
 #if($docVals)
   #foreach($v in $docVals)
@@ -220,11 +232,19 @@
 #end
 #set($startFrom = "FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'${startTypeSql}")
 #set($startSql = "SELECT w.c_uri ${startFrom}")
-#set($startSub = "SELECT w.c_id ${startFrom}")
+## Lucene scopes of the start document (I4): document.id (space/name, _default space omitted, guide 6.3) or an SQL:() restriction.
+#set($dq = '"')
+#set($docPath = "${sdFolder}/${sdName}")
+#if($sdFolder == "_default")
+  #set($docPath = $sdName)
+#end
+#set($scopeDocId = "project.id:${projectId} AND document.id:${dq}${docPath}${dq}")
+#set($scopeSql = "project.id:${projectId} AND SQL:(${startSql})")
+#set($startDocKey = "${projectId}/${sdFolder}/${sdName}")
 
 <div class="ais">
 <h4>Advanced Impact spike &mdash; test <code>$!esc.html($test)</code> &mdash; project <code>$!esc.html($projectId)</code> &mdash; PDF: <code>$!isPdf</code></h4>
-<p>Start document: <code>$!esc.html($sdFolder) / $!esc.html($sdName)</code> &mdash; roles: <code>$!esc.html($roleSql)</code> &mdash; direction <b>$direction</b>, levels <b>$levels</b>, excluded types <code>$!esc.html($typeSql)</code></p>
+<p>Start document (read with $docRead): <code>$!esc.html($sdFolder) / $!esc.html($sdName)</code> &mdash; roles: <code>$!esc.html($roleSql)</code> &mdash; direction <b>$direction</b>, levels <b>$levels</b>, excluded types <code>$!esc.html($typeSql)</code></p>
 #if(!$sdMod || $roleSql == "")
   <p class="ko">Select a start document and at least one link role in the parameters.</p>
 #elseif($test == "sql")
@@ -246,16 +266,39 @@
       #set($nestFar = "fk_uri_workitem")
     #end
     #set($nest = "SELECT w0.c_uri FROM workitem w0 INNER JOIN module m ON m.c_uri = w0.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'")
+    ## One sub-select per level (exactly n hops); the result is the union of levels 1..N. Excluded types are filtered on the
+    ## result only, not on the intermediate items (the bfs test does not follow them: counts may differ when headings link).
+    #set($ors = [])
     #foreach($lv in [1..7])
       #if($lv <= $levels)
         #set($nest = "SELECT l.${nestFar} FROM struct_workitem_linkedworkitems l WHERE l.c_role IN (${roleSql}) AND l.${nestNear} IN (${nest})")
+        #set($void = $ors.add("w.c_uri IN (${nest})"))
       #end
     #end
-    #set($sqlOut = "SELECT w.c_uri FROM workitem w WHERE w.c_uri IN (${nest})")
-    #if($direction == "both")
-      <p class="ko">The nested variant runs one direction; "both" is shown as downstream (the union needs two queries, tested in bfs).</p>
-      #set($nestNear = "fk_uri_workitem")
+    #set($orSql = "")
+    #foreach($o in $ors)
+      #if($orSql != "")
+        #set($orSql = "${orSql} OR ")
+      #end
+      #set($orSql = "${orSql}${o}")
     #end
+    #set($resType = "")
+    #if($typeSql != "")
+      #set($resType = " AND w.c_type NOT IN (${typeSql})")
+    #end
+    #set($sqlOut = "SELECT w.c_uri FROM workitem w WHERE (${orSql})${resType}")
+    #if($direction == "both")
+      <p class="ko">The nested variant runs one direction: "both" is run as downstream (the union per level is tested in bfs).</p>
+    #end
+  #end
+  #if($sqlKind == "rec")
+    #set($sqlMeaning = "levels 1..${levels} downstream, intermediate excluded types followed, no type filter on the result")
+  #elseif($sqlKind == "join3")
+    #set($sqlMeaning = "exactly 3 hops downstream (paths of length 3), no type filter")
+  #elseif($sqlKind == "nested")
+    #set($sqlMeaning = "levels 1..${levels}, direction ${direction}, excluded types filtered on the result only")
+  #else
+    #set($sqlMeaning = "custom SQL")
   #end
   <pre>$esc.html($sqlOut)</pre>
   #set($t0 = $date.systemTime)
@@ -277,14 +320,66 @@
     #end
   #end
   #set($t1 = $date.systemTime)
-  <p class="ok">The query ran. Result class <code>$!esc.html($res.getClass().getName())</code>: <b>$cnt</b> work item(s) (levels 1..$levels together, start items themselves excluded only if they are not linked back), start / end $t0 / $t1 ms (SQL + scan of modules).</p>
+  <p class="ok">The query ran. Result class <code>$!esc.html($res.getClass().getName())</code>: <b>$cnt</b> work item(s) ($sqlMeaning; items of the start document are included when they are reached), start / end $t0 / $t1 ms (SQL + scan of modules).</p>
   <table>
     <tr><th>Document</th><th>Work items</th></tr>
     #foreach($k in $docs.keySet())
       <tr><td>$!esc.html($k)</td><td>$docs.get($k)</td></tr>
     #end
   </table>
-  <p>Report: did it run (yes / the error text of the page), the count, the times, and whether the counts equal those of the <i>bfs</i> test for the same levels.</p>
+  <p>Report: did it run (yes / the error text of the page), the count, the times, and the documents. Compare <i>nested</i> with the
+  <i>bfs</i> test (same direction and levels; bfs counts each item once and leaves out the start items).</p>
+
+#elseif($test == "lucene")
+## ================================================================ I8 linkedWorkItemsOf (Lucene, 2506+, guide 6.4)
+## The start filter is an SQL:() restriction to the start document (it has no double quotes, which would need escaping in JSON).
+  #set($follows = "")
+  #foreach($r in $roleIds)
+    #if($follows != "")
+      #set($follows = "${follows},")
+    #end
+    #set($follows = "${follows}${dq}${r}${dq}")
+  #end
+  #set($hop = "linkedWorkItemsOf:([{${dq}filter${dq}:${dq}SQL:(${startSql})${dq},${dq}follows${dq}:[${follows}],${dq}steps${dq}:${levels}}])")
+  #set($lq = "project.id:${projectId} AND ${hop}")
+  #if($customLucene != "")
+    #set($lq = $customLucene)
+  #end
+  <pre>$esc.html($lq)</pre>
+  #set($t0 = $date.systemTime)
+  #set($res = $trackerService.queryWorkItems($lq, "id"))
+  #set($cnt = 0)
+  #set($inStart = 0)
+  #set($docs = $objectFactory.newMap())
+  #foreach($w in $res)
+    #set($cnt = $cnt + 1)
+    #set($wm = false)
+    #set($wm = $w.getModule())
+    #aiKey($wm)
+    #if($aiKeyOut == $startDocKey)
+      #set($inStart = $inStart + 1)
+    #end
+    #if($aiKeyOut != "")
+      #if($docs.containsKey($aiKeyOut))
+        #set($dc = $docs.get($aiKeyOut) + 1)
+        #set($void = $docs.put($aiKeyOut, $dc))
+      #else
+        #set($void = $docs.put($aiKeyOut, 1))
+      #end
+    #end
+  #end
+  #set($t1 = $date.systemTime)
+  <p class="ok">The query ran. Result class <code>$!esc.html($res.getClass().getName())</code>: <b>$cnt</b> work item(s), of which $inStart in the start document; start / end $t0 / $t1 ms.</p>
+  <table>
+    <tr><th>Document</th><th>Work items</th></tr>
+    #foreach($k in $docs.keySet())
+      <tr><td>$!esc.html($k)</td><td>$docs.get($k)</td></tr>
+    #end
+  </table>
+  <p>Report: did it run (or the error text), the count, the times and the documents. Compare with the <i>bfs</i> test for the same
+  levels in the directions down and up: which direction does linkedWorkItemsOf follow, are the levels 1..N all returned or only
+  level N, are the start items returned? Then the same with steps 1 (Levels = 1). If the SQL filter is refused, put a filter in
+  the parameter "Custom Lucene" (e.g. with document.id or id:).</p>
 
 #elseif($test == "start")
 ## ================================================================ I4 start items
@@ -295,61 +390,40 @@
   <p><b>a)</b> All items of the start document by SQL (without excluded types): <b>$cnt</b>, start / end $t0 / $t1 ms.</p>
   <pre>$esc.html($startSql)</pre>
   #if($startQuery != "")
-    #set($q0 = $date.systemTime)
-    #set($qres = $trackerService.queryWorkItems($startQuery, "id"))
-    #set($qn = 0)
-    #set($qIn = 0)
-    #set($qOut = 0)
-    #foreach($w in $qres)
-      #set($qn = $qn + 1)
-      #set($qm = false)
-      #set($qm = $w.getModule())
-      #aiKey($qm)
-      #if($aiKeyOut == "${projectId}/${sdFolder}/${sdName}")
-        #aiItem($w)
-        #if($aiOk)
-          #set($qIn = $qIn + 1)
-        #end
+    #set($scopes = ["docid", "sqlscope"])
+    #foreach($sc in $scopes)
+      #if($sc == "docid")
+        #set($q = "${scopeDocId} AND (${startQuery})")
       #else
-        #set($qOut = $qOut + 1)
+        #set($q = "${scopeSql} AND (${startQuery})")
       #end
-    #end
-    #set($q1 = $date.systemTime)
-    <p><b>b)</b> <code>trackerService.queryWorkItems("$!esc.html($startQuery)", "id")</code>: result class <code>$!esc.html($qres.getClass().getName())</code>,
-      <b>$qn</b> item(s) in the project, <b>$qIn</b> in the start document (not excluded), $qOut elsewhere; start / end $q0 / $q1 ms.</p>
-  #end
-  <p>Report: both counts and times. If b) throws, report the error: then try another way (SQL on a Lucene result, a different method) before the next test.
-  Expected: b) &lt;= a) when the query selects a subset of the document.</p>
-
-#elseif($test == "cols1")
-## ================================================================ I8a transaction.objects().searchBySql
-  #set($t0 = $date.systemTime)
-  #set($res = $transaction.objects().searchBySql($customSql))
-  #set($n = 0)
-  #foreach($o in $res)
-    #set($n = $n + 1)
-    #if($n <= $maxRows)
-      <p>No. $n class <code>$!esc.html($o.getClass().getName())</code>: <code>$!esc.html("$o")</code></p>
-    #end
-  #end
-  #set($t1 = $date.systemTime)
-  <p>Result class <code>$!esc.html($res.getClass().getName())</code>, $n row(s), start / end $t0 / $t1 ms.</p>
-  <p>Report: whether it runs outside a collection, and what the elements are (objects or rows with columns).</p>
-
-#elseif($test == "cols2")
-## ================================================================ I8b sqlSearch with several columns
-  <pre>$esc.html($customSql)</pre>
-  #set($res = $ds.sqlSearch($customSql))
-  #set($n = 0)
-  #foreach($o in $res)
-    #set($n = $n + 1)
-    #if($n <= $maxRows)
-      <p>No. $n class <code>$!esc.html($o.getClass().getName())</code>: <code>$!esc.html("$o")</code></p>
+      #set($q0 = $date.systemTime)
+      #set($qres = $trackerService.queryWorkItems($q, "id"))
+      #set($qn = 0)
+      #set($qIn = 0)
+      #set($qOut = 0)
+      #foreach($w in $qres)
+        #set($qn = $qn + 1)
+        #set($qm = false)
+        #set($qm = $w.getModule())
+        #aiKey($qm)
+        #if($aiKeyOut == $startDocKey)
+          #aiItem($w)
+          #if($aiOk)
+            #set($qIn = $qIn + 1)
+          #end
+        #else
+          #set($qOut = $qOut + 1)
+        #end
+      #end
+      #set($q1 = $date.systemTime)
+      <p><b>b) $sc</b> <code>trackerService.queryWorkItems(query, "id")</code>, result class <code>$!esc.html($qres.getClass().getName())</code>:
+        <b>$qn</b> item(s), <b>$qIn</b> in the start document and not excluded, <b>$qOut</b> outside it (expected 0); start / end $q0 / $q1 ms.</p>
+      <pre>$esc.html($q)</pre>
     #end
   #end
-  <p>Result class <code>$!esc.html($res.getClass().getName())</code>, $n row(s).</p>
-  <p>Report: set the custom SQL to <code>select l.fk_uri_p_workitem, l.fk_uri_workitem, l.c_role from struct_workitem_linkedworkitems l</code>.
-  Are the elements work items, rows or an error? If rows are usable, parents of reached items can come from SQL.</p>
+  <p>Report: the counts and times of a) and both b). If one b) throws, report the error and set the parameter "Test to run"
+  back to it after removing that variant from the query text. Expected: b) &lt;= a) and 0 outside the document.</p>
 
 #elseif($test == "bfs")
 ## ================================================================ I2 / I3 / I5 / I6 / I7 traversal by level
@@ -363,16 +437,30 @@
   #set($stop = false)
   #set($stopLv = 0)
   #set($rowsAll = [])
+  #set($reached = [])
+  #set($noBack = false)
+  #set($dirs = [])
+  #if($direction == "down" || $direction == "both")
+    #set($void = $dirs.add("down"))
+  #end
+  #if($direction == "up" || $direction == "both")
+    #set($void = $dirs.add("up"))
+  #end
   #set($tAll0 = $date.systemTime)
 
   ## ---- level 0: start items
   #set($startList = [])
-  #if($startMode == "query" && $startQuery != "")
-    #foreach($w in $trackerService.queryWorkItems($startQuery, "id"))
+  #if($startMode != "all" && $startQuery != "")
+    #if($startMode == "docid")
+      #set($q = "${scopeDocId} AND (${startQuery})")
+    #else
+      #set($q = "${scopeSql} AND (${startQuery})")
+    #end
+    #foreach($w in $trackerService.queryWorkItems($q, "id"))
       #set($wm = false)
       #set($wm = $w.getModule())
       #aiKey($wm)
-      #if($aiKeyOut == "${projectId}/${sdFolder}/${sdName}")
+      #if($aiKeyOut == $startDocKey)
         #aiItem($w)
         #if($aiOk)
           #set($void = $startList.add($w))
@@ -387,6 +475,7 @@
     #if(!$visited.containsKey($sid))
       #set($void = $visited.put($sid, 0))
       #set($void = $frontier.add($w))
+      #set($void = $reached.add($w))
     #end
   #end
   #set($t0 = $date.systemTime)
@@ -425,13 +514,6 @@
         #end
         #if($cn > 0)
           #set($void = $chunks.add($cur))
-        #end
-        #set($dirs = [])
-        #if($direction == "down" || $direction == "both")
-          #set($void = $dirs.add("down"))
-        #end
-        #if($direction == "up" || $direction == "both")
-          #set($void = $dirs.add("up"))
         #end
         #set($rTypeSql = "")
         #foreach($dir in $dirs)
@@ -474,10 +556,10 @@
                 #if("$tUr" == "false")
                   #set($tid = "$tgt.getId()")
                   #if($fIds.containsKey($tid) && ($direction == "down" || $direction == "both"))
-                    #set($e = "${xid}|${lv}|${tid}|${role}")
+                    #set($e = "${xid}|${lv}|${tid}|${role}|d")
                     #set($void = $edges.add($e))
                     #set($el = $e.length())
-#set($edgeChars = $edgeChars + $el + 1)
+                    #set($edgeChars = $edgeChars + $el + 1)
                     #set($edgeN = $edgeN + 1)
                   #end
                 #end
@@ -498,10 +580,10 @@
                   #if("$tUr" == "false")
                     #set($tid = "$tgt.getId()")
                     #if($visited.containsKey($tid) && $visited.get($tid) == $lv)
-                      #set($e = "${tid}|${lv}|${fid}|${role}")
+                      #set($e = "${tid}|${lv}|${fid}|${role}|u")
                       #set($void = $edges.add($e))
                       #set($el = $e.length())
-#set($edgeChars = $edgeChars + $el + 1)
+                      #set($edgeChars = $edgeChars + $el + 1)
                       #set($edgeN = $edgeN + 1)
                     #end
                   #end
@@ -514,37 +596,41 @@
         ## mode api: Open API links per frontier item (down = getLinkedWorkItemsStructsBack, up = Direct)
         #foreach($f in $frontier)
           #set($fid = "$f.getId()")
-          #set($lists = [])
-          #if($direction == "down" || $direction == "both")
-            #set($bk = false)
-            #set($bk = $f.getLinkedWorkItemsStructsBack())
-            #if($bk)
-              #set($void = $lists.add($bk))
+          #foreach($dir in $dirs)
+            #set($lst = false)
+            #if($dir == "down")
+              #set($lst = $f.getLinkedWorkItemsStructsBack())
+              #if(!$lst)
+                #set($noBack = true)
+              #end
+            #else
+              #set($lst = $f.getLinkedWorkItemsStructsDirect())
             #end
-          #end
-          #if($direction == "up" || $direction == "both")
-            #set($void = $lists.add($f.getLinkedWorkItemsStructsDirect()))
-          #end
-          #foreach($lst in $lists)
-            #foreach($ls in $lst)
-              #set($role = "$ls.getLinkRole().getId()")
-              #if($roleIds.contains($role))
-                #set($x = $ls.getLinkedItem())
-                #aiItem($x)
-                #if($aiOk)
-                  #set($xid = $aiId)
-                  #if($visited.containsKey($xid))
-                    #set($again = $again + 1)
-                  #else
-                    #set($void = $visited.put($xid, $lv))
-                    #set($void = $next.add($x))
-                  #end
-                  #if($visited.get($xid) == $lv)
-                    #set($e = "${xid}|${lv}|${fid}|${role}")
-                    #set($void = $edges.add($e))
-                    #set($el = $e.length())
-#set($edgeChars = $edgeChars + $el + 1)
-                    #set($edgeN = $edgeN + 1)
+            #set($dl = "u")
+            #if($dir == "down")
+              #set($dl = "d")
+            #end
+            #if($lst)
+              #foreach($ls in $lst)
+                #set($role = "$ls.getLinkRole().getId()")
+                #if($roleIds.contains($role))
+                  #set($x = $ls.getLinkedItem())
+                  #aiItem($x)
+                  #if($aiOk)
+                    #set($xid = $aiId)
+                    #if($visited.containsKey($xid))
+                      #set($again = $again + 1)
+                    #else
+                      #set($void = $visited.put($xid, $lv))
+                      #set($void = $next.add($x))
+                    #end
+                    #if($visited.get($xid) == $lv)
+                      #set($e = "${xid}|${lv}|${fid}|${role}|${dl}")
+                      #set($void = $edges.add($e))
+                      #set($el = $e.length())
+                      #set($edgeChars = $edgeChars + $el + 1)
+                      #set($edgeN = $edgeN + 1)
+                    #end
                   #end
                 #end
               #end
@@ -573,6 +659,9 @@
           #set($void = $docLvCnt.put($lk, 1))
         #end
       #end
+      #foreach($x in $next)
+        #set($void = $reached.add($x))
+      #end
       #set($lt1 = $date.systemTime)
       #set($void = $rowsAll.add("<tr><td>$lv</td><td>$frontier.size()</td><td>$queries</td><td>$next.size()</td><td>$again</td><td>$edgeN</td><td>$visited.size()</td><td>$lt0 / $lt1</td></tr>"))
       #if($next.size() > $cap)
@@ -583,6 +672,36 @@
     #end
   #end
   #set($tAll1 = $date.systemTime)
+  ## All links of the selected roles between reached items (I7): the page model the viewer toggles (roles, direction, levels)
+  ## need to recompute the reachability in the browser. One scan of the outgoing links of every reached item.
+  #set($allN = 0)
+  #set($allChars = 0)
+  #set($ta0 = $date.systemTime)
+  #if($paths == "yes")
+    #foreach($r in $reached)
+      #set($rid = "$r.getId()")
+      #foreach($ls in $r.getLinkedWorkItemsStructsDirect())
+        #set($role = "$ls.getLinkRole().getId()")
+        #if($roleIds.contains($role))
+          #set($tgt = $ls.getLinkedItem())
+          #set($tUr = "unknown")
+          #if($tgt)
+            #set($tUr = $tgt.isUnresolvable())
+          #end
+          #if("$tUr" == "false")
+            #set($tid = "$tgt.getId()")
+            #if($visited.containsKey($tid) && $tid != $rid)
+              #set($allN = $allN + 1)
+              #set($e = "${rid}|${tid}|${role}")
+              #set($el = $e.length())
+              #set($allChars = $allChars + $el + 1)
+            #end
+          #end
+        #end
+      #end
+    #end
+  #end
+  #set($ta1 = $date.systemTime)
   <p>Mode <b>$mode</b>, start items <b>$startMode</b> ($startList.size()), paths <b>$paths</b>. Total start / end $tAll0 / $tAll1 ms.</p>
   #if($stop)
     <p class="ko">Stopped after level $stopLv: more than $cap new items (parameter "Stop when..."). Expected behaviour of the cap.</p>
@@ -593,7 +712,12 @@
       $rw
     #end
   </table>
-  <p>Page model estimate for the item paths (I7): <b>$edges.size()</b> edge(s), <b>$edgeChars</b> characters (id|level|parent|role;). Compare with the page model budget of the guide (11.5).</p>
+  #if($noBack)
+    <p class="ko">getLinkedWorkItemsStructsBack() returned nothing usable (null): the downstream direction of mode api found no items.</p>
+  #end
+  <p>Page model estimate (I7): parent links <b>$edges.size()</b> (<b>$edgeChars</b> characters, item|level|parent|role|direction;);
+  all links between the $reached.size() reached items <b>$allN</b> (<b>$allChars</b> characters, source|target|role;), scan start / end $ta0 / $ta1 ms.
+  Compare with the page model caps of the other widgets (guide 11.5).</p>
   <table>
     <tr><th>Document</th><th>First level</th><th>Items per level</th></tr>
     #foreach($k in $docKeys)
@@ -604,11 +728,21 @@
   <pre>#set($en = 0)#foreach($e in $edges)#set($en = $en + 1)#if($en <= $maxRows)$esc.html($e)
 #end#end</pre>
   #if($mode == "api")
+    ## Probe: the first start item (among the first 200) with an incoming link, else the first start item.
     #set($probe = false)
+    #set($pi = 0)
     #foreach($w in $startList)
-      #if(!$probe)
-        #set($probe = $w)
+      #set($pi = $pi + 1)
+      #if(!$probe && $pi <= 200)
+        #set($pb = false)
+        #set($pb = $w.getLinkedWorkItemsStructsBack())
+        #if($pb && $pb.size() > 0)
+          #set($probe = $w)
+        #end
       #end
+    #end
+    #if(!$probe && $startList.size() > 0)
+      #set($probe = $startList.get(0))
     #end
     #if($probe)
       <p>API probe on start item <code>$!esc.html($probe.getId())</code> (I3: what do Direct and Back return?):</p>
