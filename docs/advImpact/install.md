@@ -70,8 +70,8 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
 
 - Current project only: links to work items of other projects are not followed (later version, SPEC F15); in a
   collection, documents of other projects are not reached either.
-- Collection context (0.3.0) not yet checked on 2512 (SPEC §8 lists the checks). In a collection the start query is
-  evaluated on the current items, not on the collection revision.
+- In a collection the start query is evaluated on the current items, not on the collection revision (the matching
+  items are then taken at the collection revision).
 - The **Start items** picker narrows the start items of the page (whole document or query); it cannot add other items
   without changing the query. The PDF export uses all start items.
 - Work items outside a LiveDoc are followed but not drawn (they have no document).
