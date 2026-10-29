@@ -1,0 +1,7 @@
+$parameters.put("projects", $factory.enumeration("Projects (none = current project)", "@project").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("doc", $factory.enumeration("Start document", "@document").allowNoValue(false).allowMultipleValues(false).build())
+$parameters.put("roles", $factory.enumeration("Link roles (1 to 5)", "workitem-link-role").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("direction", $factory.customEnum("Direction").addEnumItem("down", "Downstream: items that link to the start items").addEnumItem("up", "Upstream: items the start items link to").addEnumItem("both", "Both").allowNoValue(false).allowMultipleValues(false).singleValue("down").build())
+$parameters.put("levels", $factory.integer("Levels of analysis (1 to 7)").value(3).build())
+$parameters.put("excludedTypes", $factory.enumeration("Work item types not followed", "workitem-type").allowNoValue(true).allowMultipleValues(true).values(["heading"]).build())
+$parameters.put("height", $factory.integer("Graph height in pixels").value(600).build())

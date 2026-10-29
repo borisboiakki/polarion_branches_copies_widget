@@ -12,6 +12,9 @@ one build and one test setup:
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
   (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done and validated on 2512).
+- **advImpact** (`widgets/advImpact/`, **in preparation**, branch `claude/advimpact-widget-spec-7zkne9`): multi-level impact analysis from one
+  document or item subset along 1–5 link roles (default 3 levels, up to 7). Only a scaffold exists (no `render.vm`, so the build ignores it);
+  the spec draft and its open questions are in its `SPECIFICATION.md`, the spike plan in `tests/advImpact-v0.1.x/`.
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
 
 ## Required reading before coding
