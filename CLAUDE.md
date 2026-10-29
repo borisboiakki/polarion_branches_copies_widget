@@ -13,7 +13,8 @@ one build and one test setup:
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
   (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done and validated on 2512).
 - **advImpact** (`widgets/advImpact/`, **in preparation**, branch `claude/advimpact-widget-spec-7zkne9`): multi-level impact analysis from one
-  document or item subset along 1–5 link roles (default 3 levels, up to 7). Only a scaffold exists (no `render.vm`, so the build ignores it);
+  document or item subset along 1–5 link roles (default 3 levels, up to 7). Spike on 2512 **closed** (method: SQL per level + Open API
+  links, SPEC §6.1). Only a scaffold exists (no `render.vm`, so the build ignores it);
   the spec (PO answers Q1–Q12 recorded; "both" = downstream and upstream analyses combined) is in its `SPECIFICATION.md`, the spike plan and the diagnostic widget `aiSpike` in `tests/advImpact-v0.1.x/`
   (`tools/vtest/aiSpike/` smoke-tests it; rebuild `aiSpike.zip` after edits).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
@@ -139,6 +140,7 @@ Verified through web search (2026-10-27):
   SELECT only: this instance allows it); `linkedWorkItemsOf` follows **incoming links only** (downstream) and `steps` = last
   level returned; Open API `getLinkedWorkItemsStructsBack()` exists, its `getLinkedItem()` is the link **source**; recursive SQL
   works in both directions; `queryWorkItems` with `document.id:"Name" AND (query)` or `SQL:(…) AND (query)` returns the same subset.
+  Part B: copies of copies counted once (visited set). Part C (PO): level-by-level traversal very fast up to 7 levels on the largest chain.
 - **Verified by the PO on 2512 with docCoverage 0.4.0**: traceability matrix export (item titles via `getTitle()`, link role
   opposite names via `getOppositeName()`, all link pairs in the page model).
 

@@ -1,8 +1,8 @@
 # Specification — Advanced Impact Analysis widget (advImpact)
 
-**Status:** v0.2 DRAFT, 2026-10-29: PO answers Q1–Q12 recorded (§9), reviewed against the dev guide. **Nothing is
-implemented**; the folder holds the scaffold (parameters, properties, VERSION 0.0.0). The spike (diagnostic widget `aiSpike`,
-plan `tests/advImpact-v0.1.x/spike-tests.md`) is ready, not run yet. Items marked `[?]` need a spike result (§8).
+**Status:** v0.3, 2026-10-29: PO answers Q1–Q12 recorded (§9), reviewed against the dev guide, **spike closed** on 2512
+(`tests/advImpact-v0.1.x/spike-tests.md`, conclusion at its end). **Nothing is implemented**; the folder holds the scaffold
+(parameters, properties, VERSION 0.0.0). Next: implementation of 0.1.0.
 
 ## 1. Goal
 
@@ -49,7 +49,7 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | F3 | **Link roles**: multi-select `workitem-link-role`, **1 to 5** (more: first 5 + warning) | Must |
 | F4 | **Direction**: downstream, upstream or both (the two analyses combined, Q2/Q12; §3), as a parameter. With "both", a **viewer toggle** shows one direction or both | Must |
 | F5 | **Multi-level traversal**: the analysis does not stop at the first impacted document; from the items reached at level n it continues with the items linked to them (same roles at every level, Q4; direction as F4) up to **N levels** | Must |
-| F6 | **Levels**: default **3**; parameter 1–7 (integer, capped at 7 server side). If the traversal cannot be done in the budget for 7, the cap is lowered (spike I2/I6); hard-coded 3 is the fallback | Must (3), Should (up to 7) |
+| F6 | **Levels**: default **3**; parameter 1–7 (integer, capped at 7 server side). Spike part C: very fast up to 7 levels, so the parameter goes up to 7 | Must |
 | F7 | **Cycle guard**: an item is expanded once, at the lowest level it is reached; links back to already visited items are not followed | Must |
 | F8 | **Graph**: documents as nodes in layers by level (start document left), edges = (document, document) pairs with the roles and link counts, one style/colour per role, legend; same look as docCoverage (`shared/js/core.js`) | Must |
 | F9 | **Viewer toggles** (on the fly, no re-query): shown roles, direction (only when the parameter is "both"), **max level shown** (1..N, only lower than the parameter, Q6), only documents with relations, link counts on edges, extra document fields, hide/show documents. Hiding a role or a direction **recomputes the reachability and the levels** in the browser from all the links between the reached items (§6.2); a hidden document is only hidden (the traversal still goes through it) | Must |
@@ -69,7 +69,7 @@ budget** (guide §11.5): impacted items are stored once (id, title, type, docume
 items once (source, target, role); paths are rebuilt from them in the browser, never stored in full. Caps with a warning, as
 docCoverage (`pairCap`, `itemCap`).
 
-## 6. Technical approach (proposal, to be verified by the spike)
+## 6. Technical approach (decided after the spike, 2026-10-29)
 
 1. **Traversal on the server, level by level (BFS)**, with a visited set (F7). Candidates, measured by the spike:
    - **SQL per level** (`sqlSearch` on `struct_workitem_linkedworkitems` joined to `workitem`, filtered on `c_role IN (roles)`
@@ -81,6 +81,10 @@ docCoverage (`pairCap`, `itemCap`).
      links only** = downstream, returns levels 1..steps without the start items, spike A4/A5). A one-query result gives the
      set of items but not their level or parent: levels and links still come from the per-item scan.
    Widget SQL returns objects, not rows (guide §7.2): the parent and role of a reached item come from the Open API links.
+
+   **Decision (spike conclusion)**: SQL per level, one traversal per direction with its own visited set, parents and links
+   from the Open API (`Direct` / `Back`); mode Open API per item as fallback. Not used: `linkedWorkItemsOf` (downstream only),
+   recursive / nested SQL (no level per item; `WITH RECURSIVE` outside the documented SQL rules of guide §7.1).
 2. **Page model**: documents (reuse `shared/vm/documents.vm`), the reached items once (id, title, type, document, level) and
    **all links of the selected roles between reached items** (source, target, role). The browser recomputes the levels for
    the toggles (F9) with one BFS per shown direction on these links (downstream: from target to source; upstream: from source
@@ -96,8 +100,8 @@ docCoverage (`pairCap`, `itemCap`).
 
 | ID | Risk | Mitigation |
 |---|---|---|
-| R1 | Frontier `IN (...)` lists grow large at levels 4-7 (fan-out) | chunks of 500 ids; nested sub-selects or `linkedWorkItemsOf`; item cap per level with warning (spike I1/I2/I6/I8) |
-| R2 | Recursive SQL not accepted by `sqlSearch` (guide §7.1: single SELECT only) | BFS (default design) |
+| R1 | Frontier `IN (...)` lists grow large at levels 4-7 (fan-out) | chunks of 500 ids; item cap per level with warning. Spike part C: very fast up to 7 levels on the PO's largest chain |
+| R2 | Recursive SQL blocked on another instance (guide §7.1) | not used: SQL per level (accepted on 2512 anyway) |
 | R3 | Inherited links of copies (spike R2) add links to items already reached | visited set (F7): an item is counted once, at its lowest level; reuse roles only when selected (Q7). Verified (spike B1): no double count; a copy of a copy is at level 1 because its items link directly to the original |
 | R4 | Page model too large for 7 levels | store items once, cap detail lists, counts only beyond the cap |
 | R5 | "Impact" semantic differs per role (direction) | explicit direction parameter + viewer toggle |
@@ -107,8 +111,7 @@ docCoverage (`pairCap`, `itemCap`).
 
 Q1–Q12 answered on 2026-10-29 (decisions log).
 
-Open: the spike results (run 1 and part A on 2512: all methods give the same items on a small set; choice of method after the
-large set, part C; the other runs follow the run sheet in `tests/advImpact-v0.1.x/spike-tests.md`); the in-widget picker design (later version).
+Open: the in-widget picker design (later version). The spike is closed (§6.1 decision).
 
 ## 9. Decisions log
 
@@ -127,3 +130,4 @@ large set, part C; the other runs follow the run sheet in `tests/advImpact-v0.1.
 | 2026-10-29 | Q8/Q9: **current project only** in v1; projects scope and collection context in later versions (keep the SQL layer separable) | PO |
 | 2026-10-29 | Q10: Excel sheets Relations, Documents, Impacted items, Impact paths, plus traceability matrix per document | PO |
 | 2026-10-29 | Q11: sizing as the other widgets (~100 docs / 20k items); **cap of items per level** (about 5,000, to tune in spike I6) with a visible warning | PO |
+| 2026-10-29 | Spike closed: all methods agree, very fast up to 7 levels (PO, part C). Method: SQL per level + Open API links; levels 1–7, default 3; cap 5000 new items per level | Dev, PO results |

@@ -1,21 +1,21 @@
 # Spike plan — advImpact (multi-level impact analysis)
 
-**Status:** run 1, part A (with its redo) and part B **done** on 2512 (2026-10-29, project `EOLE_AI_MCP_TESTS`, small test set, see
-"Findings"); next: part C of the run sheet. Results go into the "Result" column below, into `widgets/advImpact/SPECIFICATION.md` and into the CLAUDE.md
+**Status:** **spike closed** (2026-10-29). Run 1, parts A (with its redo), B and C done on 2512 (projects `EOLE_AI_MCP_TESTS`
+and `VforIA`); conclusion and design decision at the end ("Conclusion"). Results go into the "Result" column below, into `widgets/advImpact/SPECIFICATION.md` and into the CLAUDE.md
 "Verified" notes. The mocks are aligned with a result only once it is known.
 
 ## Questions
 
 | ID | Question | Why it matters | Test | Result |
 |---|---|---|---|---|
-| I1 | Does `sqlSearch` accept one query for several levels: `WITH RECURSIVE` (expected refused: guide §7.1 allows a single `SELECT`), a self-join of the link table, nested `IN` sub-selects (one per level, union of the levels)? | One query per direction instead of N | `sql` | **All run on 2512.** `WITH RECURSIVE` is **accepted** (contrary to the expectation from guide 7.1): 8 items down, same as `bfs`. `join3` runs. `nested` runs down (run 1) and up (A3: 2 items, same as `bfs` up). Recursive up: A1b |
-| I2 | Level by level in SQL: frontier ids in `IN (...)` lists of at most 500, one query per chunk, level and direction. Time per level, largest frontier | Default design | `bfs` mode `sql` | run 1 (down, 3 levels, 6 start items): **runs**, 1 query per level, new items 5 / 2 / 0, a few ms per level. Large set: to run |
+| I1 | Does `sqlSearch` accept one query for several levels: `WITH RECURSIVE` (expected refused: guide §7.1 allows a single `SELECT`), a self-join of the link table, nested `IN` sub-selects (one per level, union of the levels)? | One query per direction instead of N | `sql` | **All run on 2512.** `WITH RECURSIVE` is **accepted** (contrary to the expectation from guide 7.1): 8 items down, same as `bfs`. `join3` runs. `nested` runs down (run 1) and up (A3: 2 items, same as `bfs` up). Recursive up works (A1b). **Answered** |
+| I2 | Level by level in SQL: frontier ids in `IN (...)` lists of at most 500, one query per chunk, level and direction. Time per level, largest frontier | Default design | `bfs` mode `sql` | **Answered**: runs, 1 query per level and direction, a few ms per level; very fast on the largest chain (part C) |
 | I3 | Level by level with the Open API: `getLinkedWorkItemsStructsDirect()` (upstream) and `getLinkedWorkItemsStructsBack()` (downstream) per frontier item. Does `Back` exist on 2512, does its `getLinkedItem()` return the **source** item? Same counts as mode `sql`? | No SQL at all; parents and roles for free | `bfs` mode `api` (probe table) | **Answered.** `getLinkedWorkItemsStructsBack()` exists, its `getLinkedItem()` is the **source** item (`LinkedWorkItemStruct`, role id readable). Mode api gives the same items per level as SQL, down (A9: 5 / 3 / 0) and both (A10 = A8: 9 items) |
 | I4 | Start items: a) all items of the document by SQL; b) the user's Lucene query restricted to the document with `document.id:"space/name"` (`_default` space omitted) or with an `SQL:(…)` clause, through `trackerService.queryWorkItems(query, "id")` | Start subset (F2, Q1) | `start` | **Answered.** Both forms work and agree: `type:stakeholderrequirement AND (status:in_analysis)` gave 4 of the 6 items with `document.id:"CustomerSpecSpike"` and with `SQL:(…)`, 0 outside the document (A6); `bfs` from that subset works (A11) |
 | I5 | Inherited links of copies (spike R2) and cycles: the visited set counts each item once, at its lowest level | Correct levels | `bfs` (column "rows already visited") | B1 (`VforIA`, `duplicates`, down from SRS_Test): **as expected**. Level 1: 10 items (5 of the copy, 5 of the copy of a copy through its inherited links); level 2: 0 new, 5 rows already visited (the copy of a copy also links to the copy); 18 items, 15 links between them. Note: through the inherited links the copy of a copy is at **level 1**, not 2. B2 (up from the copy of a copy): **as expected**, mirror of B1: 5 start items; level 1: 10 (5 of the copy, 5 of SRS_Test); level 2: 0 new, 5 rows already visited (the copy links to SRS_Test); 15 items, 15 links. **I5 answered** |
-| I9 | Direction "both" = a pure downstream and a pure upstream traversal, combined (PO, Q12): time of the two passes, combined documents | "Both" costs two analyses | `bfs` direction both | A8 (SystemSpec_1, sql): down 3 items (TestSpec1, subSysSpec1, subSysSpec2), up 2 (CustomerSpecSpike), **SystemSpec_2 not reached** (Q12 behaviour confirmed), 9 items in total, 8 ms. Times on the large set: part C |
-| I6 | Times for 3 and 7 levels, directions down, up and both, on `EOLE_AI_MCP_TESTS` (120 docs) and on a large project | Level cap (Q6), item cap per level (Q11) | `bfs` | open |
-| I7 | Page model size: parent links per reached item, and all links of the selected roles between reached items (needed for the viewer toggles, SPEC §6.2), with the time of that scan | Size caps | `bfs` with paths `yes` | run 1: 9 parent links (305 characters), 9 links between the 13 reached items (269 characters); one item with 2 parents. Large set: to run |
+| I9 | Direction "both" = a pure downstream and a pure upstream traversal, combined (PO, Q12): time of the two passes, combined documents | "Both" costs two analyses | `bfs` direction both | A8 (SystemSpec_1, sql): down 3 items (TestSpec1, subSysSpec1, subSysSpec2), up 2 (CustomerSpecSpike), **SystemSpec_2 not reached** (Q12 behaviour confirmed), 9 items in total, 8 ms. Part C: very fast. **Answered** |
+| I6 | Times for 3 and 7 levels, directions down, up and both, on `EOLE_AI_MCP_TESTS` (120 docs) and on a large project | Level cap (Q6), item cap per level (Q11) | `bfs` | **Answered** (part C, PO): very fast up to 7 levels, down, up and both, modes sql and api; cap never reached. Figures not recorded |
+| I7 | Page model size: parent links per reached item, and all links of the selected roles between reached items (needed for the viewer toggles, SPEC §6.2), with the time of that scan | Size caps | `bfs` with paths `yes` | **Answered**: about 30 characters per link (run 1: 9 links = 269 characters; B1: 15 links = 405). Sizes on the largest chain not recorded; the page model caps of docCoverage (`pairCap` 20 000) apply |
 | I8 | Lucene `linkedWorkItemsOf` (2506+, guide §6.4) with the start document as `SQL:(…)` filter, `follows` = roles, `steps` = levels: does it run, which direction does it follow, does it return levels 1..N or only N, are the start items returned? | One query for all levels | `lucene` | **Answered.** Runs (3 ms); returns levels **1..steps** together (steps 1 = 5 items = level 1; steps 3 = levels 1..3), never the start items; follows **incoming links only** (= downstream): from TestSpec1, which nothing links to, 0 items (A5). No upstream variant |
 
 Answered by the dev guide, not tested: widget SQL (`sqlSearch`, `searchBySql`) returns objects, not rows (guide §7.2), so the
@@ -123,5 +123,27 @@ roles of that chain). Note the number of start items. Run each line once; stop g
 | C8 | `bfs` | As C4, paths no | Cost of the path and link scans (C4 - C8) |
 
 If a run exceeds the page time limit, note the last settings that worked and the error.
+
+**Part C result (PO, 2026-10-29):** run on the PO's largest document chain: every run stayed **very fast**, up to 7 levels,
+in all directions and modes; no time limit or cap was reached, so no further runs are needed. Per-run figures were not
+recorded.
+
+## Conclusion (2026-10-29)
+
+| Question | Answer |
+|---|---|
+| Does the multi-level traversal fit the render budget? | Yes: a few ms per level on the test sets, "very fast" up to 7 levels on the largest chain (PO) |
+| Same result from all methods? | Yes: SQL per level, Open API per item, recursive SQL and nested SQL give the same items in both directions; `linkedWorkItemsOf` gives the same downstream items |
+| Start subset by query | Works with `document.id:"Name" AND (query)` and with `SQL:(…) AND (query)` |
+| "Both" without siblings (Q12) | Works: two pure traversals combined |
+| Copies of copies | No double count; the copy of a copy is at level 1 (its items link directly to the original) |
+
+**Design decision for the widget** (SPEC §6.1): traversal **level by level with SQL per level** (plain `SELECT` on the
+documented tables, `IN` lists of at most 500 ids), one traversal per direction, visited set per direction; parents and the
+links between reached items from the **Open API** links (`Direct` / `Back`). Reasons: it gives the level of each item (the
+one-query methods do not), works in both directions (`linkedWorkItemsOf` is downstream only) and does not depend on
+`WITH RECURSIVE`, which guide §7.1 puts outside the documented SQL rules (it can be blocked by the
+`invalidCommands` setting of another instance). Mode `api` is an equivalent fallback. Levels: parameter **1 to 7**,
+default 3 (F6 "Should" reached). Cap of 5000 new items per level kept as a safety net, with a warning.
 
 Raw exports are not committed (CLAUDE.md): send them in the chat; only the findings are kept here.

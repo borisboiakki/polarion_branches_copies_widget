@@ -7,7 +7,7 @@ between them, deduced from work item links. They share one client core, one buil
 |---|---|---|---|
 | <img src="docs/docBranches/icon.svg" width="32" alt=""> **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.4.3** (0.4.0 validated on Polarion 2512; 0.4.1–0.4.3 = shared code only) | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
 | <img src="docs/docCoverage/icon.svg" width="32" alt=""> **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.4.0** (traceability matrix export) validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) · [collection spike](tests/docCoverage-v0.3.x/spike-tests.md) |
-| **advImpact** — Advanced Impact Analysis | From one document or a subset of its work items, follows the links of selected roles over several levels to the impacted documents | **in preparation** (specification draft, no release) | [specification](widgets/advImpact/SPECIFICATION.md) · [spike plan](tests/advImpact-v0.1.x/spike-tests.md) |
+| **advImpact** — Advanced Impact Analysis | From one document or a subset of its work items, follows the links of selected roles over several levels to the impacted documents | **in preparation** (specification and spike done, implementation next) | [specification](widgets/advImpact/SPECIFICATION.md) · [spike plan](tests/advImpact-v0.1.x/spike-tests.md) |
 
 **Users: see the [user manual](docs/USER_MANUAL.md)** (deployment, adding the widgets to a page, parameters, toolbar).
 
