@@ -118,6 +118,8 @@ public class WidgetHarness {
     static int SQL_COUNT = 0;
     /** Optional SQL handler tried first by DataService.sqlSearch (returns null = not handled); used by the advImpact spike harness. */
     static java.util.function.Function<String, List<Object>> SQL_HOOK = null;
+    /** Optional Lucene query handler tried first by TrackerService.queryWorkItems (returns null = not handled); used by the advImpact harness. */
+    static java.util.function.Function<String, List<WorkItem>> QUERY_HOOK = null;
 
     static Module doc(String name) {
         Module m = new Module("Requirements", name, name);
@@ -338,6 +340,7 @@ public class WidgetHarness {
         public TrackerProject getTrackerProject(String projectId) { return new TrackerProject(); }
         /** Mock of queryWorkItems(query, sort): the query text is not evaluated; every work item is returned (none for linkedWorkItemsOf). */
         public List<WorkItem> queryWorkItems(String query, String sort) {
+            if (QUERY_HOOK != null) { List<WorkItem> hooked = QUERY_HOOK.apply(query); if (hooked != null) { return hooked; } }
             return query.contains("linkedWorkItemsOf") ? new ArrayList<WorkItem>() : new ArrayList<WorkItem>(ITEMS.values());
         }
     }

@@ -1,0 +1,220 @@
+import java.util.*;
+import java.util.regex.*;
+
+/**
+ * Renders the built advImpact widget (widgets/advImpact/dist/advImpact/render.vm) with Velocity 1.4 against the mock
+ * Polarion objects of tools/vtest/docBranches/WidgetHarness.java, on an impact test set (roles satisfies / verifies):
+ *
+ *   Specs/CustomerSpec  VIA-1, VIA-2 customerRequirement, VIA-3, VIA-4 customerNote, VIA-5 heading
+ *   _default/SysReq_A   VIA-11 satisfies 1, 12 satisfies 2, 12 satisfies an unresolvable item, 13 satisfies 2 and 5 (heading),
+ *                       12 satisfies 11 (same document)
+ *   _default/SysReq_B   VIA-21 satisfies 3, VIA-22 satisfies 1
+ *   _default/SwReq_C    VIA-31 satisfies 11, VIA-32 satisfies 21, VIA-31 verifies 41 (cycle with Test_T)
+ *   _default/Test_T     VIA-41 verifies 31
+ *   _default/Deep_D     VIA-51 verifies 41
+ *   _default/Other      VIA-61 (no link)
+ *
+ * Downstream from CustomerSpec (3 levels): level 1 = 11, 12, 13 (A), 21, 22 (B); level 2 = 31, 32 (C); level 3 = 41 (T).
+ * Both from SysReq_A: down 31 (C), 41 (T), 51 (D); up 1, 2 (CustomerSpec); SysReq_B (a sibling through CustomerSpec) not reached.
+ *
+ * The traversal SQL is answered by an interpreter of the generated statements (SQL_HOOK); the work item query by a
+ * "type:X" filter (QUERY_HOOK). Both check the template logic, not Polarion's SQL or Lucene (verified on 2512, spike).
+ * Usage: java ImpactHarness <widgetDir> <outDir>   (writes browser-fragment.html, pdf-fragment.html, logs)
+ */
+public class ImpactHarness {
+
+    static WidgetHarness.Module mod(String folder, String name) {
+        WidgetHarness.Module m = new WidgetHarness.Module(folder, name, name.replace('_', ' '));
+        WidgetHarness.MODULES.add(m);
+        return m;
+    }
+
+    static WidgetHarness.Module spec, a, b, c, t, d;
+    static final List<String> SQL_LOG = new ArrayList<String>();
+
+    static void buildTestSet() {
+        spec = mod("Specs", "CustomerSpec");
+        a = mod("_default", "SysReq_A");
+        b = mod("_default", "SysReq_B");
+        c = mod("_default", "SwReq_C");
+        t = mod("_default", "Test_T");
+        d = mod("_default", "Deep_D");
+        WidgetHarness.Module other = mod("_default", "Other");
+        WidgetHarness.wi(1, "customerRequirement", spec);
+        WidgetHarness.wi(2, "customerRequirement", spec);
+        WidgetHarness.wi(3, "customerNote", spec);
+        WidgetHarness.wi(4, "customerNote", spec);
+        WidgetHarness.wi(5, "heading", spec);
+        for (int i = 11; i <= 13; i++) { WidgetHarness.wi(i, "systemRequirement", a); }
+        for (int i = 21; i <= 22; i++) { WidgetHarness.wi(i, "systemRequirement", b); }
+        for (int i = 31; i <= 32; i++) { WidgetHarness.wi(i, "softwareRequirement", c); }
+        WidgetHarness.wi(41, "testCase", t);
+        WidgetHarness.wi(51, "testCase", d);
+        WidgetHarness.wi(61, "systemRequirement", other);
+        WidgetHarness.link(11, "satisfies", 1);
+        WidgetHarness.link(12, "satisfies", 2);
+        WidgetHarness.link(13, "satisfies", 2);
+        WidgetHarness.link(13, "satisfies", 5);
+        WidgetHarness.link(12, "satisfies", 11);
+        WidgetHarness.link(21, "satisfies", 3);
+        WidgetHarness.link(22, "satisfies", 1);
+        WidgetHarness.link(31, "satisfies", 11);
+        WidgetHarness.link(32, "satisfies", 21);
+        WidgetHarness.link(41, "verifies", 31);
+        WidgetHarness.link(31, "verifies", 41);
+        WidgetHarness.link(51, "verifies", 41);
+        WidgetHarness.link(12, "parent", 13);
+        WidgetHarness.ITEMS.get("VIA-12").title = "Title | with; separators";
+        WidgetHarness.WorkItem ghost = new WidgetHarness.WorkItem("VIA-999", "customerRequirement", spec);
+        spec.items.remove(ghost);
+        ghost.unresolvable = true;
+        WidgetHarness.ITEMS.get("VIA-12").links.add(new WidgetHarness.Link("satisfies", ghost));
+    }
+
+    /** One traversal level: "... wt.c_id IN (...)" (downstream: link sources) or "... ws.c_id IN (...)" (upstream: targets). */
+    static List<Object> traversal(String sql) {
+        boolean down = sql.contains("wt.c_id IN (");
+        boolean up = sql.contains("ws.c_id IN (");
+        if (!sql.startsWith("SELECT DISTINCT") || !(down || up)) { return null; }
+        SQL_LOG.add(sql);
+        Set<String> roles = WidgetHarness.listAfter(sql, "l.c_role IN (");
+        Set<String> ids = WidgetHarness.listAfter(sql, down ? "wt.c_id IN (" : "ws.c_id IN (");
+        Set<String> excluded = WidgetHarness.listAfter(sql, "c_type NOT IN (");
+        Set<WidgetHarness.WorkItem> out = new LinkedHashSet<WidgetHarness.WorkItem>();
+        for (WidgetHarness.WorkItem s : WidgetHarness.ITEMS.values()) {
+            for (WidgetHarness.Link l : s.getLinkedWorkItemsStructsDirect()) {
+                WidgetHarness.WorkItem tg = l.getLinkedItem();
+                if (tg.isUnresolvable() || !roles.contains(l.getLinkRole().getId())) { continue; }
+                WidgetHarness.WorkItem near = down ? tg : s;
+                WidgetHarness.WorkItem far = down ? s : tg;
+                if (near.getProjectId().equals(far.getProjectId()) && ids.contains(near.getId()) && !excluded.contains(far.getType().getId())) {
+                    out.add(far);
+                }
+            }
+        }
+        return new ArrayList<Object>(out);
+    }
+
+    /** Lucene stand-in: "type:X" keeps the items of type X (the SQL:() document restriction is checked by the template). */
+    static List<WidgetHarness.WorkItem> query(String q) {
+        Matcher m = Pattern.compile("type:([A-Za-z0-9_]+)").matcher(q);
+        List<WidgetHarness.WorkItem> out = new ArrayList<WidgetHarness.WorkItem>();
+        String type = m.find() ? m.group(1) : null;
+        for (WidgetHarness.WorkItem w : WidgetHarness.ITEMS.values()) {
+            if (type == null || w.getType().getId().equals(type)) { out.add(w); }
+        }
+        return out;
+    }
+
+    static List<Object> list(Object... o) { return new ArrayList<Object>(Arrays.asList(o)); }
+
+    static Map<String, WidgetHarness.Param> params(WidgetHarness.Module start, String dir, int levels, Object... roles) {
+        Map<String, WidgetHarness.Param> p = new HashMap<String, WidgetHarness.Param>();
+        p.put("doc", new WidgetHarness.Param(start == null ? null : new WidgetHarness.DocOpt(start), null));
+        List<Object> rl = new ArrayList<Object>();
+        for (Object r : roles) { rl.add(new WidgetHarness.RoleOpt((String) r)); }
+        p.put("roles", new WidgetHarness.Param(null, rl));
+        p.put("direction", new WidgetHarness.Param(dir, null));
+        p.put("levels", new WidgetHarness.Param(Integer.valueOf(levels), null));
+        p.put("startQuery", new WidgetHarness.Param("", null));
+        p.put("excludedTypes", new WidgetHarness.Param(null, list(new WidgetHarness.RoleOpt("heading"))));
+        p.put("lineCounts", new WidgetHarness.Param("show", null));
+        p.put("extraFields", new WidgetHarness.Param(null, list("items")));
+        p.put("height", new WidgetHarness.Param(Integer.valueOf(520), null));
+        return p;
+    }
+
+    static String attr(String html, String cls) {
+        Matcher m = Pattern.compile("class=\"" + cls + "\" data-v=\"([^\"]*)\"").matcher(html);
+        return m.find() ? m.group(1) : "";
+    }
+
+    /** Ids of the reached items of the page model, sorted. */
+    static String itemIds(String html) {
+        List<String> ids = new ArrayList<String>();
+        for (String part : attr(html, "ai-it").split(";")) {
+            if (!part.isEmpty()) { ids.add(part.split("[|]")[0]); }
+        }
+        Collections.sort(ids);
+        return String.join(",", ids);
+    }
+
+    public static void main(String[] args) throws Exception {
+        buildTestSet();
+        WidgetHarness.SQL_HOOK = new java.util.function.Function<String, List<Object>>() {
+            public List<Object> apply(String sql) { return traversal(sql); }
+        };
+        WidgetHarness.QUERY_HOOK = new java.util.function.Function<String, List<WidgetHarness.WorkItem>>() {
+            public List<WidgetHarness.WorkItem> apply(String q) { return query(q); }
+        };
+        String dir = args[0];
+        String out = args[1];
+
+        // Browser view: downstream from CustomerSpec, 3 levels, satisfies + verifies.
+        String br = WidgetHarness.render(dir, params(spec, "down", 3, "satisfies", "verifies"), false, out + "/velocity-browser.log");
+        WidgetHarness.write(out + "/browser-fragment.html", br);
+        WidgetHarness.check(itemIds(br).equals("VIA-1,VIA-11,VIA-12,VIA-13,VIA-2,VIA-21,VIA-22,VIA-3,VIA-31,VIA-32,VIA-4,VIA-41"),
+            "downstream 3 levels: start items and levels 1-3 reached, heading and level 4 left out: " + itemIds(br));
+        WidgetHarness.check(br.contains("data-dir=\"down\" data-levels=\"3\" data-start=\"VforIA/Specs/CustomerSpec\""), "root: direction, levels, start document");
+        WidgetHarness.check(br.contains("data-roles=\"satisfies|satisfies|is satisfied by;verifies|verifies|is verified by\""), "roles with names and opposite names");
+        WidgetHarness.check(attr(br, "ai-it").startsWith("VIA-1|0|customerRequirement|1|Title VIA-1;"), "start item flagged, document index 0 = start document");
+        WidgetHarness.check(attr(br, "ai-it").contains("VIA-12|1|systemRequirement|0|Title   with  separators;"), "separators in titles replaced");
+        String links = attr(br, "ai-ln");
+        WidgetHarness.check(links.contains("VIA-11|VIA-1|satisfies;") && links.contains("VIA-12|VIA-11|satisfies;") && links.contains("VIA-31|VIA-41|verifies;")
+            && links.contains("VIA-41|VIA-31|verifies;") && !links.contains("VIA-999") && !links.contains("parent") && !links.contains("VIA-5|"),
+            "links between reached items: same-document and cycle links kept, unresolvable, unselected role and unreached targets left out");
+        WidgetHarness.check(br.contains("data-k=\"VforIA/Specs/CustomerSpec\"") && br.contains("data-k=\"VforIA/_default/Test_T\"")
+            && !br.contains("data-k=\"VforIA/_default/Other\"") && !br.contains("data-k=\"VforIA/_default/Deep_D\""), "documents: only those with reached items");
+        int queries = SQL_LOG.size();
+        WidgetHarness.check(queries == 3, "one traversal query per level and direction (" + queries + ")");
+
+        // Static view
+        String pdf = WidgetHarness.render(dir, params(spec, "down", 3, "satisfies", "verifies"), true, out + "/velocity-pdf.log");
+        WidgetHarness.write(out + "/pdf-fragment.html", pdf);
+        WidgetHarness.check(!pdf.contains("<script") && pdf.contains("downstream, 3 levels, 8 impacted work items in 4 documents"), "PDF: header, no script");
+        WidgetHarness.check(pdf.contains("<td>_default / SysReq_A</td><td>Downstream level 1</td><td>3</td><td>3</td>")
+            && pdf.contains("<td>_default / SwReq_C</td><td>Downstream level 2</td><td>2</td>")
+            && pdf.contains("<td>_default / Test_T</td><td>Downstream level 3</td><td>1</td>")
+            && pdf.contains("<td>Specs / CustomerSpec</td><td>Start document</td><td>0</td><td>4</td>"), "PDF: documents with position and impacted items");
+        WidgetHarness.check(pdf.contains("<td>_default / SysReq_A</td><td>satisfies 3</td><td>Specs / CustomerSpec</td>")
+            && pdf.contains("<td>_default / Test_T</td><td>verifies 1</td><td>_default / SwReq_C</td>")
+            && !pdf.contains("<td>_default / SwReq_C</td><td>verifies"), "PDF: relations along the paths only (the cycle link back is not a path)");
+        WidgetHarness.check(pdf.contains("<td>VIA-41</td><td>Title VIA-41</td><td>_default / Test_T</td><td>downstream</td><td>3</td>"), "PDF: impacted items with level");
+
+        // Both directions from SysReq_A: no sibling SysReq_B.
+        String both = WidgetHarness.render(dir, params(a, "both", 3, "satisfies", "verifies"), false, out + "/velocity-both.log");
+        WidgetHarness.write(out + "/both-fragment.html", both);
+        WidgetHarness.check(itemIds(both).equals("VIA-1,VIA-11,VIA-12,VIA-13,VIA-2,VIA-31,VIA-41,VIA-51"),
+            "both: downstream C, T, D and upstream CustomerSpec, sibling SysReq_B not reached: " + itemIds(both));
+        String bothPdf = WidgetHarness.render(dir, params(a, "both", 3, "satisfies", "verifies"), true, out + "/velocity-bothpdf.log");
+        WidgetHarness.check(bothPdf.contains("<td>Specs / CustomerSpec</td><td>Upstream level 1</td><td>2</td>")
+            && bothPdf.contains("<td>_default / Deep_D</td><td>Downstream level 3</td>") && !bothPdf.contains("SysReq_B"), "both, PDF: upstream on level 1, no sibling");
+
+        // Upstream from SwReq_C, satisfies only.
+        String up = WidgetHarness.render(dir, params(c, "up", 3, "satisfies"), false, out + "/velocity-up.log");
+        WidgetHarness.check(itemIds(up).equals("VIA-1,VIA-11,VIA-21,VIA-3,VIA-31,VIA-32"), "up from SwReq_C: A, B then CustomerSpec: " + itemIds(up));
+
+        // Start query: type:customerRequirement = VIA-1, VIA-2 only.
+        Map<String, WidgetHarness.Param> q = params(spec, "down", 1, "satisfies", "verifies");
+        q.put("startQuery", new WidgetHarness.Param("type:customerRequirement", null));
+        String sub = WidgetHarness.render(dir, q, false, out + "/velocity-query.log");
+        WidgetHarness.check(itemIds(sub).equals("VIA-1,VIA-11,VIA-12,VIA-13,VIA-2,VIA-22"), "start query: subset VIA-1, VIA-2 and what links to them: " + itemIds(sub));
+        WidgetHarness.check(sub.contains("data-query=\"type:customerRequirement\""), "start query passed to the page");
+        q.put("startQuery", new WidgetHarness.Param("type:nothing", null));
+        String none = WidgetHarness.render(dir, q, true, out + "/velocity-noquery.log");
+        WidgetHarness.check(none.contains("no work item of the start document matches the query"), "start query without match: message");
+
+        // Levels capped at 7, roles at 5; missing parameters.
+        String deep = WidgetHarness.render(dir, params(spec, "down", 12, "satisfies", "verifies"), false, out + "/velocity-deep.log");
+        WidgetHarness.check(deep.contains("data-levels=\"7\"") && itemIds(deep).contains("VIA-51"), "levels capped at 7, level 4 reached");
+        String six = WidgetHarness.render(dir, params(spec, "down", 2, "satisfies", "verifies", "parent", "duplicates", "derived_from", "branched_from"), false, out + "/velocity-six.log");
+        WidgetHarness.check(six.contains("Only the first 5 link roles are used (1 ignored).") && !six.contains("branched_from|"), "more than 5 roles: warning");
+        WidgetHarness.check(WidgetHarness.render(dir, params(null, "down", 3, "satisfies"), false, out + "/velocity-nodoc.log").contains("select the start document"), "no start document: message");
+        WidgetHarness.check(WidgetHarness.render(dir, params(spec, "down", 3), false, out + "/velocity-norole.log").contains("select at least one link role"), "no role: message");
+        WidgetHarness.Module gone = new WidgetHarness.Module("_default", "Gone", "Gone");
+        gone.unresolvable = true;
+        WidgetHarness.check(WidgetHarness.render(dir, params(gone, "down", 3, "satisfies"), false, out + "/velocity-gone.log").contains("the start document cannot be read"),
+            "unreadable start document: message");
+        System.out.println("Rendered: browser " + br.length() + " chars, pdf " + pdf.length() + " chars");
+    }
+}

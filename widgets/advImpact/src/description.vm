@@ -1,1 +1,7 @@
-<p><b>Advanced Impact Analysis</b> starts from one LiveDoc, or a subset of its work items, and follows the work item links of the selected roles to the documents that hold impacted work items, level after level.</p>
+<p><b>Advanced Impact Analysis</b> starts from one LiveDoc of the current project, or the work items of it selected by a query, and follows the work item links of the selected roles (1 to 5) over several levels (1 to 7, default 3) to the documents that contain impacted work items.</p>
+<ul>
+  <li><b>Downstream</b>: work items that link to the start items, then the items that link to those, and so on. <b>Upstream</b>: the items the start items link to, and so on. <b>Both</b>: the two analyses combined; a path never changes direction.</li>
+  <li>The graph shows the start document in the middle, upstream documents on the left and downstream documents on the right, one column per level. Each line carries the role names and the number of links; arrows follow the link direction.</li>
+  <li>Toggles: roles, direction, levels shown, documents shown. Click a document for its impacted work items (with the item each was reached from) and its traceability matrix; Excel export with relations, documents, impacted items and impact paths.</li>
+</ul>
+<p>Work items of the excluded types (default <code>heading</code>) are neither start items nor followed. Each work item is counted once, at its lowest level. In PDF export, the widget renders a static graph and tables.</p>

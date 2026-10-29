@@ -1,0 +1,2597 @@
+## Advanced Impact Analysis - render.vm
+## Source: widgets/advImpact/src/render.vm. tools/build-widget.py inlines the shared snippets (shared/vm) at the
+## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
+## Velocity 1.4 and writes widgets/advImpact/dist/advImpact.zip.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+## Method (spike tests/advImpact-v0.1.x, closed on 2512): start items of one document, then level by level one SQL query
+## per direction on struct_workitem_linkedworkitems (frontier ids in IN lists of at most 500), each direction with its own
+## visited set ("both" = a downstream and an upstream analysis, combined: a path never changes direction). Then the links of
+## the selected roles between the reached items (Open API, getLinkedWorkItemsStructsDirect): the browser recomputes the
+## levels from them for the toggles (roles, direction, levels).
+## Terms: a link is stored on its source item and points to its target (verified on 2512). Downstream = items whose link
+## points to the frontier (link sources); upstream = targets of the links of the frontier.
+#set($bwVersion = "0.1.0")
+## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
+## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
+<style>
+  .bw-root, .cw-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
+  .bw-toolbar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
+  .bw-ctl { font-size: 12px; padding: 2px 4px; }
+  .bw-search { width: 170px; }
+  .bw-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; }
+  .bw-fields { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  .bw-btns { display: inline-flex; gap: 4px; }
+  .bw-btn { font-size: 12px; padding: 2px 8px; cursor: pointer; border: 1px solid rgb(170,178,195); background: rgb(248,249,252); border-radius: 3px; }
+  .bw-btn:hover { background: rgb(232,237,247); }
+  .bw-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 2px 0 4px 0; }
+  .bw-leg { display: inline-flex; align-items: center; gap: 4px; }
+  .bw-muted { color: rgb(110,118,135); }
+  .bw-status { color: rgb(110,118,135); margin-bottom: 4px; }
+  .bw-view { overflow: auto; border: 1px solid rgb(215,220,230); background: rgb(255,255,255); }
+  .bw-svg { display: block; }
+  .bw-node, .bw-edge, .bw-edge-label { cursor: pointer; }
+  .bw-tip { position: absolute; z-index: 20; background: rgb(255,255,250); border: 1px solid rgb(170,170,170); padding: 4px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); pointer-events: none; max-width: 420px; }
+  .bw-tip-head { font-weight: 600; }
+  .bw-details { border: 1px solid rgb(215,220,230); background: rgb(250,251,253); padding: 6px 8px; margin-bottom: 6px; }
+  .bw-details-head { font-weight: 600; margin-bottom: 4px; }
+  .bw-items { margin: 4px 0 0 18px; padding: 0; max-height: 180px; overflow: auto; }
+  .bw-table { border-collapse: collapse; margin: 4px 0; }
+  .bw-table td, .bw-table th { border: 1px solid rgb(200,205,215); padding: 3px 6px; text-align: left; vertical-align: top; }
+  .bw-table th { background: rgb(238,241,246); }
+  .bw-error, .bw-warn { color: rgb(198,40,40); }
+</style>
+<style>
+  .ai-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
+  .ai-pick { position: relative; display: inline-block; }
+  .ai-pick-panel { position: absolute; z-index: 30; top: 24px; left: 0; min-width: 260px; max-height: 320px; overflow: auto; background: rgb(255,255,255); border: 1px solid rgb(170,178,195); box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 6px 8px; }
+  .ai-pick-panel .bw-check { margin: 2px 0; }
+</style>
+
+## ======================================================================= parameters
+## Shared snippet params.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED params.vm".
+## Parameters common to the document widgets: projects and excludedTypes (values only), spaces, showMode, lineCounts, extraFields, height.
+## On 2512 a customEnum singleValue is a String; .value()/.value work for string and integer
+## parameters. Each accessor form is tried; a #set with a null value keeps the previous value.
+## Integers are re-parsed from their text so that comparisons always work on Integer (Velocity 1.4).
+#set($bwUnset = "__unset__")
+
+## projects: @project multi-selector (guide 10.2), read in common.vm with bwOptionIds (nothing selected = current project).
+#set($projectVals = false)
+#set($projectVals = $parameters.projects.values)
+#set($projectVals = $parameters.projects.values())
+
+## excludedTypes: workitem-type multi-selector, read in common.vm with bwOptionIds (nothing selected = all types counted).
+#set($excludedTypeVals = false)
+#set($excludedTypeVals = $parameters.excludedTypes.values)
+#set($excludedTypeVals = $parameters.excludedTypes.values())
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.spaces.value)
+#set($tmp = $parameters.spaces.value())
+#set($spacesStr = "")
+#if("$tmp" != $bwUnset)
+  #set($spacesStr = "$tmp")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.showMode.singleValue)
+#set($tmp = $parameters.showMode.singleValue())
+#set($showMode = "related")
+#if("$tmp" == "all")
+  #set($showMode = "all")
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.lineCounts.singleValue)
+#set($tmp = $parameters.lineCounts.singleValue())
+#set($showCounts = true)
+#if("$tmp" == "hide")
+  #set($showCounts = false)
+#end
+
+#set($extraList = [])
+#set($tmp = false)
+#set($tmp = $parameters.extraFields.values)
+#set($tmp = $parameters.extraFields.values())
+#if($tmp)
+  #foreach($v in $tmp)
+    #set($fid = "$v")
+    #set($fid = $v.id())
+    #set($fidS = "$fid")
+    #if($fidS.matches("type|status|created|updated|items") && !$extraList.contains($fidS))
+      #set($void = $extraList.add($fidS))
+    #end
+  #end
+#end
+#set($extrasStr = "")
+#foreach($f in $extraList)
+  #if($extrasStr != "")
+    #set($extrasStr = "${extrasStr},")
+  #end
+  #set($extrasStr = "${extrasStr}${f}")
+#end
+
+#set($bwInt = 0)
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.height.value)
+#set($tmp = $parameters.height.value())
+#set($tmpS = "$tmp")
+#set($graphHeight = 600)
+#if($tmpS.matches("[0-9]{1,5}"))
+  #set($graphHeight = $bwInt.parseInt($tmpS))
+#end
+#if($graphHeight < 200)
+  #set($graphHeight = 600)
+#end
+
+## advImpact limits (spike conclusion, SPEC 6.1): link roles used, levels, new items per level and direction (the analysis
+## of that direction stops after a level above it), reached items and links written to the page model (whole page).
+#set($maxRoles = 5)
+#set($maxLevels = 7)
+#set($levelCap = 5000)
+#set($itemCap = 20000)
+#set($linkCap = 40000)
+#set($chunkSize = 500)
+
+## ======================================================================= lists
+## Shared snippet common.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED common.vm".
+## Lists, projects in scope, output mode and the bwKey / bwDocLabel macros. Needs params.vm.
+## Option ids from the values() of an enumeration multi-selector: link roles (workitem-link-role, verified on 2512,
+## docCoverage spike C2: each value is a ProxyEnumOption, id() = role id), work item types (workitem-type, verified on
+## 2512) and projects (@project, id() expected to be the project id: not yet verified on 2512).
+## Identifiers only, as they go into SQL.
+#macro(bwOptionIds $bwVals $bwOut)
+  #if($bwVals)
+    #foreach($bwV in $bwVals)
+      #set($bwRid = "$bwV")
+      #set($bwRid = $bwV.id())
+      #set($bwRidS = "$bwRid")
+      #if($bwRidS.matches("[A-Za-z0-9_.-]+") && !$bwOut.contains($bwRidS))
+        #set($void = $bwOut.add($bwRidS))
+      #end
+    #end
+  #end
+#end
+
+#set($excludedTypes = [])
+#bwOptionIds($excludedTypeVals $excludedTypes)
+
+## Space names may contain blanks; they are compared in Velocity only, never put into SQL.
+#set($spaceFilter = [])
+#foreach($bwPart in $spacesStr.split(","))
+  #set($bwT = $bwPart.trim())
+  #if($bwT != "")
+    #set($void = $spaceFilter.add($bwT))
+  #end
+#end
+
+#set($typeSql = "")
+#foreach($t in $excludedTypes)
+  #if($typeSql != "")
+    #set($typeSql = "${typeSql},")
+  #end
+  #set($typeSql = "${typeSql}'${t}'")
+#end
+
+## Current project (page) and projects in scope: the selected projects, or the current project when none is selected.
+## Project ids are identifiers only, as they go into SQL.
+#set($projectIdRaw = "")
+#set($projectIdRaw = $page.getReference().projectId())
+#set($projectId = "$projectIdRaw")
+#set($projectIds = [])
+#bwOptionIds($projectVals $projectIds)
+#set($scopeWarn = "")
+#if($projectIds.size() == 0 && $projectVals && $projectVals.size() > 0)
+  #set($scopeWarn = "The selected projects could not be read; the current project is used.")
+#end
+#if($projectIds.size() == 0 && $projectId.matches("[A-Za-z0-9_.-]+"))
+  #set($void = $projectIds.add($projectId))
+#end
+## On a page outside a project (repository level), the first selected project stands for the current project.
+#if(!$projectId.matches("[A-Za-z0-9_.-]+") && $projectIds.size() > 0)
+  #set($projectId = $projectIds.get(0))
+#end
+#set($projectOk = false)
+#if($projectIds.size() > 0)
+  #set($projectOk = true)
+#end
+#set($multiProject = false)
+#if($projectIds.size() > 1)
+  #set($multiProject = true)
+#end
+#if($projectIds.size() > 5)
+  #set($scopeWarn = "${scopeWarn} $projectIds.size() projects selected: the page may render slowly.")
+#end
+#set($projectSql = "")
+#set($projectsStr = "")
+#foreach($p in $projectIds)
+  #if($projectSql != "")
+    #set($projectSql = "${projectSql},")
+    #set($projectsStr = "${projectsStr},")
+  #end
+  #set($projectSql = "${projectSql}'${p}'")
+  #set($projectsStr = "${projectsStr}${p}")
+#end
+## Scope line of the main view and the PDF header
+#set($scopeText = "Project: ${projectsStr}")
+#if($multiProject)
+  #set($projectsTxt = $projectsStr.replace(",", ", "))
+  #set($scopeText = "Projects: ${projectsTxt}")
+#end
+
+#set($isStatic = false)
+#if($widgetContext.target().isPdf() || $widgetContext.target().isPrint())
+  #set($isStatic = true)
+#end
+
+## Document key used everywhere: "project/space/name" (bwKeyProject = project of the document).
+## Referenced objects (document of a link, "branched from" source) can be unresolvable (deleted, no access).
+## Any access other than isUnresolvable() then throws, so they are only used when isUnresolvable() is false.
+#macro(bwKey $bwMod)
+  #set($bwKeyOut = "")
+  #set($bwUr = "unknown")
+  #if($bwMod)
+    #set($bwUr = $bwMod.isUnresolvable())
+  #end
+  #set($bwKeyProject = "")
+  #if("$bwUr" == "false")
+    #set($bwP = "")
+    #set($bwP = $bwMod.getProjectId())
+    #if("$bwP" == "")
+      #set($bwP = $projectId)
+    #end
+    #set($bwF = "")
+    #set($bwF = $bwMod.getModuleFolder())
+    #set($bwN = "")
+    #set($bwN = $bwMod.getId())
+    #if("$bwN" != "")
+      #set($bwKeyOut = "${bwP}/${bwF}/${bwN}")
+      #set($bwKeyProject = "$bwP")
+    #end
+  #end
+#end
+
+## Document label for tables and lists: "space / name", prefixed with the project when several projects are in scope,
+## "(HEAD)" added for a document of a collection without a pinned revision (documents.vm).
+#macro(bwDocLabel $bwD)
+  #set($bwLs = $bwD.get("space"))
+  #set($bwLn = $bwD.get("id"))
+  #set($bwDocLabelOut = "${bwLs} / ${bwLn}")
+  #if($multiProject)
+    #set($bwLp = $bwD.get("project"))
+    #set($bwDocLabelOut = "${bwLp} / ${bwDocLabelOut}")
+  #end
+  #if($bwD.get("rev") == "HEAD")
+    #set($bwDocLabelOut = "${bwDocLabelOut} (HEAD)")
+  #end
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.direction.singleValue)
+#set($tmp = $parameters.direction.singleValue())
+#set($direction = "down")
+#if("$tmp" == "up" || "$tmp" == "both")
+  #set($direction = "$tmp")
+#end
+#set($dirs = [])
+#if($direction == "down" || $direction == "both")
+  #set($void = $dirs.add("down"))
+#end
+#if($direction == "up" || $direction == "both")
+  #set($void = $dirs.add("up"))
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.levels.value)
+#set($tmp = $parameters.levels.value())
+#set($tmpS = "$tmp")
+#set($levels = 3)
+#if($tmpS.matches("[0-9]{1,2}"))
+  #set($levels = $bwInt.parseInt($tmpS))
+#end
+#if($levels < 1)
+  #set($levels = 1)
+#end
+#if($levels > $maxLevels)
+  #set($levels = $maxLevels)
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.startQuery.value)
+#set($tmp = $parameters.startQuery.value())
+#set($startQuery = "")
+#if("$tmp" != $bwUnset)
+  #set($startQuery = "$tmp")
+  #set($startQuery = $startQuery.trim())
+#end
+
+## Start document: single-select @document parameter. singleValue() is the model-backed option (verified on 2512, spike
+## A/run 1); values() is tried as a fallback. getModelObject() -> ProxyDocument (isUnresolvable first) -> getOldApi() = Module.
+#set($sdVals = [])
+#set($sdOpt = false)
+#set($sdOpt = $parameters.doc.singleValue())
+#if($sdOpt)
+  #set($void = $sdVals.add($sdOpt))
+#else
+  #set($sdAll = false)
+  #set($sdAll = $parameters.doc.values())
+  #if($sdAll)
+    #set($sdVals = $sdAll)
+  #end
+#end
+#set($sdMod = false)
+#set($sdSelected = false)
+#foreach($v in $sdVals)
+  #if(!$sdMod)
+    #set($sdSelected = true)
+    #set($mo = false)
+    #set($mo = $v.getModelObject())
+    #set($moUr = "unknown")
+    #if($mo)
+      #set($moUr = $mo.isUnresolvable())
+    #end
+    #if("$moUr" == "false")
+      #set($sdMod = $mo.getOldApi())
+    #end
+  #end
+#end
+#bwKey($sdMod)
+#set($startKey = $bwKeyOut)
+#set($sdFolder = "")
+#set($sdName = "")
+#if($startKey != "")
+  #set($sdFolder = $sdMod.getModuleFolder())
+  #set($sdFolder = "$sdFolder")
+  #set($sdName = $sdMod.getId())
+  #set($sdName = "$sdName")
+#end
+
+## Link roles: selector values (id() = role id). At most maxRoles. Names and opposite names from the project's
+## link role enumeration (docCoverage spike C2); the id when not found.
+#set($roleAll = [])
+#set($roleVals = false)
+#set($roleVals = $parameters.roles.values)
+#set($roleVals = $parameters.roles.values())
+#bwOptionIds($roleVals $roleAll)
+#set($roleIds = [])
+#foreach($r in $roleAll)
+  #if($roleIds.size() < $maxRoles)
+    #set($void = $roleIds.add($r))
+  #end
+#end
+#set($rolesDropped = $roleAll.size() - $roleIds.size())
+#set($roleName = $objectFactory.newMap())
+#set($roleOpp = $objectFactory.newMap())
+#foreach($r in $roleIds)
+  #set($void = $roleName.put($r, $r))
+  #set($void = $roleOpp.put($r, $r))
+#end
+#if($projectOk && $roleIds.size() > 0)
+  #set($tp = false)
+  #set($tp = $trackerService.getTrackerProject($projectId))
+  #set($roleEnum = false)
+  #if($tp)
+    #set($roleEnum = $tp.getWorkItemLinkRoleEnum())
+  #end
+  #if($roleEnum)
+    #foreach($o in $roleEnum.getAllOptions())
+      #set($oId = "")
+      #set($oId = $o.getId())
+      #set($oIdS = "$oId")
+      #if($roleName.containsKey($oIdS))
+        #set($oName = "")
+        #set($oName = $o.getName())
+        #if("$oName" != "")
+          #set($void = $roleName.put($oIdS, "$oName"))
+          #set($void = $roleOpp.put($oIdS, "$oName"))
+        #end
+        #set($oOpp = "")
+        #set($oOpp = $o.getOppositeName())
+        #if("$oOpp" != "")
+          #set($void = $roleOpp.put($oIdS, "$oOpp"))
+        #end
+      #end
+    #end
+  #end
+#end
+#set($roleSql = "")
+#foreach($r in $roleIds)
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+## Line styles of the roles, in selection order (same palette as graph.js).
+#set($roleColors = ["rgb(51,103,214)", "rgb(198,40,40)", "rgb(26,127,55)", "rgb(142,68,173)", "rgb(211,84,0)"])
+#set($roleDashes = ["", "9,5", "2,4", "6,3", "12,4,2,4"])
+
+## Resolved work item of the current project, not of an excluded type: aiOk = true, aiId = its id.
+#macro(aiItem $aiW)
+  #set($aiOk = false)
+  #set($aiId = "")
+  #set($aiWUr = "unknown")
+  #if($aiW)
+    #set($aiWUr = $aiW.isUnresolvable())
+  #end
+  #if("$aiWUr" == "false")
+    #set($aiId = "$aiW.getId()")
+    #set($aiType = "")
+    #set($aiTypeObj = false)
+    #set($aiTypeObj = $aiW.getType())
+    #if($aiTypeObj)
+      #set($aiType = "$aiTypeObj.getId()")
+    #end
+    #set($aiProj = "$aiW.getProjectId()")
+    #if(!$excludedTypes.contains($aiType) && $aiProj == $projectId)
+      #set($aiOk = true)
+    #end
+  #end
+#end
+
+#if(!$projectOk)
+  <div class="bw-warn">Advanced Impact Analysis: place this widget on a page of a project.</div>
+#elseif($startKey == "")
+  #if($sdSelected)
+  <div class="bw-warn">Advanced Impact Analysis: the start document cannot be read (deleted, or no access).</div>
+  #else
+  <div class="bw-warn">Advanced Impact Analysis: select the start document in the widget parameters.</div>
+  #end
+#elseif($roleIds.size() == 0)
+  <div class="bw-warn">Advanced Impact Analysis: select at least one link role in the widget parameters.</div>
+#else
+#set($ds = $trackerService.getDataService())
+#set($warn = "")
+#if($rolesDropped > 0)
+  #set($warn = "Only the first $maxRoles link roles are used ($rolesDropped ignored).")
+#end
+#if($scopeWarn != "")
+  #set($warn = "${warn} ${scopeWarn}")
+#end
+
+## ======================================================================= start items
+## All items of the start document (excluded types left out), or the work item query restricted to it with an SQL:()
+## clause (verified on 2512, spike A6/A11). The restriction is checked again in Velocity.
+#set($projectQ = $projectId.replace("'", "''"))
+#set($sdFolderQ = $sdFolder.replace("'", "''"))
+#set($sdNameQ = $sdName.replace("'", "''"))
+#set($startTypeSql = "")
+#if($typeSql != "")
+  #set($startTypeSql = " AND w.c_type NOT IN (${typeSql})")
+#end
+#set($startSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'${startTypeSql}")
+#set($startCand = [])
+#if($startQuery != "")
+  #set($startLucene = "project.id:${projectId} AND SQL:(${startSql}) AND (${startQuery})")
+  #set($startCand = $trackerService.queryWorkItems($startLucene, "id"))
+#else
+  #set($startCand = $ds.sqlSearch($startSql))
+#end
+## items: id -> work item (all reached items, start items first); itemDoc: id -> document key
+#set($items = $objectFactory.newMap())
+#set($itemOrder = [])
+#set($itemDoc = $objectFactory.newMap())
+#set($startIds = $objectFactory.newMap())
+#foreach($w in $startCand)
+  #aiItem($w)
+  #if($aiOk && !$items.containsKey($aiId))
+    #set($wm = false)
+    #set($wm = $w.getModule())
+    #bwKey($wm)
+    #if($bwKeyOut == $startKey)
+      #set($void = $items.put($aiId, $w))
+      #set($void = $itemOrder.add($aiId))
+      #set($void = $itemDoc.put($aiId, $bwKeyOut))
+      #set($void = $startIds.put($aiId, true))
+    #end
+  #end
+#end
+
+## ======================================================================= traversal
+## lvl.down / lvl.up: id -> level in that direction (start items 0). One pass per direction, its own visited set.
+#set($lvlD = $objectFactory.newMap())
+#set($lvlU = $objectFactory.newMap())
+#set($rTypeSqlD = "")
+#set($rTypeSqlU = "")
+#if($typeSql != "")
+  #set($rTypeSqlD = " AND ws.c_type NOT IN (${typeSql})")
+  #set($rTypeSqlU = " AND wt.c_type NOT IN (${typeSql})")
+#end
+#set($cutText = "")
+#set($reachedMax = 0)
+#foreach($pass in $dirs)
+  #set($visited = $lvlD)
+  #if($pass == "up")
+    #set($visited = $lvlU)
+  #end
+  #set($frontier = [])
+  #foreach($sid in $startIds.keySet())
+    #set($void = $visited.put($sid, 0))
+    #set($void = $frontier.add($sid))
+  #end
+  #set($stop = false)
+  #foreach($lv in [1..7])
+    #if($lv <= $levels && $frontier.size() > 0 && !$stop)
+      ## IN lists of at most chunkSize ids (ids are identifiers: checked before going into SQL)
+      #set($chunks = [])
+      #set($cur = [])
+      #foreach($fid in $frontier)
+        #if($fid.matches("[A-Za-z0-9_.-]+"))
+          #if($cur.size() == $chunkSize)
+            #set($void = $chunks.add($cur))
+            #set($cur = [])
+          #end
+          #set($void = $cur.add("'${fid}'"))
+        #end
+      #end
+      #if($cur.size() > 0)
+        #set($void = $chunks.add($cur))
+      #end
+      #set($next = [])
+      #foreach($chunk in $chunks)
+        #set($inSql = "")
+        #foreach($q in $chunk)
+          #if($inSql != "")
+            #set($inSql = "${inSql},")
+          #end
+          #set($inSql = "${inSql}${q}")
+        #end
+        #if($pass == "down")
+          #set($sql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = wt.fk_uri_project WHERE p.c_id = '${projectQ}' AND ws.fk_uri_project = wt.fk_uri_project AND l.c_role IN (${roleSql}) AND wt.c_id IN (${inSql})${rTypeSqlD}")
+        #else
+          #set($sql = "SELECT DISTINCT wt.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectQ}' AND ws.fk_uri_project = wt.fk_uri_project AND l.c_role IN (${roleSql}) AND ws.c_id IN (${inSql})${rTypeSqlU}")
+        #end
+        #foreach($r in $ds.sqlSearch($sql))
+          #set($rid = "$r.getId()")
+          #if(!$visited.containsKey($rid))
+            #set($void = $visited.put($rid, $lv))
+            #set($void = $next.add($rid))
+            #if(!$items.containsKey($rid))
+              #set($void = $items.put($rid, $r))
+              #set($void = $itemOrder.add($rid))
+            #end
+          #end
+        #end
+      #end
+      #if($lv > $reachedMax && $next.size() > 0)
+        #set($reachedMax = $lv)
+      #end
+      #if($next.size() > $levelCap)
+        #set($stop = true)
+        #set($cutText = "${cutText} The ${pass}stream analysis stopped after level ${lv}: more than ${levelCap} new work items in that level.")
+      #end
+      #if($items.size() > $itemCap)
+        #set($stop = true)
+        #set($cutText = "${cutText} The ${pass}stream analysis stopped after level ${lv}: more than ${itemCap} work items reached.")
+      #end
+      #set($frontier = $next)
+    #end
+  #end
+#end
+#if($cutText != "")
+  #set($warn = "${warn}${cutText}")
+#end
+
+## ======================================================================= documents of the reached items
+#set($docOnly = [])
+#foreach($id in $itemOrder)
+  #if(!$itemDoc.containsKey($id))
+    #set($w = $items.get($id))
+    #set($wm = false)
+    #set($wm = $w.getModule())
+    #bwKey($wm)
+    #set($void = $itemDoc.put($id, $bwKeyOut))
+  #end
+  #set($dk = $itemDoc.get($id))
+  #if($dk != "" && !$docOnly.contains($dk))
+    #set($void = $docOnly.add($dk))
+  #end
+#end
+#if(!$docOnly.contains($startKey))
+  #set($void = $docOnly.add($startKey))
+#end
+## Shared snippet documents.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED documents.vm".
+## Collects the documents into docList / docByKey (maps with key, project, id, title, space, type, status, created,
+## updated, rev, items, itemObjs, module). Needs common.vm.
+## HEAD (no colRef): the documents of the projects in scope. Optional: docOnly = list of keys (project/space/name) to
+## keep among the documents of the current project; docOther = the same for the documents of the other projects in
+## scope. Empty or unset = all documents.
+## Collection (colRef = collection reference, set by the widget): the documents of the collection and of its upstream
+## collections, each at the revision the collection pins (rev = that revision, "HEAD" when none is pinned), with their
+## work items at that revision. Verified on 2512 (docCoverage spike K2, K3, extra round).
+#set($ds = $trackerService.getDataService())
+#if(!$docOnly)
+  #set($docOnly = [])
+#end
+#if(!$docOther)
+  #set($docOther = [])
+#end
+#set($docList = [])
+#set($docByKey = $objectFactory.newMap())
+#set($typeFilterSql = "")
+#if($typeSql != "")
+  #set($typeFilterSql = " AND w.c_type NOT IN (${typeSql})")
+#end
+
+## Document map of module bwDocM (key bwDocKey, project bwDocProj, space bwDocSpace) -> bwDocOut.
+#macro(bwDocMap $bwDocM)
+  #set($bwDocOut = $objectFactory.newMap())
+  #set($dName = $bwDocM.getId())
+  #set($dTitle = "")
+  #set($dTitle = $bwDocM.getTitle())
+  #if("$dTitle" == "")
+    #set($dTitle = "$dName")
+  #end
+  #set($dType = "")
+  #set($dTypeObj = false)
+  #set($dTypeObj = $bwDocM.getType())
+  #if($dTypeObj)
+    #set($dType = $dTypeObj.getId())
+    #set($dType = $dTypeObj.getName())
+  #end
+  #set($dStatus = "")
+  #set($dStatusObj = false)
+  #set($dStatusObj = $bwDocM.getStatus())
+  #if($dStatusObj)
+    #set($dStatus = $dStatusObj.getId())
+    #set($dStatus = $dStatusObj.getName())
+  #end
+  #set($dCreated = "")
+  #set($dDate = false)
+  #set($dDate = $bwDocM.getCreated())
+  #if($dDate)
+    #set($dCreated = "$dDate")
+    #set($dCreated = $date.format("yyyy-MM-dd", $dDate))
+  #end
+  #set($dUpdated = "")
+  #set($dDate = false)
+  #set($dDate = $bwDocM.getUpdated())
+  #if($dDate)
+    #set($dUpdated = "$dDate")
+    #set($dUpdated = $date.format("yyyy-MM-dd", $dDate))
+  #end
+  #set($void = $bwDocOut.put("key", $bwDocKey))
+  #set($void = $bwDocOut.put("project", "$bwDocProj"))
+  #set($void = $bwDocOut.put("id", "$dName"))
+  #set($void = $bwDocOut.put("title", "$dTitle"))
+  #set($void = $bwDocOut.put("space", "$bwDocSpace"))
+  #set($void = $bwDocOut.put("type", "$dType"))
+  #set($void = $bwDocOut.put("status", "$dStatus"))
+  #set($void = $bwDocOut.put("created", "$dCreated"))
+  #set($void = $bwDocOut.put("updated", "$dUpdated"))
+  #set($void = $bwDocOut.put("rev", ""))
+  #set($void = $bwDocOut.put("items", -1))
+  #set($void = $bwDocOut.put("itemObjs", []))
+  #set($void = $bwDocOut.put("module", $bwDocM))
+#end
+
+#if($colRef)
+  ## ------------------------------------------------------------------ collection
+  #set($colDocs = $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($colRef))
+  #foreach($cd in $colDocs)
+    #set($m = false)
+    #set($m = $cd.getOldApi())
+    #bwKey($m)
+    #set($bwDocKey = $bwKeyOut)
+    #set($bwDocProj = $bwKeyProject)
+    #set($bwDocSpace = "")
+    #if($bwDocKey != "")
+      #set($bwDocSpace = $m.getModuleFolder())
+    #end
+    #if($bwDocKey != "" && !$docByKey.containsKey($bwDocKey) && ($spaceFilter.size() == 0 || $spaceFilter.contains("$bwDocSpace")))
+      #bwDocMap($m)
+      #set($dRev = "")
+      #set($dRev = $m.getRevision())
+      #if("$dRev" == "")
+        #set($dRev = "HEAD")
+      #end
+      #set($void = $bwDocOut.put("rev", "$dRev"))
+      #set($void = $bwDocOut.put("items", 0))
+      #set($void = $docList.add($bwDocOut))
+      #set($void = $docByKey.put($bwDocKey, $bwDocOut))
+    #end
+  #end
+  ## Work items of all the collection documents in one query, grouped by their document (at the collection revision).
+  #set($colItemSql = "select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module")
+  #if($typeSql != "")
+    #set($colItemSql = "${colItemSql} where w.c_type not in (${typeSql})")
+  #end
+  #foreach($cw in $transaction.objects().searchBySql($colItemSql).collection($colRef))
+    #set($cwi = false)
+    #set($cwi = $cw.getOldApi())
+    #if($cwi)
+      #set($cwm = false)
+      #set($cwm = $cwi.getModule())
+      #bwKey($cwm)
+      #if($bwKeyOut != "" && $docByKey.containsKey($bwKeyOut))
+        #set($void = $docByKey.get($bwKeyOut).get("itemObjs").add($cwi))
+      #end
+    #end
+  #end
+  #foreach($d in $docList)
+    #set($void = $d.put("items", $d.get("itemObjs").size()))
+  #end
+#else
+  ## ------------------------------------------------------------------ HEAD
+  #set($docSql = "SELECT m.c_uri FROM module m INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id IN (${projectSql})")
+  #foreach($m in $ds.sqlSearch($docSql))
+    #bwKey($m)
+    #set($dKey = $bwKeyOut)
+    #set($dProj = $bwKeyProject)
+    #set($dSpace = "")
+    #set($dSpace = $m.getModuleFolder())
+    #set($keep = true)
+    #if($dKey == "" || $docByKey.containsKey($dKey))
+      #set($keep = false)
+    #end
+    #if($keep && $spaceFilter.size() > 0 && !$spaceFilter.contains("$dSpace"))
+      #set($keep = false)
+    #end
+    #if($keep && $docOnly.size() > 0 && $dProj == $projectId && !$docOnly.contains($dKey))
+      #set($keep = false)
+    #end
+    #if($keep && $docOther.size() > 0 && $dProj != $projectId && !$docOther.contains($dKey))
+      #set($keep = false)
+    #end
+    #if($keep)
+      #set($bwDocKey = $dKey)
+      #set($bwDocProj = $dProj)
+      #set($bwDocSpace = "$dSpace")
+      #bwDocMap($m)
+      #set($d = $bwDocOut)
+      ## Work items contained in the document, excluded types not counted. Quotes doubled for SQL.
+      #set($spaceStr = "$dSpace")
+      #set($nameStr = $d.get("id"))
+      #set($spaceSql = $spaceStr.replace("'", "''"))
+      #set($nameSql = $nameStr.replace("'", "''"))
+      #set($projSql = $dProj.replace("'", "''"))
+      #set($cntSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projSql}' AND m.c_modulefolder = '${spaceSql}' AND m.c_id = '${nameSql}'${typeFilterSql}")
+      #set($dItems = -1)
+      #set($dItemObjs = [])
+      #set($dItemObjs = $ds.sqlSearch($cntSql))
+      #set($dItems = $dItemObjs.size())
+      #set($void = $d.put("items", $dItems))
+      #set($void = $d.put("itemObjs", $dItemObjs))
+      #set($void = $docList.add($d))
+      #set($void = $docByKey.put($dKey, $d))
+    #end
+  #end
+#end
+## Items outside any document (not in a LiveDoc) are grouped under a pseudo document key "".
+
+## ======================================================================= links between the reached items
+## All links of the selected roles from a reached item to another reached item (the browser recomputes the levels from
+## them, SPEC 6.2). Ids are written as is: Polarion ids contain no "|" or ";".
+#set($links = [])
+#set($linkN = 0)
+#foreach($id in $itemOrder)
+  #set($w = $items.get($id))
+  #foreach($ls in $w.getLinkedWorkItemsStructsDirect())
+    #set($role = "")
+    #set($roleObj = false)
+    #set($roleObj = $ls.getLinkRole())
+    #if($roleObj)
+      #set($role = "$roleObj.getId()")
+    #end
+    #if($roleIds.contains($role))
+      #set($tgt = false)
+      #set($tgt = $ls.getLinkedItem())
+      #set($tUr = "unknown")
+      #if($tgt)
+        #set($tUr = $tgt.isUnresolvable())
+      #end
+      #if("$tUr" == "false")
+        #set($tid = "$tgt.getId()")
+        #set($tProj = "$tgt.getProjectId()")
+        #if($tid != $id && $tProj == $projectId && $items.containsKey($tid))
+          #if($linkN < $linkCap)
+            #set($trip = [$id, $tid, $role])
+            #set($void = $links.add($trip))
+          #end
+          #set($linkN = $linkN + 1)
+        #end
+      #end
+    #end
+  #end
+#end
+#if($linkN > $linkCap)
+  #set($warn = "${warn} Large page: only the first ${linkCap} links are written to the page (${linkN} found).")
+#end
+
+## ======================================================================= levels, documents and relations (server copy
+## of the browser computation, used by the static view): item level = lowest level over the directions; a document is on
+## the side and level of its lowest item (start document: 0). Relations = links along a path of the analysis
+## (downstream: source one level below its target; upstream: target one level above its source), o = document of the
+## target (left), c = document of the source.
+#set($docLvl = $objectFactory.newMap())
+#set($docSide = $objectFactory.newMap())
+#set($docImp = $objectFactory.newMap())
+#set($void = $docLvl.put($startKey, 0))
+#set($void = $docSide.put($startKey, "start"))
+#foreach($id in $itemOrder)
+  #set($dk = $itemDoc.get($id))
+  #if($dk != "" && $docByKey.containsKey($dk))
+    #set($best = -1)
+    #set($bestSide = "")
+    #if($lvlD.containsKey($id))
+      #set($best = $lvlD.get($id))
+      #set($bestSide = "down")
+    #end
+    #if($lvlU.containsKey($id))
+      #set($lu = $lvlU.get($id))
+      #if($best < 0 || $lu < $best)
+        #set($best = $lu)
+        #set($bestSide = "up")
+      #end
+    #end
+    #if($best > 0)
+      #set($n = 0)
+      #if($docImp.containsKey($dk))
+        #set($n = $docImp.get($dk))
+      #end
+      #set($n = $n + 1)
+      #set($void = $docImp.put($dk, $n))
+    #end
+    #if(!$docLvl.containsKey($dk) || $docLvl.get($dk) > $best)
+      #set($void = $docLvl.put($dk, $best))
+      #set($void = $docSide.put($dk, $bestSide))
+    #end
+  #end
+#end
+#set($edges = $objectFactory.newMap())
+#set($edgeKeys = [])
+#foreach($ln in $links)
+  #set($s = $ln.get(0))
+  #set($t = $ln.get(1))
+  #set($role = $ln.get(2))
+  #set($onPath = false)
+  #if($lvlD.containsKey($s) && $lvlD.containsKey($t))
+    #set($ls1 = $lvlD.get($s))
+    #set($lt1 = $lvlD.get($t))
+    #set($lt1 = $lt1 + 1)
+    #if($ls1 == $lt1)
+      #set($onPath = true)
+    #end
+  #end
+  #if($lvlU.containsKey($s) && $lvlU.containsKey($t))
+    #set($ls1 = $lvlU.get($s))
+    #set($lt1 = $lvlU.get($t))
+    #set($ls1 = $ls1 + 1)
+    #if($ls1 == $lt1)
+      #set($onPath = true)
+    #end
+  #end
+  #set($ok = $itemDoc.get($t))
+  #set($ck = $itemDoc.get($s))
+  #if($onPath && $ok != $ck && $docByKey.containsKey($ok) && $docByKey.containsKey($ck))
+    #set($ek = "${ok}>${ck}")
+    #if(!$edges.containsKey($ek))
+      #set($e = $objectFactory.newMap())
+      #set($void = $e.put("o", $ok))
+      #set($void = $e.put("c", $ck))
+      #set($void = $e.put("links", $objectFactory.newMap()))
+      #foreach($r in $roleIds)
+        #set($void = $e.get("links").put($r, 0))
+      #end
+      #set($void = $edges.put($ek, $e))
+      #set($void = $edgeKeys.add($ek))
+    #end
+    #set($e = $edges.get($ek))
+    #set($nl = $e.get("links").get($role))
+    #set($nl = $nl + 1)
+    #set($void = $e.get("links").put($role, $nl))
+  #end
+#end
+
+## Text helpers for the output
+#macro(aiRolesLabel $aiEd $aiWithCounts)
+  #set($aiLabel = "")
+  #foreach($aiR in $roleIds)
+    #set($aiN = $aiEd.get("links").get($aiR))
+    #if($aiN > 0)
+      #if($aiLabel != "")
+        #set($aiLabel = "${aiLabel} + ")
+      #end
+      #set($aiNm = $roleName.get($aiR))
+      #if($aiWithCounts)
+        #set($aiLabel = "${aiLabel}${aiNm} ${aiN}")
+      #else
+        #set($aiLabel = "${aiLabel}${aiNm}")
+      #end
+    #end
+  #end
+#end
+#macro(aiSideLabel $aiK)
+  #set($aiSideOut = "")
+  #set($aiSd = $docSide.get($aiK))
+  #set($aiLv = $docLvl.get($aiK))
+  #if($aiSd == "start")
+    #set($aiSideOut = "Start document")
+  #elseif($aiSd == "down")
+    #set($aiSideOut = "Downstream level ${aiLv}")
+  #elseif($aiSd == "up")
+    #set($aiSideOut = "Upstream level ${aiLv}")
+  #end
+#end
+#set($impTotal = $items.size() - $startIds.size())
+#set($dirText = "downstream")
+#if($direction == "up")
+  #set($dirText = "upstream")
+#elseif($direction == "both")
+  #set($dirText = "downstream and upstream")
+#end
+
+## ======================================================================= output
+#if($isStatic)
+## ----------------------------------------------------------------- static view (PDF / print)
+## No JavaScript. Elements limited to rect, line, polygon and text (rendered in PDF, docBranches spike V7).
+## Columns: upstream levels on the left, the start document, downstream levels on the right.
+#set($upMax = 0)
+#set($downMax = 0)
+#foreach($k in $docLvl.keySet())
+  #set($sd = $docSide.get($k))
+  #set($lv = $docLvl.get($k))
+  #if($sd == "up" && $lv > $upMax)
+    #set($upMax = $lv)
+  #end
+  #if($sd == "down" && $lv > $downMax)
+    #set($downMax = $lv)
+  #end
+#end
+#set($nCols = $upMax + $downMax + 1)
+#set($colOf = $objectFactory.newMap())
+#foreach($d in $docList)
+  #set($k = $d.get("key"))
+  #if($docLvl.containsKey($k))
+    #set($sd = $docSide.get($k))
+    #set($lv = $docLvl.get($k))
+    #set($ci = $upMax)
+    #if($sd == "up")
+      #set($ci = $upMax - $lv)
+    #elseif($sd == "down")
+      #set($ci = $upMax + $lv)
+    #end
+    #set($void = $colOf.put($k, $ci))
+  #end
+#end
+## Geometry (integers only)
+#set($nW = 220)
+#set($cGap = 150)
+#set($rGap = 16)
+#set($mg = 16)
+#set($nLines = 5 + $extraList.size())
+#set($nH = 16 + 14 * $nLines)
+#set($px = $objectFactory.newMap())
+#set($py = $objectFactory.newMap())
+#set($maxRows = 0)
+#set($lastCol = $nCols - 1)
+#foreach($ci in [0..$lastCol])
+  #set($ri = 0)
+  #foreach($d in $docList)
+    #set($k = $d.get("key"))
+    #if($colOf.containsKey($k) && $colOf.get($k) == $ci)
+      #set($x = $mg + $ci * ($nW + $cGap))
+      #set($y = $mg + $ri * ($nH + $rGap))
+      #set($void = $px.put($k, $x))
+      #set($void = $py.put($k, $y))
+      #set($ri = $ri + 1)
+    #end
+  #end
+  #if($ri > $maxRows)
+    #set($maxRows = $ri)
+  #end
+#end
+#set($cw = 2 * $mg + $nCols * $nW + $lastCol * $cGap)
+#set($ch = 2 * $mg + $maxRows * ($nH + $rGap))
+#set($outW = $cw)
+#set($outH = $ch)
+#if($cw > 700)
+  #set($outW = 700)
+  #set($outH = $ch * 700 / $cw)
+#end
+<div class="ai-root">
+<div><b>Advanced Impact Analysis</b> &mdash; $esc.html($scopeText) &mdash; $dirText, $levels levels, $impTotal impacted work items in $docImp.size() documents <span class="bw-muted">(widget v$bwVersion)</span></div>
+#set($legend = "")
+#set($ri = 0)
+#foreach($r in $roleIds)
+  #if($legend != "")
+    #set($legend = "${legend}, ")
+  #end
+  #set($rn = $roleName.get($r))
+  #set($rc = "solid blue")
+  #if($ri == 1)
+    #set($rc = "dashed red")
+  #elseif($ri == 2)
+    #set($rc = "dotted green")
+  #elseif($ri == 3)
+    #set($rc = "dashed purple")
+  #elseif($ri == 4)
+    #set($rc = "dash-dot orange")
+  #end
+  #set($legend = "${legend}${rn} ${rc}")
+  #set($ri = $ri + 1)
+#end
+#set($startD = $docByKey.get($startKey))
+#bwDocLabel($startD)
+#set($startTxt = "${bwDocLabelOut} ($startIds.size() work items)")
+#if($startQuery != "")
+  #set($startTxt = "${bwDocLabelOut} ($startIds.size() work items, query: ${startQuery})")
+#end
+<div class="bw-muted">Start: $esc.html($startTxt). Upstream documents on the left, downstream on the right; arrows follow the link direction. Line style: $esc.html($legend).</div>
+#if($warn.trim() != "")
+<div class="bw-warn">$esc.html($warn.trim())</div>
+#end
+#if($startIds.size() == 0)
+#set($noStartTxt = "No start work item: the start document has no work item (excluded types left out).")
+#if($startQuery != "")
+  #set($noStartTxt = "No start work item: no work item of the start document matches the query (excluded types left out).")
+#end
+<p>$esc.html($noStartTxt)</p>
+#elseif($impTotal == 0)
+<p>No work item reached with the selected link roles.</p>
+#end
+<svg xmlns="http://www.w3.org/2000/svg" width="$outW" height="$outH" viewBox="0 0 $cw $ch">
+<rect x="0" y="0" width="$cw" height="$ch" fill="rgb(255,255,255)"/>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($eo = $e.get("o"))
+  #set($ec = $e.get("c"))
+  #if($px.containsKey($eo) && $px.containsKey($ec))
+  #set($half = $nH / 2)
+  #set($x1 = $px.get($eo) + $nW)
+  #set($y1 = $py.get($eo) + $half)
+  #set($x2 = $px.get($ec))
+  #set($y2 = $py.get($ec) + $half)
+  #set($xm = $x1 + $cGap / 2)
+  #set($color = "")
+  #set($dash = "")
+  #set($ri = 0)
+  #foreach($r in $roleIds)
+    #if($color == "" && $e.get("links").get($r) > 0)
+      #set($color = $roleColors.get($ri))
+      #set($dash = $roleDashes.get($ri))
+    #end
+    #set($ri = $ri + 1)
+  #end
+  #aiRolesLabel($e $showCounts)
+  #set($ax = $x1 + 9)
+  #set($ay1 = $y1 - 5)
+  #set($ay2 = $y1 + 5)
+  #set($lx = $xm + 3)
+  #set($ly = $y2 - 4)
+<line x1="$ax" y1="$y1" x2="$xm" y2="$y1" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y1" x2="$xm" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y2" x2="$x2" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<polygon points="$ax,$ay1 $x1,$y1 $ax,$ay2" fill="$color"/>
+<text x="$lx" y="$ly" font-family="Arial" font-size="9" fill="$color">$esc.html($aiLabel)</text>
+  #end
+#end
+#foreach($d in $docList)
+  #set($k = $d.get("key"))
+  #if($px.containsKey($k))
+    #set($x = $px.get($k))
+    #set($y = $py.get($k))
+    #set($tx = $x + 7)
+    #set($fill = "rgb(246,248,252)")
+    #if($k == $startKey)
+      #set($fill = "rgb(255,246,230)")
+    #end
+<rect x="$x" y="$y" width="$nW" height="$nH" rx="5" fill="$fill" stroke="rgb(120,132,155)" stroke-width="1"/>
+    #set($lines = [])
+    #set($void = $lines.add($d.get("id")))
+    #set($void = $lines.add($d.get("title")))
+    #set($dSs = $d.get("space"))
+    #if($multiProject)
+      #set($dPs = $d.get("project"))
+      #set($dSs = "${dPs} / ${dSs}")
+    #end
+    #set($void = $lines.add($dSs))
+    #aiSideLabel($k)
+    #set($void = $lines.add($aiSideOut))
+    #set($imp = 0)
+    #if($docImp.containsKey($k))
+      #set($imp = $docImp.get($k))
+    #end
+    #set($dItems = $d.get("items"))
+    #if($k == $startKey)
+      #set($void = $lines.add("Start items: $startIds.size() / ${dItems}"))
+    #else
+      #set($void = $lines.add("Impacted: ${imp} / ${dItems}"))
+    #end
+    #foreach($f in $extraList)
+      #set($fv = "$d.get($f)")
+      #if($f == "items" && $fv == "-1")
+        #set($fv = "")
+      #end
+      #set($fl = $f)
+      #if($f == "type")
+        #set($fl = "Type")
+      #elseif($f == "status")
+        #set($fl = "Status")
+      #elseif($f == "created")
+        #set($fl = "Created")
+      #elseif($f == "updated")
+        #set($fl = "Updated")
+      #elseif($f == "items")
+        #set($fl = "Work items")
+      #end
+      #set($void = $lines.add("${fl}: ${fv}"))
+    #end
+    #set($li = 0)
+    #foreach($t in $lines)
+      #set($ts = "$t")
+      #if($ts.length() > 36)
+        #set($ts2 = $ts.substring(0, 35))
+        #set($ts = "${ts2}...")
+      #end
+      #set($ty = $y + 19 + $li * 14)
+      #set($fw = "normal")
+      #if($li == 0)
+        #set($fw = "bold")
+      #end
+<text x="$tx" y="$ty" font-family="Arial" font-size="11" font-weight="$fw" fill="rgb(25,35,55)">$esc.html($ts)</text>
+      #set($li = $li + 1)
+    #end
+  #end
+#end
+</svg>
+<table class="bw-table">
+<tr><th>Document</th><th>Position</th><th>Impacted work items</th><th>Work items</th></tr>
+#foreach($d in $docList)
+  #set($k = $d.get("key"))
+  #if($docLvl.containsKey($k))
+    #aiSideLabel($k)
+    #set($imp = 0)
+    #if($docImp.containsKey($k))
+      #set($imp = $docImp.get($k))
+    #end
+    #bwDocLabel($d)
+<tr><td>$esc.html($bwDocLabelOut)</td><td>$esc.html($aiSideOut)</td><td>$imp</td><td>$d.get("items")</td></tr>
+  #end
+#end
+</table>
+#if($edgeKeys.size() > 0)
+<table class="bw-table">
+<tr><th>Document (link sources)</th><th>Roles (links)</th><th>Document (link targets)</th></tr>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #aiRolesLabel($e true)
+  #set($c = $docByKey.get($e.get("c")))
+  #bwDocLabel($c)
+  #set($cLabel = $bwDocLabelOut)
+  #set($o = $docByKey.get($e.get("o")))
+  #bwDocLabel($o)
+<tr><td>$esc.html($cLabel)</td><td>$esc.html($aiLabel)</td><td>$esc.html($bwDocLabelOut)</td></tr>
+#end
+</table>
+#end
+#if($impTotal > 0)
+<table class="bw-table">
+<tr><th>Impacted work item</th><th>Title</th><th>Document</th><th>Direction</th><th>Level</th></tr>
+#set($shownN = 0)
+#foreach($id in $itemOrder)
+  #if(!$startIds.containsKey($id) && $shownN < 200)
+    #set($w = $items.get($id))
+    #set($wT = "")
+    #set($wT = $w.getTitle())
+    #set($dk = $itemDoc.get($id))
+    #set($dLabel = "")
+    #if($docByKey.containsKey($dk))
+      #bwDocLabel($docByKey.get($dk))
+      #set($dLabel = $bwDocLabelOut)
+    #end
+    #set($iDir = "")
+    #set($iLv = "")
+    #if($lvlD.containsKey($id))
+      #set($iDir = "downstream")
+      #set($iLv = $lvlD.get($id))
+    #end
+    #if($lvlU.containsKey($id))
+      #set($lu = $lvlU.get($id))
+      #if($iDir == "" || $lu < $iLv)
+        #set($iDir = "upstream")
+        #set($iLv = $lu)
+      #end
+    #end
+<tr><td>$esc.html($id)</td><td>$!esc.html($wT)</td><td>$esc.html($dLabel)</td><td>$iDir</td><td>$iLv</td></tr>
+    #set($shownN = $shownN + 1)
+  #end
+#end
+</table>
+#if($impTotal > 200)
+<p class="bw-muted">First 200 of $impTotal impacted work items (the browser view and the Excel export list all of them).</p>
+#end
+#end
+</div>
+#else
+## ----------------------------------------------------------------- browser view (model + inlined JS)
+#set($countsFlag = "1")
+#if(!$showCounts)
+#set($countsFlag = "0")
+#end
+#set($rolesStr = "")
+#foreach($r in $roleIds)
+#if($rolesStr != "")
+#set($rolesStr = "${rolesStr};")
+#end
+#set($rn = $roleName.get($r))
+#set($ro = $roleOpp.get($r))
+#set($rolesStr = "${rolesStr}${r}|${rn}|${ro}")
+#end
+## Document index of each reached item (position in docList; -1 = not in a shown document).
+#set($docIdx = $objectFactory.newMap())
+#set($di = 0)
+#foreach($d in $docList)
+#set($void = $docIdx.put($d.get("key"), $di))
+#set($di = $di + 1)
+#end
+<div class="ai-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-mode="all" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-dir="$direction" data-levels="$levels" data-start="$esc.html($startKey)" data-query="$esc.html($startQuery)" data-warn="$esc.html($warn.trim())">
+  <div class="bw-muted">$esc.html($scopeText)</div>
+  <div class="bw-model" style="display:none">
+#foreach($d in $docList)
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
+#end
+## Reached items "id|document index|type|start flag|title;" (separators in titles replaced) and links "source|target|role;".
+    <i class="ai-it" data-v="#foreach($id in $itemOrder)#set($w = $items.get($id))#set($wT = '')#set($wT = $w.getTitle())#set($wT = "$wT")#set($wT = $wT.replace('|', ' '))#set($wT = $wT.replace(';', ' '))#set($wTy = '')#set($wTyO = false)#set($wTyO = $w.getType())#if($wTyO)#set($wTy = "$wTyO.getId()")#end#set($dk = $itemDoc.get($id))#set($dx = -1)#if($docIdx.containsKey($dk))#set($dx = $docIdx.get($dk))#end#set($sf = 0)#if($startIds.containsKey($id))#set($sf = 1)#end$esc.html("${id}|${dx}|${wTy}|${sf}|${wT}");#end"></i>
+    <i class="ai-ln" data-v="#foreach($ln in $links)#set($s = $ln.get(0))#set($t = $ln.get(1))#set($role = $ln.get(2))$esc.html("${s}|${t}|${role}");#end"></i>
+  </div>
+</div>
+## Excel export library (xlsx-js-style, resources/xlsx.js), loaded with the Widget SDK directive.
+<div class="bw-lib" style="display:none">#loadWidgetJs("resources/xlsx.js")</div>
+<script>
+(function () {
+  'use strict';
+
+  /*
+   * Shared client core of the document widgets (docBranches, docCoverage).
+   *
+   * tools/build-widget.py places this fragment inside each widget's IIFE, before the widget's own
+   * graph.js code, so nothing is global. Velocity parses the result: no dollar sign, hash sign,
+   * backslash or non-ASCII character in this file (the build checks it). Use HASH in URLs.
+   *
+   * Edge categories ("cats") describe the kinds of relation a widget draws:
+   *   [{ id: 'branch', name: 'branch', label: 'Branches', color: 'rgb(...)', dash: '9,5' }, ...]
+   * in precedence order (the first category present on an edge gives its line style). An edge is
+   *   { o: originKey, c: targetKey, kinds: { catId: count }, meta: { catId: bool }, indirect: bool,
+   *     samples: [{ c: itemInTarget, o: itemInOrigin, k: catId }], ... widget fields }
+   */
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var HASH = String.fromCharCode(35);
+  var INDIRECT_COLOR = 'rgb(150,150,150)';
+  var EXTRA_FIELDS = [
+    ['type', 'Type'], ['status', 'Status'], ['created', 'Created'], ['updated', 'Updated'], ['items', 'Work items']
+  ];
+  var NODE_W = 240;
+  var LINE_H = 15;
+  var PAD = 8;
+  var COL_GAP = 130;
+  var ROW_GAP = 22;
+  var MARGIN = 20;
+  var FONT = 'Segoe UI, Arial, sans-serif';
+  // Non-ASCII characters are built at runtime so the template stays ASCII-only.
+  var ARROW = String.fromCharCode(8594);
+  var ELLIPSIS = String.fromCharCode(8230);
+  var MINUS = String.fromCharCode(8722);
+  var DASH = String.fromCharCode(8211);
+
+  // ------------------------------------------------------------------ helpers
+
+  function el(tag, attrs, parent, text) {
+    var e = document.createElement(tag);
+    setAttrs(e, attrs);
+    if (text !== undefined) { e.textContent = text; }
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function svg(tag, attrs, parent, text) {
+    var e = document.createElementNS(SVG_NS, tag);
+    setAttrs(e, attrs);
+    if (text !== undefined) { e.textContent = text; }
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function setAttrs(e, attrs) {
+    if (!attrs) { return; }
+    for (var k in attrs) {
+      if (Object.prototype.hasOwnProperty.call(attrs, k) && attrs[k] !== null && attrs[k] !== undefined) {
+        e.setAttribute(k, attrs[k]);
+      }
+    }
+  }
+
+  function trunc(s, n) {
+    s = s || '';
+    return s.length > n ? s.substring(0, n - 1) + ELLIPSIS : s;
+  }
+
+  function toInt(v) {
+    var n = parseInt(v, 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function pct(part, whole) {
+    if (!whole || whole <= 0) { return null; }
+    return Math.round(100 * part / whole);
+  }
+
+  function basePath() {
+    var p = window.location.pathname;
+    return p.substring(0, p.lastIndexOf('/') + 1);
+  }
+
+  // Documents and work items open in their own project (node.project, from the page model). In a collection (col =
+  // "collection project/collection id", root data-col) they open in the collection context, at the collection revision:
+  // .../project/P/collection/ID/... for the collection's project, .../project/P/collection/CP//ID/... for another
+  // project (formats rendered by Polarion 2512, docCoverage spike K2/K3).
+  function projectPath(project, col) {
+    var p = basePath() + HASH + '/project/' + encodeURIComponent(project);
+    if (!col) { return p; }
+    var i = col.lastIndexOf('/');
+    var cp = col.substring(0, i);
+    var cid = encodeURIComponent(col.substring(i + 1));
+    return p + '/collection/' + (cp === project ? cid : encodeURIComponent(cp) + '//' + cid);
+  }
+
+  function docUrl(node) {
+    return projectPath(node.project, node.col) + '/wiki/' + encodeURIComponent(node.space) + '/' + encodeURIComponent(node.id);
+  }
+
+  function itemUrl(project, id, col) {
+    return projectPath(project, col) + '/workitem?id=' + encodeURIComponent(id);
+  }
+
+  function absUrl(u) {
+    return window.location.protocol + '//' + window.location.host + u;
+  }
+
+  function bez(a, b, c, d, t) {
+    var u = 1 - t;
+    return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+  }
+
+  function fieldIndex(f) {
+    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return i; } }
+    return 99;
+  }
+
+  function fieldLabel(f) {
+    for (var i = 0; i < EXTRA_FIELDS.length; i++) { if (EXTRA_FIELDS[i][0] === f) { return EXTRA_FIELDS[i][1]; } }
+    return f;
+  }
+
+  function download(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name }, document.body);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.parentNode.removeChild(a); }, 1000);
+  }
+
+  // ------------------------------------------------------------------ model helpers
+
+  function readNodes(root) {
+    var nodes = [];
+    var byKey = {};
+    var nEls = root.querySelectorAll('.bw-model .bw-n');
+    for (var i = 0; i < nEls.length; i++) {
+      var d = nEls[i].dataset;
+      var n = {
+        key: d.k, project: d.p || root.dataset.project || '', id: d.id || '', title: d.title || d.id || '', space: d.space || '',
+        col: root.dataset.col || '', rev: d.rev || '',
+        type: d.type || '', status: d.status || '',
+        created: d.created || '', updated: d.updated || '',
+        items: d.items === '' || d.items === undefined ? -1 : toInt(d.items),
+        el: nEls[i]
+      };
+      if (n.key && !byKey[n.key]) {
+        byKey[n.key] = n;
+        nodes.push(n);
+      }
+    }
+    return { nodes: nodes, byKey: byKey };
+  }
+
+  // "c|o|k;c|o|k" -> [{ c, o, k }]
+  function parseSamples(s) {
+    var out = [];
+    if (!s) { return out; }
+    var parts = s.split(';');
+    for (var i = 0; i < parts.length; i++) {
+      var f = parts[i].split('|');
+      if (f.length === 3) { out.push({ c: f[0], o: f[1], k: f[2] }); }
+    }
+    return out;
+  }
+
+  // Sort key of a document: project, space, name.
+  function docSortKey(n) {
+    return n.project + '/' + n.space + '/' + n.id;
+  }
+
+  function catById(cats, id) {
+    for (var i = 0; i < cats.length; i++) { if (cats[i].id === id) { return cats[i]; } }
+    return null;
+  }
+
+  // First category present on the edge (precedence order); the last category as fallback.
+  function mainKind(e, cats) {
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      if (e.kinds[k] > 0 || e.meta[k]) { return cats[i]; }
+    }
+    return cats[cats.length - 1];
+  }
+
+  // noCounts: kind names only (line labels when the viewer hides the linked item counts).
+  function kindsLabel(e, cats, noCounts) {
+    var parts = [];
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      if (e.kinds[k] > 0) { parts.push(cats[i].name + (noCounts ? '' : ' ' + e.kinds[k])); }
+      else if (e.meta[k]) { parts.push(cats[i].name); }
+    }
+    return parts.join(' + ');
+  }
+
+  // "a,b" -> { a: true, b: true }; empty or unknown -> every category.
+  function relFromData(s, cats) {
+    var r = {};
+    var any = false;
+    var parts = (s || '').split(',');
+    for (var i = 0; i < parts.length; i++) {
+      if (catById(cats, parts[i])) { r[parts[i]] = true; any = true; }
+    }
+    if (!any) { cats.forEach(function (c) { r[c.id] = true; }); }
+    return r;
+  }
+
+  // Edge restricted to the selected categories (null when none of its categories is selected).
+  function restrictEdge(e, cats, rel) {
+    var kinds = {};
+    var meta = {};
+    var any = false;
+    for (var i = 0; i < cats.length; i++) {
+      var k = cats[i].id;
+      kinds[k] = rel[k] ? e.kinds[k] : 0;
+      meta[k] = rel[k] ? !!e.meta[k] : false;
+      if (kinds[k] > 0 || meta[k]) { any = true; }
+    }
+    if (!any) { return null; }
+    var r = {};
+    for (var p in e) { if (Object.prototype.hasOwnProperty.call(e, p)) { r[p] = e[p]; } }
+    r.kinds = kinds;
+    r.meta = meta;
+    r.samples = e.samples.filter(function (sm) { return !catById(cats, sm.k) || rel[sm.k]; });
+    return r;
+  }
+
+  // ------------------------------------------------------------------ layout
+
+  function nodeHeight(state) {
+    return PAD * 2 + LINE_H * ((state.baseLines || 3) + state.extras.length);
+  }
+
+  // Layered layout: origin documents on the left (longest path over direct edges), barycentre
+  // ordering to reduce crossings, documents without a shown edge in a grid below (mode 'all').
+  // state.keep(node) can force a node without edges into the grid.
+  function layout(model, state, edges) {
+    var h = nodeHeight(state);
+    var degree = {};
+    for (var i = 0; i < edges.length; i++) {
+      degree[edges[i].o] = (degree[edges[i].o] || 0) + 1;
+      degree[edges[i].c] = (degree[edges[i].c] || 0) + 1;
+    }
+    var linked = [];
+    var isolated = [];
+    for (var j = 0; j < model.nodes.length; j++) {
+      var n = model.nodes[j];
+      if (state.hidden && state.hidden[n.key]) { continue; }
+      if (degree[n.key]) { linked.push(n); }
+      else if (state.mode === 'all') { isolated.push(n); }
+    }
+
+    // Levels: longest path over direct edges (sources on the left).
+    var lvl = {};
+    for (var a = 0; a < linked.length; a++) { lvl[linked[a].key] = 0; }
+    var direct = [];
+    for (var b = 0; b < edges.length; b++) { if (!edges[b].indirect) { direct.push(edges[b]); } }
+    for (var pass = 0; pass <= linked.length; pass++) {
+      var changed = false;
+      for (var c = 0; c < direct.length; c++) {
+        var e = direct[c];
+        if (lvl[e.c] < lvl[e.o] + 1 && lvl[e.o] + 1 < 50) { lvl[e.c] = lvl[e.o] + 1; changed = true; }
+      }
+      if (!changed) { break; }
+    }
+
+    var cols = [];
+    linked.sort(function (x, y) {
+      return (x.project + '/' + x.space + '/' + x.title).localeCompare(y.project + '/' + y.space + '/' + y.title);
+    });
+    for (var d = 0; d < linked.length; d++) {
+      var L = lvl[linked[d].key];
+      if (!cols[L]) { cols[L] = []; }
+      cols[L].push(linked[d]);
+    }
+    for (var f = 0; f < cols.length; f++) { if (!cols[f]) { cols[f] = []; } }
+
+    // Barycentre ordering to reduce crossings.
+    var parents = {};
+    var children = {};
+    for (var g = 0; g < direct.length; g++) {
+      (children[direct[g].o] = children[direct[g].o] || []).push(direct[g].c);
+      (parents[direct[g].c] = parents[direct[g].c] || []).push(direct[g].o);
+    }
+    var order = {};
+    function index() {
+      for (var q = 0; q < cols.length; q++) {
+        for (var r = 0; r < cols[q].length; r++) { order[cols[q][r].key] = r; }
+      }
+    }
+    function bary(list) {
+      if (!list || !list.length) { return null; }
+      var s = 0;
+      for (var t = 0; t < list.length; t++) { s += order[list[t]]; }
+      return s / list.length;
+    }
+    function sortCol(col, rel) {
+      var keyed = col.map(function (n2, idx) {
+        var bv = bary(rel[n2.key]);
+        return { n: n2, v: bv === null ? idx : bv, idx: idx };
+      });
+      keyed.sort(function (x, y) { return x.v - y.v || x.idx - y.idx; });
+      return keyed.map(function (k) { return k.n; });
+    }
+    index();
+    for (var sweep = 0; sweep < 4; sweep++) {
+      for (var u = 1; u < cols.length; u++) { cols[u] = sortCol(cols[u], parents); index(); }
+      for (var v = cols.length - 2; v >= 0; v--) { cols[v] = sortCol(cols[v], children); index(); }
+    }
+
+    // Edges that skip a level arc over the graph; reserve room above the first row.
+    var topPad = 0;
+    for (var sk = 0; sk < edges.length; sk++) {
+      if (lvl[edges[sk].c] - lvl[edges[sk].o] > 1) { topPad = 40; break; }
+    }
+    var pos = {};
+    var maxRows = 0;
+    for (var w = 0; w < cols.length; w++) {
+      maxRows = Math.max(maxRows, cols[w].length);
+      for (var z = 0; z < cols[w].length; z++) {
+        pos[cols[w][z].key] = { x: MARGIN + w * (NODE_W + COL_GAP), y: MARGIN + topPad + z * (h + ROW_GAP) };
+      }
+    }
+    var width = MARGIN * 2 + Math.max(1, cols.length) * NODE_W + Math.max(0, cols.length - 1) * COL_GAP;
+    var height = MARGIN * 2 + topPad + maxRows * (h + ROW_GAP);
+    var isoTop = linked.length ? height + ROW_GAP : MARGIN + 18;
+    var gridCols = Math.max(3, cols.length);
+    if (isolated.length) {
+      isolated.sort(function (x, y) {
+        return (x.project + '/' + x.space + '/' + x.title).localeCompare(y.project + '/' + y.space + '/' + y.title);
+      });
+      for (var m = 0; m < isolated.length; m++) {
+        pos[isolated[m].key] = {
+          x: MARGIN + (m % gridCols) * (NODE_W + 40),
+          y: isoTop + Math.floor(m / gridCols) * (h + ROW_GAP)
+        };
+      }
+      width = Math.max(width, MARGIN * 2 + Math.min(gridCols, isolated.length) * (NODE_W + 40));
+      height = isoTop + Math.ceil(isolated.length / gridCols) * (h + ROW_GAP) + MARGIN;
+    }
+    return {
+      pos: pos, width: width, height: Math.max(height, 80), nodeH: h,
+      linked: linked, isolated: isolated, isoTop: linked.length ? height : MARGIN, topPad: topPad
+    };
+  }
+
+  // ------------------------------------------------------------------ base widget
+  // Methods shared by the widgets; each widget constructor calls initBase(this, root) and
+  // defines cats, filePrefix, emptyText, edgeSummary(e), showDetails(e), drawTable(), exportExcel().
+
+  var Base = {};
+
+  function initBase(self, root, model) {
+    self.root = root;
+    self.model = model;
+    var ds = root.dataset;
+    self.project = ds.project || '';
+    // Several projects in scope: documents are labelled with their project.
+    self.multi = (ds.projects || '').split(',').filter(function (x) { return x; }).length > 1;
+    self.height = toInt(ds.height) || 600;
+    self.state = {
+      mode: ds.mode === 'all' ? 'all' : 'related',
+      counts: ds.counts !== '0',
+      extras: (ds.extras || '').split(',').filter(function (x) { return x; }),
+      filter: '',
+      zoom: 1,
+      view: 'graph'
+    };
+  }
+
+  function extendBase(Ctor) {
+    for (var k in Base) { if (Object.prototype.hasOwnProperty.call(Base, k)) { Ctor.prototype[k] = Base[k]; } }
+  }
+
+  Base.checkbox = function (parent, label, checked, onChange) {
+    var lab = el('label', { 'class': 'bw-check' }, parent);
+    var cb = el('input', { type: 'checkbox' }, lab);
+    cb.checked = !!checked;
+    el('span', null, lab, label);
+    cb.addEventListener('change', function () { onChange(cb.checked); });
+    return lab;
+  };
+
+  Base.button = function (parent, label, title, onClick) {
+    var b = el('button', { type: 'button', 'class': 'bw-btn', title: title }, parent, label);
+    b.addEventListener('click', onClick);
+    return b;
+  };
+
+  // Toolbar group with one checkbox per category (state.rel).
+  Base.kindChecks = function (bar, title) {
+    var self = this;
+    var box = el('span', { 'class': 'bw-fields' }, bar);
+    el('span', { 'class': 'bw-muted' }, box, title);
+    this.cats.forEach(function (cat) {
+      self.checkbox(box, cat.label, self.state.rel[cat.id], function (on) {
+        self.state.rel[cat.id] = on; self.render(true);
+      });
+    });
+    return box;
+  };
+
+  Base.countsCheck = function (bar) {
+    var self = this;
+    var cnt = this.checkbox(bar, 'Item counts', this.state.counts, function (on) {
+      self.state.counts = on; self.render(false);
+    });
+    cnt.title = 'Show the number of linked work items on the lines';
+    return cnt;
+  };
+
+  Base.fieldChecks = function (bar) {
+    var self = this;
+    var fields = el('span', { 'class': 'bw-fields' }, bar);
+    el('span', { 'class': 'bw-muted' }, fields, 'Fields:');
+    EXTRA_FIELDS.forEach(function (f) {
+      self.checkbox(fields, f[1], self.state.extras.indexOf(f[0]) >= 0, function (on) {
+        var ex = self.state.extras.filter(function (x) { return x !== f[0]; });
+        if (on) { ex.push(f[0]); }
+        ex.sort(function (x, y) { return fieldIndex(x) - fieldIndex(y); });
+        self.state.extras = ex;
+        self.render(false);
+      });
+    });
+    return fields;
+  };
+
+  Base.searchBox = function (bar) {
+    var self = this;
+    var search = el('input', { 'class': 'bw-ctl bw-search', type: 'search', placeholder: 'Highlight documents' + ELLIPSIS }, bar);
+    search.addEventListener('input', function () { self.state.filter = search.value.trim().toLowerCase(); self.render(false); });
+    return search;
+  };
+
+  Base.viewButtons = function (bar) {
+    var self = this;
+    var btns = el('span', { 'class': 'bw-btns' }, bar);
+    this.button(btns, 'Fit', 'Fit the graph to the view', function () { self.fit(); });
+    this.button(btns, MINUS, 'Zoom out', function () { self.setZoom(self.state.zoom / 1.25); });
+    this.button(btns, '+', 'Zoom in', function () { self.setZoom(self.state.zoom * 1.25); });
+    this.viewBtn = this.button(btns, 'Table', 'Switch between graph and table', function () {
+      self.state.view = self.state.view === 'graph' ? 'table' : 'graph';
+      self.render(false);
+    });
+    this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
+    this.button(btns, 'Excel', 'Download the shown documents and relations as an Excel workbook', function () { self.exportExcel(); });
+    this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
+    return btns;
+  };
+
+  // Areas below the toolbar: legend, status, details, graph view, table, tooltip.
+  Base.buildAreas = function () {
+    var root = this.root;
+    this.legend(el('div', { 'class': 'bw-legend' }, root));
+    this.status = el('div', { 'class': 'bw-status' }, root);
+    this.details = el('div', { 'class': 'bw-details' }, root);
+    this.details.style.display = 'none';
+    this.view = el('div', { 'class': 'bw-view' }, root);
+    this.view.style.height = this.height + 'px';
+    this.svgEl = svg('svg', { xmlns: SVG_NS, 'class': 'bw-svg' }, this.view);
+    this.table = el('div', { 'class': 'bw-table-wrap' }, root);
+    this.tip = el('div', { 'class': 'bw-tip' }, root);
+    this.tip.style.display = 'none';
+  };
+
+  Base.legendKinds = function (box) {
+    this.cats.forEach(function (cat) {
+      var item = el('span', { 'class': 'bw-leg' }, box);
+      var s = svg('svg', { width: 34, height: 10 }, item);
+      svg('line', { x1: 1, y1: 5, x2: 33, y2: 5, stroke: cat.color, 'stroke-width': 2.5, 'stroke-dasharray': cat.dash || null }, s);
+      el('span', null, item, cat.name);
+    });
+  };
+
+  // Redraws graph and table after a state change; statusText(edges) gives the status line.
+  Base.layoutAndDraw = function (edges, refit) {
+    var st = this.state;
+    this.lay = layout(this.model, st, edges);
+    this.edges = edges;
+    this.viewBtn.textContent = st.view === 'graph' ? 'Table' : 'Graph';
+    this.view.style.display = st.view === 'graph' ? '' : 'none';
+    this.table.style.display = st.view === 'table' ? '' : 'none';
+    this.drawGraph();
+    this.drawTable();
+    if (refit) { this.fit(); } else { this.applyZoom(); }
+  };
+
+  // Text lines of a document box; widgets can override it (keep it in line with state.baseLines).
+  Base.nodeLines = function (n) {
+    var lines = [
+      { text: n.id, weight: 600, color: 'rgb(25,35,55)' },
+      { text: n.title, weight: 400, color: 'rgb(25,35,55)' },
+      { text: (this.multi ? n.project + ' / ' + n.space : n.space) + (n.rev === 'HEAD' ? '  (HEAD)' : ''), weight: 400, color: 'rgb(110,118,135)' }
+    ];
+    this.state.extras.forEach(function (f) {
+      var v = n[f];
+      if (f === 'items') { v = n.items >= 0 ? String(n.items) : ''; }
+      lines.push({ text: fieldLabel(f) + ': ' + (v || DASH), weight: 400, color: 'rgb(80,88,105)' });
+    });
+    return lines;
+  };
+
+  Base.drawGraph = function () {
+    var self = this;
+    var root = this.svgEl;
+    while (root.firstChild) { root.removeChild(root.firstChild); }
+    var lay = this.lay;
+    var h = lay.nodeH;
+    svg('rect', { x: 0, y: 0, width: lay.width, height: lay.height, fill: 'rgb(255,255,255)' }, root);
+    if (!lay.linked.length && !lay.isolated.length) {
+      svg('text', { x: MARGIN, y: MARGIN + 14, 'font-family': FONT, 'font-size': 13, fill: 'rgb(90,90,90)' }, root,
+        this.emptyText);
+      return;
+    }
+    if (lay.isolated.length && lay.linked.length) {
+      svg('text', { x: MARGIN, y: lay.isoTop + 14, 'font-family': FONT, 'font-size': 12, fill: 'rgb(110,110,110)' }, root,
+        'Documents without relations');
+    }
+    var gEdges = svg('g', null, root);
+    var gNodes = svg('g', null, root);
+    var gLabels = svg('g', null, root);
+    var filter = this.state.filter;
+
+    this.edges.forEach(function (e) {
+      var p = lay.pos[e.o];
+      var q = lay.pos[e.c];
+      if (!p || !q) { return; }
+      var x1 = p.x + NODE_W, y1 = p.y + h / 2, x2 = q.x, y2 = q.y + h / 2;
+      var dx = x2 > x1 ? Math.max(30, (x2 - x1) / 2) : 70;
+      var c1x = x1 + dx, c2x = x2 - dx, c1y = y1, c2y = y2;
+      if (x2 - x1 > COL_GAP + NODE_W) {
+        // Skips at least one level: arc above the graph instead of crossing documents.
+        c1x = x1 + COL_GAP;
+        c2x = x2 - COL_GAP;
+        c1y = c2y = Math.max(4, Math.min(y1, y2) - h / 2 - lay.topPad - 30);
+      }
+      var d = 'M' + x1 + ',' + y1 + ' C' + c1x + ',' + c1y + ' ' + c2x + ',' + c2y + ' ' + (x2 - 2) + ',' + y2;
+      var cat = mainKind(e, self.cats);
+      var color = e.indirect ? INDIRECT_COLOR : cat.color;
+      var g = svg('g', { 'class': 'bw-edge' }, gEdges);
+      svg('path', {
+        d: d, fill: 'none', stroke: color, 'stroke-width': e.indirect ? 1.4 : 2.2,
+        'stroke-dasharray': e.indirect ? '4,4' : (cat.dash || null),
+        opacity: e.indirect ? 0.7 : 1
+      }, g);
+      // Arrow head at the target document, or at the origin when the widget draws arrows backwards
+      // (docCoverage: origin = upstream on the left, arrow in the link direction downstream -> upstream).
+      var head = self.arrowAtOrigin ?
+        (x1 + 10) + ',' + (y1 - 5) + ' ' + x1 + ',' + y1 + ' ' + (x1 + 10) + ',' + (y1 + 5) :
+        (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5);
+      svg('polygon', { points: head, fill: color }, g);
+      var hit = svg('path', { d: d, fill: 'none', stroke: 'rgb(0,0,0)', 'stroke-opacity': 0, 'stroke-width': 12, 'class': 'bw-hit' }, g);
+      // Label near the target end (one per edge there, while several edges can share an origin).
+      var lt = 0.8;
+      var mx = bez(x1, c1x, c2x, x2, lt);
+      var my = bez(y1, c1y, c2y, y2, lt) - 3;
+      var label = kindsLabel(e, self.cats, !self.state.counts) + (e.indirect ? ' (indirect)' : '');
+      var lg = svg('g', { 'class': 'bw-edge-label' }, gLabels);
+      var bg = svg('rect', { fill: 'rgb(255,255,255)', opacity: 0.9, rx: 3 }, lg);
+      var t = svg('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-family': FONT, 'font-size': 11, fill: color }, lg, label);
+      try {
+        var bb = t.getBBox();
+        // Keep the label clear of the target document box.
+        var over = bb.x + bb.width + 6 - x2;
+        if (over > 0) { setAttrs(t, { x: mx - over }); bb = t.getBBox(); }
+        setAttrs(bg, { x: bb.x - 3, y: bb.y - 1, width: bb.width + 6, height: bb.height + 2 });
+      } catch (err) { /* not rendered yet */ }
+      [hit, lg].forEach(function (target) {
+        target.addEventListener('mousemove', function (ev) { self.showTip(ev, self.edgeSummary(e)); });
+        target.addEventListener('mouseleave', function () { self.hideTip(); });
+        target.addEventListener('click', function () { self.showDetails(e); });
+      });
+    });
+
+    var nodes = lay.linked.concat(lay.isolated);
+    nodes.forEach(function (n) {
+      var p = lay.pos[n.key];
+      var match = !filter || (n.id + ' ' + n.title + ' ' + n.space + ' ' + n.project).toLowerCase().indexOf(filter) >= 0;
+      var a = svg('a', { href: docUrl(n), target: '_top', 'class': 'bw-node' }, gNodes);
+      var g = svg('g', { opacity: match ? 1 : 0.3 }, a);
+      svg('rect', {
+        x: p.x, y: p.y, width: NODE_W, height: h, rx: 6,
+        fill: 'rgb(246,248,252)', stroke: filter && match ? 'rgb(230,126,34)' : 'rgb(120,132,155)',
+        'stroke-width': filter && match ? 2.5 : 1.2
+      }, g);
+      self.nodeLines(n).forEach(function (ln, i) {
+        svg('text', {
+          x: p.x + PAD, y: p.y + PAD + 11 + i * LINE_H, 'font-family': FONT, 'font-size': 12,
+          'font-weight': ln.weight, fill: ln.color
+        }, g, trunc(ln.text, 36));
+      });
+      svg('title', null, a, self.docLabel(n) + ' ' + DASH + ' ' + n.title);
+      if (self.onNode) { self.onNode(a, n); }
+    });
+  };
+
+  Base.showTip = function (ev, lines) {
+    var tip = this.tip;
+    tip.textContent = '';
+    lines.forEach(function (l, i) { el('div', i === 0 ? { 'class': 'bw-tip-head' } : null, tip, l); });
+    var r = this.root.getBoundingClientRect();
+    tip.style.display = 'block';
+    tip.style.left = (ev.clientX - r.left + 14) + 'px';
+    tip.style.top = (ev.clientY - r.top + 14) + 'px';
+  };
+
+  Base.hideTip = function () { this.tip.style.display = 'none'; };
+
+  // "space / name", prefixed with the project when several projects are in scope; "(HEAD)" for a document of a
+  // collection without a pinned revision.
+  Base.docLabel = function (n) {
+    return (this.multi ? n.project + ' / ' : '') + n.space + ' / ' + n.id + (n.rev === 'HEAD' ? ' (HEAD)' : '');
+  };
+
+  // Opens the details box with a header "origin -> target" and a Close button; returns the box.
+  Base.openDetails = function (o, c) {
+    var box = this.details;
+    box.textContent = '';
+    box.style.display = 'block';
+    var head = el('div', { 'class': 'bw-details-head' }, box);
+    el('a', { href: docUrl(o), target: '_top' }, head, o.id);
+    if (c) {
+      el('span', null, head, '  ' + ARROW + '  ');
+      el('a', { href: docUrl(c), target: '_top' }, head, c.id);
+    }
+    var close = this.button(head, 'Close', 'Close the details', function () { box.style.display = 'none'; });
+    close.style.marginLeft = '12px';
+    return box;
+  };
+
+  // List of work item pairs (target item -> origin item) with the category name. Each item opens in the project
+  // of its document.
+  Base.sampleList = function (box, e, title) {
+    var self = this;
+    var nc = this.model.byKey[e.c];
+    var no = this.model.byKey[e.o];
+    if (!e.samples.length) { return; }
+    el('div', { 'class': 'bw-muted' }, box, title);
+    var ul = el('ul', { 'class': 'bw-items' }, box);
+    e.samples.forEach(function (s) {
+      var li = el('li', null, ul);
+      el('a', { href: itemUrl(nc.project, s.c, nc.col), target: '_top' }, li, s.c);
+      el('span', null, li, ' ' + ARROW + ' ');
+      el('a', { href: itemUrl(no.project, s.o, no.col), target: '_top' }, li, s.o);
+      var cat = catById(self.cats, s.k);
+      el('span', { 'class': 'bw-muted' }, li, ' (' + (cat ? cat.name : s.k) + ')');
+    });
+    if (e.total > e.samples.length) {
+      el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (e.total - e.samples.length) + ' more');
+    }
+  };
+
+  // Simple HTML table: header names and rows of cells ({ text, href } or plain text).
+  Base.htmlTable = function (headers, rows, emptyText) {
+    var wrap = this.table;
+    var t = el('table', { 'class': 'bw-table' }, wrap);
+    var hr = el('tr', null, el('thead', null, t));
+    headers.forEach(function (x) { el('th', null, hr, x); });
+    var tb = el('tbody', null, t);
+    rows.forEach(function (row) {
+      var tr = el('tr', null, tb);
+      row.forEach(function (cell) {
+        var td = el('td', null, tr);
+        if (cell && cell.href) { el('a', { href: cell.href, target: '_top' }, td, cell.text); }
+        else { td.textContent = cell === null || cell === undefined ? '' : String(cell); }
+      });
+    });
+    if (!rows.length) { el('div', { 'class': 'bw-muted' }, wrap, emptyText); }
+  };
+
+  Base.setZoom = function (z) {
+    this.state.zoom = Math.max(0.1, Math.min(3, z));
+    this.applyZoom();
+  };
+
+  Base.applyZoom = function () {
+    var lay = this.lay;
+    var z = this.state.zoom;
+    setAttrs(this.svgEl, {
+      viewBox: '0 0 ' + lay.width + ' ' + lay.height,
+      width: Math.round(lay.width * z), height: Math.round(lay.height * z)
+    });
+  };
+
+  Base.fit = function () {
+    var lay = this.lay;
+    var w = this.view.clientWidth || 800;
+    var h = this.view.clientHeight || this.height;
+    var z = Math.min(1, (w - 12) / lay.width, (h - 12) / lay.height);
+    this.setZoom(Math.max(z, 0.2));
+  };
+
+  Base.svgString = function () {
+    var clone = this.svgEl.cloneNode(true);
+    setAttrs(clone, { xmlns: SVG_NS, width: this.lay.width, height: this.lay.height });
+    return new XMLSerializer().serializeToString(clone);
+  };
+
+  Base.fileName = function (ext) {
+    return this.filePrefix + (this.project || 'project') + '.' + ext;
+  };
+
+  Base.exportSvg = function () {
+    download(new Blob([this.svgString()], { type: 'image/svg+xml' }), this.fileName('svg'));
+  };
+
+  Base.shownDocs = function () {
+    return this.lay.linked.concat(this.lay.isolated).slice().sort(function (a, b) {
+      return docSortKey(a).localeCompare(docSortKey(b));
+    });
+  };
+
+  Base.sortedEdges = function () {
+    var by = this.model.byKey;
+    return this.edges.slice().sort(function (a, b) {
+      var oa = by[a.o], ob = by[b.o], ca = by[a.c], cb = by[b.c];
+      return docSortKey(oa).localeCompare(docSortKey(ob)) || docSortKey(ca).localeCompare(docSortKey(cb));
+    });
+  };
+
+  // ------------------------------------------------------------------ Excel export
+  // Uses the XLSX library (xlsx-js-style) loaded from the widget resources with loadWidgetJs.
+  // sheets: [{ name, rows (first row = header), widths, links: [{ r, c, url }] }]; name = file name (default fileName).
+  // Falls back to a CSV of the first sheet when the library is not available.
+
+  function sheetFromRows(X, rows, widths, links) {
+    var ws = X.utils.aoa_to_sheet(rows);
+    var head = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '3367D6' } }, alignment: { vertical: 'center' } };
+    for (var c = 0; c < rows[0].length; c++) {
+      var ref = X.utils.encode_cell({ r: 0, c: c });
+      if (ws[ref]) { ws[ref].s = head; }
+    }
+    (links || []).forEach(function (lk) {
+      var cell = ws[X.utils.encode_cell({ r: lk.r, c: lk.c })];
+      if (cell) { cell.l = { Target: lk.url }; cell.s = { font: { color: { rgb: '1A4DB3' }, underline: true } }; }
+    });
+    ws['!cols'] = widths.map(function (w) { return { wch: w }; });
+    if (rows.length > 1) {
+      ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: rows[0].length - 1 } }) };
+    }
+    return ws;
+  }
+
+  function csvCell(v) {
+    var t = v === null || v === undefined ? '' : String(v);
+    return /[",;]|[^ -~]/.test(t) ? '"' + t.split('"').join('""') + '"' : t;
+  }
+
+  Base.exportWorkbook = function (sheets, name) {
+    var X = window.XLSX;
+    if (!X || !X.utils || !X.write) { this.exportCsv(sheets[0].rows, sheets[0].what); return; }
+    var wb = X.utils.book_new();
+    sheets.forEach(function (sh) {
+      X.utils.book_append_sheet(wb, sheetFromRows(X, sh.rows, sh.widths, sh.links), sh.name);
+    });
+    var data = X.write(wb, { bookType: 'xlsx', type: 'array' });
+    download(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name || this.fileName('xlsx'));
+  };
+
+  Base.exportCsv = function (rows, what) {
+    var nl = String.fromCharCode(13, 10);
+    var lines = rows.map(function (row) { return row.map(csvCell).join(','); });
+    download(new Blob([String.fromCharCode(65279) + lines.join(nl) + nl], { type: 'text/csv' }), this.fileName('csv'));
+    this.status.textContent += ' ' + DASH + ' Excel library not loaded: ' + (what || 'data') + ' exported as CSV.';
+  };
+
+  // ------------------------------------------------------------------ start
+
+  function startWidgets(rootClass, Ctor, name) {
+    var roots = document.querySelectorAll('.' + rootClass);
+    for (var i = 0; i < roots.length; i++) {
+      if (roots[i].getAttribute('data-bw-ready') === '1') { continue; }
+      roots[i].setAttribute('data-bw-ready', '1');
+      try {
+        new Ctor(roots[i]);
+      } catch (err) {
+        roots[i].appendChild(el('div', { 'class': 'bw-error' }, null, name + ' widget error: ' + err));
+      }
+    }
+  }
+
+  /*
+   * Advanced Impact Analysis - client-side graph (widget-specific part).
+   *
+   * tools/build-widget.py inlines shared/js/core.js and this file into render.vm, inside one IIFE.
+   * Same restrictions as core.js: no dollar sign, hash sign, backslash or non-ASCII character.
+   *
+   * The page model holds the start items, every work item the server reached (levels up to the parameter, in the
+   * parameter direction) and every link of the selected roles between them. The browser recomputes the analysis for
+   * the shown roles, directions and levels: one breadth-first search per direction from the start items (a path never
+   * changes direction, SPEC Q12), each item at its lowest level. Columns: upstream levels on the left, the start
+   * document, downstream levels on the right. Edges: o = document of the link targets (left), c = document of the link
+   * sources; arrows follow the link direction (arrowAtOrigin).
+   */
+
+  var ROLE_STYLES = [
+    { color: 'rgb(51,103,214)', dash: '' },
+    { color: 'rgb(198,40,40)', dash: '9,5' },
+    { color: 'rgb(26,127,55)', dash: '2,4' },
+    { color: 'rgb(142,68,173)', dash: '6,3' },
+    { color: 'rgb(211,84,0)', dash: '12,4,2,4' }
+  ];
+  // Links listed per relation and impacted items listed per document in the details box (Excel lists all of them).
+  var SAMPLE_CAP = 30;
+  var DETAIL_CAP = 200;
+  var GT = String.fromCharCode(62);
+
+  // data-roles "id|name|opposite name;..." -> categories in selection order.
+  function readCats(s) {
+    var cats = [];
+    (s || '').split(';').forEach(function (part) {
+      var f = part.split('|');
+      if (!f[0] || cats.length >= ROLE_STYLES.length) { return; }
+      var st = ROLE_STYLES[cats.length];
+      var name = f[1] || f[0];
+      cats.push({ id: f[0], name: name, label: name, opp: f[2] || name, color: st.color, dash: st.dash });
+    });
+    return cats;
+  }
+
+  // Work item ids in natural order: prefix, then number (VIA-2 before VIA-10).
+  function idCompare(a, b) {
+    var na = a.split('-');
+    var nb = b.split('-');
+    var pa = na.slice(0, -1).join('-');
+    var pb = nb.slice(0, -1).join('-');
+    if (pa !== pb) { return pa < pb ? -1 : 1; }
+    var ia = parseInt(na[na.length - 1], 10);
+    var ib = parseInt(nb[nb.length - 1], 10);
+    if (isNaN(ia) || isNaN(ib) || ia === ib) { return a < b ? -1 : (a > b ? 1 : 0); }
+    return ia - ib;
+  }
+
+  function readModel(root) {
+    var model = readNodes(root);
+    var nEls = root.querySelectorAll('.bw-model .bw-n');
+    var byIndex = [];
+    for (var i = 0; i < nEls.length; i++) { byIndex.push(model.byKey[nEls[i].dataset.k] || null); }
+    model.start = model.byKey[root.dataset.start] || null;
+    // Items "id|doc index|type|start|title;"
+    model.items = [];
+    model.byId = {};
+    var it = root.querySelector('.bw-model .ai-it');
+    ((it && it.dataset.v) || '').split(';').forEach(function (part) {
+      var f = part.split('|');
+      if (f.length < 5 || !f[0] || model.byId[f[0]]) { return; }
+      var item = {
+        id: f[0], doc: byIndex[toInt(f[1])] || null, type: f[2], start: f[3] === '1', title: f.slice(4).join('|')
+      };
+      if (toInt(f[1]) < 0) { item.doc = null; }
+      model.items.push(item);
+      model.byId[item.id] = item;
+    });
+    // Links "source|target|role;" between reached items, indexed both ways.
+    model.links = [];
+    model.bySource = {};
+    model.byTarget = {};
+    var ln = root.querySelector('.bw-model .ai-ln');
+    ((ln && ln.dataset.v) || '').split(';').forEach(function (part) {
+      var f = part.split('|');
+      if (f.length !== 3 || !model.byId[f[0]] || !model.byId[f[1]]) { return; }
+      var l = { s: f[0], t: f[1], k: f[2], i: model.links.length };
+      model.links.push(l);
+      (model.bySource[l.s] = model.bySource[l.s] || []).push(l);
+      (model.byTarget[l.t] = model.byTarget[l.t] || []).push(l);
+    });
+    return model;
+  }
+
+  function Widget(root) {
+    this.cats = readCats(root.dataset.roles);
+    initBase(this, root, readModel(root));
+    this.filePrefix = 'impact-analysis-';
+    this.emptyText = 'No document to show.';
+    this.arrowAtOrigin = true;
+    this.warn = root.dataset.warn || '';
+    this.query = root.dataset.query || '';
+    this.dirParam = root.dataset.dir === 'up' || root.dataset.dir === 'both' ? root.dataset.dir : 'down';
+    this.levels = Math.max(1, Math.min(7, toInt(root.dataset.levels) || 3));
+    var st = this.state;
+    st.rel = relFromData('', this.cats);
+    st.dirs = { down: this.dirParam !== 'up', up: this.dirParam !== 'down' };
+    st.maxLevel = this.levels;
+    st.hidden = {};
+    st.baseLines = 5;
+    this.build();
+    this.render(true);
+  }
+  extendBase(Widget);
+
+  Widget.prototype.build = function () {
+    var self = this;
+    var bar = el('div', { 'class': 'bw-toolbar' }, this.root);
+    this.docPicker(bar);
+    this.kindChecks(bar, 'Roles:');
+    if (this.dirParam === 'both') {
+      var dbox = el('span', { 'class': 'bw-fields' }, bar);
+      el('span', { 'class': 'bw-muted' }, dbox, 'Direction:');
+      [['down', 'Downstream'], ['up', 'Upstream']].forEach(function (d) {
+        self.checkbox(dbox, d[1], true, function (on) { self.state.dirs[d[0]] = on; self.render(true); });
+      });
+    }
+    var lab = el('label', { 'class': 'bw-check' }, bar);
+    el('span', { 'class': 'bw-muted' }, lab, 'Levels:');
+    var sel = el('select', { 'class': 'bw-ctl', title: 'Levels of analysis shown (the widget parameter sets the maximum)' }, lab);
+    for (var i = 1; i <= this.levels; i++) { el('option', { value: String(i) }, sel, String(i)); }
+    sel.value = String(this.levels);
+    sel.addEventListener('change', function () { self.state.maxLevel = toInt(sel.value); self.render(true); });
+    this.countsCheck(bar).title = 'Show the number of links on the lines';
+    this.fieldChecks(bar);
+    this.searchBox(bar);
+    this.viewButtons(bar);
+    this.buildAreas();
+  };
+
+  // In-widget document selector: hides documents from the graph (the analysis still goes through them).
+  Widget.prototype.docPicker = function (bar) {
+    var self = this;
+    var wrap = el('span', { 'class': 'ai-pick' }, bar);
+    var btn = this.button(wrap, 'Documents', 'Choose the documents shown', function () {
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+    var panel = el('div', { 'class': 'ai-pick-panel' }, wrap);
+    panel.style.display = 'none';
+    var all = this.checkbox(panel, '(all)', true, function (on) {
+      self.model.nodes.forEach(function (n) { if (on) { delete self.state.hidden[n.key]; } else { self.state.hidden[n.key] = true; } });
+      boxes.forEach(function (b) { b.checked = on; });
+      update();
+    });
+    all.style.fontWeight = '600';
+    var boxes = [];
+    this.model.nodes.slice().sort(function (a, b) {
+      return docSortKey(a).localeCompare(docSortKey(b));
+    }).forEach(function (n) {
+      var lab = self.checkbox(panel, self.docLabel(n), true, function (on) {
+        if (on) { delete self.state.hidden[n.key]; } else { self.state.hidden[n.key] = true; }
+        update();
+      });
+      lab.style.display = 'flex';
+      boxes.push(lab.querySelector('input'));
+    });
+    function update() {
+      var shown = self.model.nodes.filter(function (n) { return !self.state.hidden[n.key]; }).length;
+      btn.textContent = 'Documents (' + shown + '/' + self.model.nodes.length + ')';
+      self.render(true);
+    }
+    btn.textContent = 'Documents (' + this.model.nodes.length + '/' + this.model.nodes.length + ')';
+  };
+
+  Widget.prototype.legend = function (box) {
+    this.legendKinds(box);
+    el('span', { 'class': 'bw-muted' }, box, 'Upstream documents on the left, the start document, downstream documents on the right; ' +
+      'arrows follow the link direction. Click a document for its impacted work items, a line for its links.');
+  };
+
+  // ------------------------------------------------------------------ analysis (current roles, directions, levels)
+
+  Widget.prototype.compute = function () {
+    var st = this.state;
+    var m = this.model;
+    var res = { lvl: {}, dir: {}, parents: {}, pathLinks: [], docs: {} };
+    var per = {};
+    ['down', 'up'].forEach(function (d) {
+      if (!st.dirs[d]) { return; }
+      var lv = {};
+      var frontier = [];
+      m.items.forEach(function (it) { if (it.start) { lv[it.id] = 0; frontier.push(it.id); } });
+      for (var k = 1; k <= st.maxLevel && frontier.length; k++) {
+        var next = [];
+        frontier.forEach(function (id) {
+          var ls = (d === 'down' ? m.byTarget[id] : m.bySource[id]) || [];
+          ls.forEach(function (l) {
+            if (!st.rel[l.k]) { return; }
+            var other = d === 'down' ? l.s : l.t;
+            if (lv[other] === undefined) { lv[other] = k; next.push(other); }
+          });
+        });
+        frontier = next;
+      }
+      per[d] = lv;
+    });
+    // Item level: lowest over the shown directions (downstream first on a tie).
+    ['down', 'up'].forEach(function (d) {
+      var lv = per[d];
+      if (!lv) { return; }
+      Object.keys(lv).forEach(function (id) {
+        if (res.lvl[id] === undefined || lv[id] < res.lvl[id]) { res.lvl[id] = lv[id]; res.dir[id] = d; }
+      });
+    });
+    // Links along a path of the analysis (each link once) and the parents of each reached item.
+    var seen = {};
+    m.links.forEach(function (l) {
+      if (!st.rel[l.k]) { return; }
+      var dn = per.down, up = per.up;
+      if (dn && dn[l.s] !== undefined && dn[l.t] !== undefined && dn[l.s] === dn[l.t] + 1) {
+        (res.parents[l.s] = res.parents[l.s] || []).push({ id: l.t, k: l.k, d: 'down' });
+        if (!seen[l.i]) { seen[l.i] = true; res.pathLinks.push(l); }
+      }
+      if (up && up[l.s] !== undefined && up[l.t] !== undefined && up[l.t] === up[l.s] + 1) {
+        (res.parents[l.t] = res.parents[l.t] || []).push({ id: l.s, k: l.k, d: 'up' });
+        if (!seen[l.i]) { seen[l.i] = true; res.pathLinks.push(l); }
+      }
+    });
+    // Documents: side and level of their lowest item (start document: 0), impacted items.
+    var start = m.start;
+    if (start) { res.docs[start.key] = { side: 'start', level: 0, items: [], starts: 0 }; }
+    m.items.forEach(function (it) {
+      if (!it.doc || res.lvl[it.id] === undefined) { return; }
+      var L = res.lvl[it.id];
+      var info = res.docs[it.doc.key];
+      if (!info) { info = res.docs[it.doc.key] = { side: res.dir[it.id], level: L, items: [], starts: 0 }; }
+      else if (info.side !== 'start' && L < info.level) { info.side = res.dir[it.id]; info.level = L; }
+      if (L > 0) { info.items.push(it); } else { info.starts++; }
+    });
+    Object.keys(res.docs).forEach(function (k) {
+      res.docs[k].items.sort(function (a, b) { return res.lvl[a.id] - res.lvl[b.id] || idCompare(a.id, b.id); });
+    });
+    return res;
+  };
+
+  // Relations between the shown documents: o = document of the link targets, c = of the link sources.
+  Widget.prototype.relations = function (res) {
+    var st = this.state;
+    var cats = this.cats;
+    var by = {};
+    var list = [];
+    var m = this.model;
+    res.pathLinks.forEach(function (l) {
+      var so = m.byId[l.s].doc;
+      var ta = m.byId[l.t].doc;
+      if (!so || !ta || so === ta || st.hidden[so.key] || st.hidden[ta.key]) { return; }
+      var key = ta.key + GT + so.key;
+      var e = by[key];
+      if (!e) {
+        e = by[key] = { o: ta.key, c: so.key, kinds: {}, meta: {}, indirect: false, pairs: [], samples: [], total: 0 };
+        cats.forEach(function (c) { e.kinds[c.id] = 0; });
+        list.push(e);
+      }
+      e.kinds[l.k]++;
+      e.pairs.push({ c: l.s, o: l.t, k: l.k });
+    });
+    list.forEach(function (e) {
+      e.pairs.sort(function (a, b) { return idCompare(a.c, b.c) || idCompare(a.o, b.o); });
+      e.samples = e.pairs.slice(0, SAMPLE_CAP);
+      e.total = e.pairs.length;
+      e.links = e.pairs.length;
+    });
+    return list;
+  };
+
+  function posLabel(info) {
+    if (!info) { return DASH; }
+    if (info.side === 'start') { return 'Start document'; }
+    return (info.side === 'up' ? 'Upstream' : 'Downstream') + ' level ' + info.level;
+  }
+
+  function dirLabel(d) { return d === 'up' ? 'upstream' : 'downstream'; }
+
+  Widget.prototype.nodeLines = function (n) {
+    var lines = Base.nodeLines.call(this, n);
+    var info = this.res.docs[n.key];
+    var count = info && info.side === 'start' ?
+      'Start items: ' + info.starts + ' / ' + (n.items >= 0 ? n.items : DASH) :
+      'Impacted: ' + (info ? info.items.length : 0) + ' / ' + (n.items >= 0 ? n.items : DASH);
+    lines.splice(3, 0,
+      { text: posLabel(info), weight: 600, color: info && info.side === 'start' ? 'rgb(176,96,0)' : 'rgb(26,90,60)' },
+      { text: count, weight: 400, color: 'rgb(80,88,105)' });
+    return lines;
+  };
+
+  Widget.prototype.onNode = function (a, n) {
+    var self = this;
+    a.addEventListener('click', function (ev) { ev.preventDefault(); self.showDocDetails(n); });
+  };
+
+  // ------------------------------------------------------------------ layout (columns by signed level)
+
+  Widget.prototype.layoutAndDraw = function (edges, refit) {
+    var st = this.state;
+    this.lay = this.columns(edges);
+    this.edges = edges;
+    this.viewBtn.textContent = st.view === 'graph' ? 'Table' : 'Graph';
+    this.view.style.display = st.view === 'graph' ? '' : 'none';
+    this.table.style.display = st.view === 'table' ? '' : 'none';
+    this.drawGraph();
+    this.drawTable();
+    if (refit) { this.fit(); } else { this.applyZoom(); }
+  };
+
+  Widget.prototype.columns = function (edges) {
+    var st = this.state;
+    var res = this.res;
+    var h = PAD * 2 + LINE_H * (st.baseLines + st.extras.length);
+    var shown = this.model.nodes.filter(function (n) { return res.docs[n.key] && !st.hidden[n.key]; });
+    var upMax = 0;
+    shown.forEach(function (n) { var i = res.docs[n.key]; if (i.side === 'up') { upMax = Math.max(upMax, i.level); } });
+    var colOf = {};
+    var cols = [];
+    shown.forEach(function (n) {
+      var i = res.docs[n.key];
+      var c = i.side === 'up' ? upMax - i.level : (i.side === 'down' ? upMax + i.level : upMax);
+      colOf[n.key] = c;
+      (cols[c] = cols[c] || []).push(n);
+    });
+    for (var f = 0; f < cols.length; f++) {
+      cols[f] = (cols[f] || []).sort(function (x, y) { return docSortKey(x).localeCompare(docSortKey(y)); });
+    }
+    // Barycentre ordering over the relations (both ends) to reduce crossings.
+    var nb = {};
+    edges.forEach(function (e) {
+      (nb[e.o] = nb[e.o] || []).push(e.c);
+      (nb[e.c] = nb[e.c] || []).push(e.o);
+    });
+    var order = {};
+    function index() { cols.forEach(function (col) { col.forEach(function (n, r) { order[n.key] = r; }); }); }
+    index();
+    for (var sweep = 0; sweep < 4; sweep++) {
+      for (var c2 = 0; c2 < cols.length; c2++) {
+        cols[c2] = cols[c2].map(function (n, idx) {
+          var l = (nb[n.key] || []).filter(function (k) { return order[k] !== undefined && colOf[k] !== colOf[n.key]; });
+          var v = l.length ? l.reduce(function (s, k) { return s + order[k]; }, 0) / l.length : idx;
+          return { n: n, v: v, idx: idx };
+        }).sort(function (x, y) { return x.v - y.v || x.idx - y.idx; }).map(function (x) { return x.n; });
+        index();
+      }
+    }
+    var topPad = 0;
+    edges.forEach(function (e) { if (Math.abs(colOf[e.c] - colOf[e.o]) > 1) { topPad = 40; } });
+    var pos = {};
+    var maxRows = 0;
+    cols.forEach(function (col, w) {
+      maxRows = Math.max(maxRows, col.length);
+      col.forEach(function (n, z) {
+        pos[n.key] = { x: MARGIN + w * (NODE_W + COL_GAP), y: MARGIN + topPad + z * (h + ROW_GAP) };
+      });
+    });
+    var width = MARGIN * 2 + Math.max(1, cols.length) * NODE_W + Math.max(0, cols.length - 1) * COL_GAP;
+    var height = MARGIN * 2 + topPad + maxRows * (h + ROW_GAP);
+    return { pos: pos, width: width, height: Math.max(height, 80), nodeH: h, linked: shown, isolated: [], isoTop: height, topPad: topPad };
+  };
+
+  Widget.prototype.render = function (refit) {
+    this.res = this.compute();
+    var edges = this.relations(this.res);
+    this.layoutAndDraw(edges, refit);
+    var res = this.res;
+    var nImp = 0;
+    var nDocs = 0;
+    Object.keys(res.docs).forEach(function (k) { var i = res.docs[k]; nImp += i.items.length; if (i.items.length) { nDocs++; } });
+    var dirs = [];
+    if (this.state.dirs.down) { dirs.push('downstream'); }
+    if (this.state.dirs.up) { dirs.push('upstream'); }
+    var starts = this.model.items.filter(function (it) { return it.start; }).length;
+    this.status.textContent = starts + ' start items' + (this.query ? ' (query: ' + this.query + ')' : '') + ', ' +
+      nImp + ' impacted work items in ' + nDocs + ' documents, ' + (dirs.join(' and ') || 'no direction') + ', ' +
+      this.state.maxLevel + ' levels' + (this.warn ? ' ' + DASH + ' ' + this.warn : '');
+    if (this.details.style.display !== 'none') {
+      if (this.detailDoc && !this.state.hidden[this.detailDoc.key] && res.docs[this.detailDoc.key]) { this.showDocDetails(this.detailDoc); }
+      else { this.details.style.display = 'none'; }
+    }
+  };
+
+  // ------------------------------------------------------------------ details
+
+  Widget.prototype.edgeSummary = function (e) {
+    var o = this.model.byKey[e.o];
+    var c = this.model.byKey[e.c];
+    return [c.id + '  ' + ARROW + '  ' + o.id, kindsLabel(e, this.cats) + ' (' + e.links + ' links)'];
+  };
+
+  Widget.prototype.showDetails = function (e) {
+    this.detailDoc = null;
+    var o = this.model.byKey[e.o];
+    var c = this.model.byKey[e.c];
+    var box = this.openDetails(c, o);
+    this.edgeSummary(e).slice(1).forEach(function (l) { el('div', null, box, l); });
+    this.sampleList(box, e, 'Links (source ' + ARROW + ' target):');
+  };
+
+  // Ids of the parents ("reached from") of an item, with their roles.
+  Widget.prototype.parentText = function (id) {
+    var self = this;
+    return (this.res.parents[id] || []).map(function (p) {
+      var cat = catById(self.cats, p.k);
+      return p.id + ' (' + (cat ? (p.d === 'down' ? cat.opp : cat.name) : p.k) + ')';
+    }).join(', ');
+  };
+
+  Widget.prototype.showDocDetails = function (n) {
+    var self = this;
+    this.detailDoc = n;
+    var info = this.res.docs[n.key];
+    var box = this.openDetails(n, null);
+    var b = this.button(box.firstChild, 'Traceability matrix (Excel)', 'Download the links of the work items of this document as an Excel workbook', function () {
+      self.exportDocMatrix(n);
+    });
+    b.style.marginLeft = '8px';
+    el('div', null, box, n.title + ' ' + DASH + ' ' + (this.multi ? n.project + ' / ' : '') + n.space + ' ' + DASH + ' ' + posLabel(info));
+    if (!info || !info.items.length) {
+      el('div', { 'class': 'bw-muted' }, box, info && info.side === 'start' ? info.starts + ' start items, no other work item of this document is reached.' : 'No impacted work item.');
+      return;
+    }
+    el('div', null, box, info.items.length + ' impacted work items' + (info.side === 'start' ? ' (besides ' + info.starts + ' start items)' : '') + ':');
+    var ul = el('ul', { 'class': 'bw-items' }, box);
+    info.items.slice(0, DETAIL_CAP).forEach(function (it) {
+      var li = el('li', null, ul);
+      el('a', { href: itemUrl(n.project, it.id, n.col), target: '_top' }, li, it.id);
+      el('span', null, li, ' ' + it.title + ' ');
+      el('span', { 'class': 'bw-muted' }, li, DASH + ' ' + dirLabel(self.res.dir[it.id]) + ' level ' + self.res.lvl[it.id] +
+        ', from ' + self.parentText(it.id));
+    });
+    if (info.items.length > DETAIL_CAP) {
+      el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (info.items.length - DETAIL_CAP) + ' more (Excel lists all of them)');
+    }
+  };
+
+  // ------------------------------------------------------------------ table
+
+  Widget.prototype.shownDocInfo = function () {
+    var res = this.res;
+    var st = this.state;
+    return this.model.nodes.filter(function (n) { return res.docs[n.key] && !st.hidden[n.key]; }).sort(function (a, b) {
+      var ia = res.docs[a.key], ib = res.docs[b.key];
+      var sa = ia.side === 'up' ? -ia.level : ia.level;
+      var sb = ib.side === 'up' ? -ib.level : ib.level;
+      return sa - sb || docSortKey(a).localeCompare(docSortKey(b));
+    });
+  };
+
+  Widget.prototype.drawTable = function () {
+    var self = this;
+    this.table.textContent = '';
+    if (this.state.view !== 'table') { return; }
+    var docs = this.shownDocInfo().map(function (n) {
+      var info = self.res.docs[n.key];
+      return [{ text: self.docLabel(n), href: docUrl(n) }, posLabel(info),
+        String(info.side === 'start' ? info.starts + ' start' : info.items.length), n.items >= 0 ? String(n.items) : ''];
+    });
+    this.htmlTable(['Document', 'Position', 'Impacted work items', 'Work items'], docs, 'No document.');
+    var rows = this.sortedEdges().map(function (e) {
+      var o = self.model.byKey[e.o];
+      var c = self.model.byKey[e.c];
+      return [{ text: self.docLabel(c), href: docUrl(c) }, kindsLabel(e, self.cats), { text: self.docLabel(o), href: docUrl(o) }];
+    });
+    if (rows.length) { this.htmlTable(['Document (link sources)', 'Roles (links)', 'Document (link targets)'], rows, ''); }
+  };
+
+  // ------------------------------------------------------------------ Excel export (current filters)
+
+  // Path from a start item to the item: first parent at each step.
+  Widget.prototype.pathOf = function (id) {
+    var ids = [id];
+    var roles = [];
+    var cur = id;
+    for (var guard = 0; guard < 10; guard++) {
+      var ps = this.res.parents[cur];
+      if (!ps || !ps.length) { break; }
+      var cat = catById(this.cats, ps[0].k);
+      roles.unshift(cat ? (ps[0].d === 'down' ? cat.opp : cat.name) : ps[0].k);
+      cur = ps[0].id;
+      ids.unshift(cur);
+    }
+    return { ids: ids, roles: roles };
+  };
+
+  Widget.prototype.exportExcel = function () {
+    var self = this;
+    var by = this.model.byKey;
+    var cats = this.cats;
+    var res = this.res;
+    var edges = this.sortedEdges();
+    var rel = [['Source project', 'Source space', 'Source document', 'Source title', 'Roles',
+      'Target project', 'Target space', 'Target document', 'Target title']
+      .concat(cats.map(function (c) { return c.name + ' links'; })).concat(['Links'])];
+    var relLinks = [];
+    edges.forEach(function (e, i) {
+      var o = by[e.o];
+      var c = by[e.c];
+      rel.push([c.project, c.space, c.id, c.title, kindsLabel(e, cats), o.project, o.space, o.id, o.title]
+        .concat(cats.map(function (k) { return e.kinds[k.id]; })).concat([e.links]));
+      relLinks.push({ r: i + 1, c: 2, url: absUrl(docUrl(c)) });
+      relLinks.push({ r: i + 1, c: 7, url: absUrl(docUrl(o)) });
+    });
+    var shown = this.shownDocInfo();
+    var docs = [['Project', 'Space', 'Document', 'Title', 'Type', 'Status', 'Created', 'Updated', 'Work items',
+      'Position', 'Direction', 'Level', 'Impacted work items', 'Start items']];
+    shown.forEach(function (n) {
+      var info = res.docs[n.key];
+      docs.push([n.project, n.space, n.id, n.title, n.type, n.status, n.created, n.updated, n.items < 0 ? '' : n.items,
+        posLabel(info), info.side === 'start' ? '' : dirLabel(info.side), info.level, info.items.length, info.starts]);
+    });
+    var docLinks = shown.map(function (n, i) { return { r: i + 1, c: 2, url: absUrl(docUrl(n)) }; });
+    var items = [['Work item', 'Title', 'Type', 'Document', 'Direction', 'Level', 'Reached from']];
+    var itemLinks = [];
+    var paths = [['Work item', 'Title', 'Document', 'Direction', 'Level', 'Path from a start item', 'Links along the path']];
+    var pathLinks = [];
+    shown.forEach(function (n) {
+      res.docs[n.key].items.forEach(function (it) {
+        items.push([it.id, it.title, it.type, self.docLabel(n), dirLabel(res.dir[it.id]), res.lvl[it.id], self.parentText(it.id)]);
+        itemLinks.push({ r: items.length - 1, c: 0, url: absUrl(itemUrl(n.project, it.id, n.col)) });
+        var p = self.pathOf(it.id);
+        paths.push([it.id, it.title, self.docLabel(n), dirLabel(res.dir[it.id]), res.lvl[it.id],
+          p.ids.join(' ' + GT + ' '), p.roles.join(' ' + GT + ' ')]);
+        pathLinks.push({ r: paths.length - 1, c: 0, url: absUrl(itemUrl(n.project, it.id, n.col)) });
+      });
+    });
+    this.exportWorkbook([
+      { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
+        widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8]) },
+      { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 12, 12, 11, 20, 12, 7, 12, 10] },
+      { name: 'Impacted items', rows: items, links: itemLinks, widths: [16, 50, 16, 34, 12, 7, 40] },
+      { name: 'Impact paths', rows: paths, links: pathLinks, widths: [16, 50, 34, 12, 7, 50, 50] }
+    ]);
+  };
+
+  // Traceability matrix of a document: one row per link of the selected (shown) roles of each of its reached work items
+  // to another reached item (item repeated when it has several links); "not linked" when it has none.
+  Widget.prototype.exportDocMatrix = function (n) {
+    var self = this;
+    var m = this.model;
+    var res = this.res;
+    var st = this.state;
+    var cats = this.cats;
+    var rows = [['Work item', 'Title', 'Linked item', 'Linked item title', 'Link', 'Linked document', 'Linked item level']];
+    var urls = [];
+    var its = m.items.filter(function (it) { return it.doc === n && res.lvl[it.id] !== undefined; });
+    its.sort(function (a, b) { return idCompare(a.id, b.id); });
+    its.forEach(function (it) {
+      var ls = [];
+      (m.bySource[it.id] || []).forEach(function (l) { if (st.rel[l.k] && res.lvl[l.t] !== undefined) { ls.push({ id: l.t, k: l.k, out: true }); } });
+      (m.byTarget[it.id] || []).forEach(function (l) { if (st.rel[l.k] && res.lvl[l.s] !== undefined) { ls.push({ id: l.s, k: l.k, out: false }); } });
+      if (!ls.length) {
+        rows.push([it.id, it.title, 'not linked', '', '', '', '']);
+        urls.push({ r: rows.length - 1, c: 0, url: absUrl(itemUrl(n.project, it.id, n.col)) });
+        return;
+      }
+      ls.sort(function (a, b) { return idCompare(a.id, b.id); });
+      ls.forEach(function (l) {
+        var other = m.byId[l.id];
+        var cat = catById(cats, l.k);
+        var od = other.doc;
+        rows.push([it.id, it.title, l.id, other.title, cat ? (l.out ? cat.name : cat.opp) : l.k, od ? self.docLabel(od) : '',
+          res.lvl[l.id] === 0 ? 'start' : dirLabel(res.dir[l.id]) + ' ' + res.lvl[l.id]]);
+        urls.push({ r: rows.length - 1, c: 0, url: absUrl(itemUrl(n.project, it.id, n.col)) });
+        if (od) { urls.push({ r: rows.length - 1, c: 2, url: absUrl(itemUrl(od.project, l.id, od.col)) }); }
+      });
+    });
+    this.exportWorkbook([{ name: 'Traceability', what: 'traceability matrix', rows: rows, links: urls,
+      widths: [16, 50, 16, 50, 22, 40, 16] }], 'traceability-' + n.id.replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xlsx');
+  };
+
+  startWidgets('ai-root', Widget, 'Impact');
+})();
+</script>
+#end
+#end
