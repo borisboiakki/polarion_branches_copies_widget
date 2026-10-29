@@ -113,6 +113,46 @@ async function clickDoc(p, name) {
   await p.click('button:has-text("Documents")');
   await p.waitForTimeout(150);
 
+  // Start items picker: search, type filter, select / clear shown, Excel follows the selection.
+  await p.click('.ai-pick button:has-text("Start items")');
+  const pickIds = async () => p.$$eval('.ai-st-list label', ls => ls.map(l => l.textContent.split(':')[0]));
+  expect(JSON.stringify(await pickIds()) === JSON.stringify(['VIA-1', 'VIA-2', 'VIA-3', 'VIA-4']) &&
+    (await p.textContent('.ai-pick button:has-text("Start items")')) === 'Start items (4/4)', 'picker lists the 4 start items, all selected');
+  await p.fill('.ai-st-search', 'via-3');
+  await p.waitForTimeout(100);
+  expect(JSON.stringify(await pickIds()) === JSON.stringify(['VIA-3']), 'search on the id narrows the list');
+  await p.fill('.ai-st-search', 'title via-2');
+  await p.waitForTimeout(100);
+  expect(JSON.stringify(await pickIds()) === JSON.stringify(['VIA-2']), 'search on the title narrows the list');
+  await p.fill('.ai-st-search', '');
+  await p.click('.ai-st-types label:has-text("customerNote") input');
+  await p.waitForTimeout(100);
+  expect(JSON.stringify(await pickIds()) === JSON.stringify(['VIA-1', 'VIA-2']), 'type filter: customer notes hidden from the list');
+  await p.click('.ai-st-types label:has-text("customerNote") input');
+  await p.click('.ai-st-row button:has-text("Clear shown")');
+  await p.waitForTimeout(150);
+  expect((await status()).startsWith('0 of 4 start items') && (await p.textContent('.bw-view svg')).indexOf('No start item selected') >= 0,
+    'clear shown: no start item, empty graph message');
+  await p.click('.ai-st-list label:has-text("VIA-1") input');
+  await p.waitForTimeout(150);
+  console.log('status VIA-1:', await status());
+  expect((await status()).startsWith('1 of 4 start items, 5 impacted work items in 4 documents') &&
+    (await p.textContent('.ai-pick button:has-text("Start items")')) === 'Start items (1/4)' &&
+    (await nodeText('CustomerSpec')).indexOf('Start items: 1 / 4') >= 0, 'only VIA-1: VIA-11, VIA-22, then VIA-12 (same-document link), VIA-31, then VIA-41 reached');
+  await p.click('.ai-pick button:has-text("Start items")');
+  const [d0] = await Promise.all([p.waitForEvent('download'), p.click('.bw-toolbar button:text-is("Excel")')]);
+  await d0.saveAs(dir + '/export-via1.xlsx');
+  const book1 = await readBook(p, dir + '/export-via1.xlsx');
+  const paths1 = book1[3].rows.slice(1);
+  expect(paths1.length === 5 && paths1.every(r => r[5].startsWith('VIA-1 ' + String.fromCharCode(62))) &&
+    book1[4].name === 'Start items' && book1[4].rows.length === 2 && book1[4].rows[1][0] === 'VIA-1',
+    'Excel follows the selection: paths from VIA-1 only, Start items sheet');
+  await p.click('.ai-pick button:has-text("Start items")');
+  await p.click('.ai-st-row button:has-text("Select shown")');
+  await p.click('.ai-pick button:has-text("Start items")');
+  await p.waitForTimeout(150);
+  expect((await status()).startsWith('4 start items, 8 impacted work items'), 'select shown: back to all start items');
+
   // Counts toggle, table, exports.
   await p.click('label:has-text("Item counts") input');
   await p.waitForTimeout(150);
@@ -130,7 +170,7 @@ async function clickDoc(p, name) {
   await d2.saveAs(dir + '/export.xlsx');
   const book = await readBook(p, dir + '/export.xlsx');
   expect(d2.suggestedFilename() === 'impact-analysis-VforIA.xlsx' &&
-    book.map(s => s.name).join('|') === 'Relations|Documents|Impacted items|Impact paths', 'Excel export: four sheets');
+    book.map(s => s.name).join('|') === 'Relations|Documents|Impacted items|Impact paths|Start items', 'Excel export: five sheets');
   const items = book[2].rows;
   const paths = book[3].rows;
   console.log('paths:', JSON.stringify(paths.slice(0, 4)));

@@ -12,9 +12,10 @@ one build and one test setup:
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
   (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done and validated on 2512).
-- **advImpact** (`widgets/advImpact/`, branch `claude/advimpact-widget-spec-7zkne9`): multi-level impact analysis from one
+- **advImpact** (`widgets/advImpact/`): multi-level impact analysis from one
   document or item subset along 1–5 link roles (default 3 levels, up to 7). Spike on 2512 **closed** (method: SQL per level + Open API
-  links, SPEC §6.1). **0.1.0 implemented** (tested on mocks and in Chromium, not yet on 2512; harness `tools/vtest/advImpact/`);
+  links, SPEC §6.1). **0.1.1 validated by the PO on 2512**; **0.2.0** adds the in-widget start item picker (SPEC F17, browser
+  only, narrows the server start set; not yet on 2512); harness `tools/vtest/advImpact/`;
   the spec (PO answers Q1–Q12 recorded; "both" = downstream and upstream analyses combined) is in its `SPECIFICATION.md`, the spike plan and the diagnostic widget `aiSpike` in `tests/advImpact-v0.1.x/`
   (`tools/vtest/aiSpike/` smoke-tests it; rebuild `aiSpike.zip` after edits).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.

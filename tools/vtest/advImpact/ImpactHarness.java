@@ -159,6 +159,8 @@ public class ImpactHarness {
         WidgetHarness.check(br.contains("data-roles=\"satisfies|satisfies|is satisfied by;verifies|verifies|is verified by\""), "roles with names and opposite names");
         WidgetHarness.check(attr(br, "ai-it").startsWith("VIA-1|0|customerRequirement|1|Title VIA-1;"), "start item flagged, document index 0 = start document");
         WidgetHarness.check(attr(br, "ai-it").contains("VIA-12|1|systemRequirement|0|Title   with  separators;"), "separators in titles replaced");
+        WidgetHarness.check(attr(br, "ai-ty").contains("customerRequirement|customerRequirement;") && attr(br, "ai-ty").contains("systemRequirement|systemRequirement;"),
+            "type names of the reached items (start item picker)");
         String links = attr(br, "ai-ln");
         WidgetHarness.check(links.contains("VIA-11|VIA-1|satisfies;") && links.contains("VIA-12|VIA-11|satisfies;") && links.contains("VIA-31|VIA-41|verifies;")
             && links.contains("VIA-41|VIA-31|verifies;") && !links.contains("VIA-999") && !links.contains("parent") && !links.contains("VIA-5|"),
