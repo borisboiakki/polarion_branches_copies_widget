@@ -12,9 +12,10 @@ one build and one test setup:
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
   (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done and validated on 2512).
-- **advImpact** (`widgets/advImpact/`, branch `claude/advimpact-widget-spec-7zkne9`): multi-level impact analysis from one
+- **advImpact** (`widgets/advImpact/`): multi-level impact analysis from one
   document or item subset along 1–5 link roles (default 3 levels, up to 7). Spike on 2512 **closed** (method: SQL per level + Open API
-  links, SPEC §6.1). **0.1.0 implemented** (tested on mocks and in Chromium, not yet on 2512; harness `tools/vtest/advImpact/`);
+  links, SPEC §6.1). **0.1.1 validated by the PO on 2512**; **0.2.0** adds the in-widget start item picker (SPEC F17, browser
+  only, narrows the server start set; validated by the PO on 2512); harness `tools/vtest/advImpact/`;
   the spec (PO answers Q1–Q12 recorded; "both" = downstream and upstream analyses combined) is in its `SPECIFICATION.md`, the spike plan and the diagnostic widget `aiSpike` in `tests/advImpact-v0.1.x/`
   (`tools/vtest/aiSpike/` smoke-tests it; rebuild `aiSpike.zip` after edits).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
@@ -26,7 +27,9 @@ Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks
    - Widget & parameters: §2 · Velocity: §3 · Lucene: §6 · SQL: §7 · REST: §8 · Java/SDK: §9
    - Checklist before submitting: §13
    - Findings verified in this project are also in the guide: selectors (§2.1), collection context (§2.8, §12.5),
-     Velocity 1.4 behaviours (§3.1.9), link role names (§10.4), page model size (§11.5)
+     Velocity 1.4 behaviours (§3.1.9), link role names (§10.4), page model size (§11.5), multi-level link traversal and
+     Back links (§3.3), `linkedWorkItemsOf` direction (§6.4), document-restricted queries (§6.3), recursive SQL (§7.1),
+     interactive widget UI on 2512 (§11.7)
 2. `docs/ARCHITECTURE.md` — how the widgets are built (Velocity side, page model, shared client core, tests).
    Keep it up to date when the structure, the page model or the shared hooks change.
 3. `widgets/<widget>/SPECIFICATION.md` — requirements and open questions of the widget you touch. If a task conflicts

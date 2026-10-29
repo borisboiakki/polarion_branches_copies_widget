@@ -3,7 +3,7 @@
 **Status:** v0.3, 2026-10-29: PO answers Q1–Q12 recorded (§9), reviewed against the dev guide, **spike closed** on 2512
 (`tests/advImpact-v0.1.x/spike-tests.md`, conclusion at its end). **0.1.0 implemented** (`widgets/advImpact/src`), tested
 with Velocity 1.4 on mocks and in Chromium (`tools/vtest/advImpact/`); to be validated on 2512. Install guide:
-`docs/advImpact/install.md`.
+`docs/advImpact/install.md`. **0.2.0**: in-widget start item picker (F17), validated by the PO on 2512.
 
 ## 1. Goal
 
@@ -46,7 +46,7 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | ID | Requirement | Priority |
 |---|---|---|
 | F1 | **Start document**: a single-select document selector (`@document`, current project; same limitation as docCoverage) | Must |
-| F2 | **Start item subset**: a work item **query parameter** (Lucene) restricted to the start document (empty = all counted items of the document). The restriction is added by the widget: `document.id:"space/name"` or an `SQL:(…)` clause, whichever works (spike I4). In-widget picker = later version (Q1) | Must |
+| F2 | **Start item subset**: a work item **query parameter** (Lucene) restricted to the start document (empty = all counted items of the document). The restriction is added by the widget: `document.id:"space/name"` or an `SQL:(…)` clause, whichever works (spike I4). The viewer narrows this set in the widget (F17) | Must |
 | F3 | **Link roles**: multi-select `workitem-link-role`, **1 to 5** (more: first 5 + warning) | Must |
 | F4 | **Direction**: downstream, upstream or both (the two analyses combined, Q2/Q12; §3), as a parameter. With "both", a **viewer toggle** shows one direction or both | Must |
 | F5 | **Multi-level traversal**: the analysis does not stop at the first impacted document; from the items reached at level n it continues with the items linked to them (same roles at every level, Q4; direction as F4) up to **N levels** | Must |
@@ -61,6 +61,7 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | F14 | Links to unresolvable items ignored; `isUnresolvable()` guard on every referenced object | Must |
 | F15 | **Projects** parameter and **collection context** as docCoverage F16/F17 | Later versions (Q8/Q9) |
 | F16 | Warning in the widget when a traversal was cut off (level cap, item cap per level, Q11). After a cut-off the browser recomputation of F9 is incomplete: the warning stays shown | Must |
+| F17 | **Start item picker** (0.2.0): toolbar panel *Start items (k/N)* listing the server start items (F2), with a search on id or title, a filter by type, *Select shown* / *Clear shown*; the analysis is recomputed in the browser from the selected items (as F9). It can only narrow the server start set: the server reached everything reachable from it, so the result is exact (except after a cut-off, F16). Excel adds a *Start items* sheet (selected items, start query). The PDF view uses the server start set | Must |
 
 ## 5. Non-functional requirements
 
@@ -112,11 +113,14 @@ docCoverage (`pairCap`, `itemCap`).
 
 Q1–Q12 answered on 2026-10-29 (decisions log).
 
-Open: the in-widget picker design (later version). The spike is closed (§6.1 decision).
+The spike is closed (§6.1 decision). The in-widget picker is F17 (0.2.0).
 
 Checks on 2512 for 0.1.0 (not possible in the sandbox): upload and parameters (single-select start document, query,
 direction, levels), numbers against the spike results (run 1 / part A sets), toggles, details, Excel and traceability
 matrix, PDF export, rendering time on the largest chain.
+
+Checks on 2512 for 0.2.0 (PO, 2026-10-29: the picker works as expected). Still worth watching: type names in the picker (`ITypeOpt.getName()`, the id is shown when it is missing), picker
+speed with a start document of several thousand items (the list renders at most 300 entries; the search narrows it).
 
 ## 9. Decisions log
 
@@ -138,3 +142,5 @@ matrix, PDF export, rendering time on the largest chain.
 | 2026-10-29 | Spike closed: all methods agree, very fast up to 7 levels (PO, part C). Method: SQL per level + Open API links; levels 1–7, default 3; cap 5000 new items per level | Dev, PO results |
 | 2026-10-29 | 0.1.0 implemented as specified: F1–F14 and F16 (F15 projects / collection later). Item paths in the browser = one path per item (first parent at each step); the details list every parent | Dev |
 | 2026-10-29 | 0.1.1 (PO test of 0.1.0 on 2512): the Levels select did not react: replaced by one button per level, status line shows levels shown and the deepest level reached. Refresh renamed **Reload page** in all widgets: a widget cannot be re-rendered alone in view mode (PO) | PO, Dev |
+| 2026-10-29 | In-widget start item picker (Q1 follow-up, 0.2.0): a **browser picker** that narrows the server start set (whole document or query subset), with a search on id or title and a filter by type; no page reload. A page parameter with reload (any query) is not planned. To pick from the whole document, leave the start query empty | PO |
+| 2026-10-29 | 0.2.0 validated on 2512: the start item picker works as expected | PO |

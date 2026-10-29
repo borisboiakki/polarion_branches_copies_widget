@@ -125,7 +125,9 @@ the spike, `tests/advImpact-v0.1.x/spike-tests.md`):
 Page model of advImpact: root `<div class="ai-root">` with `data-dir`, `data-levels`, `data-start` (start document
 key), `data-query`, `data-roles`, `data-warn` (and the common `data-*`); `bw-n` per document (common attributes only);
 one `<i class="ai-it" data-v="id|document index|type|start flag|title;…">` (document index = position of the `bw-n`,
--1 outside a document; `|` and `;` in titles replaced) and one `<i class="ai-ln" data-v="source|target|role;…">`.
+-1 outside a document; `|` and `;` in titles replaced), one `<i class="ai-ty" data-v="type id|type name;…">` (types of
+the reached items, for the start item picker) and one `<i class="ai-ln" data-v="source|target|role;…">`. The browser
+starts the analysis from the start items selected in the *Start items* panel (`state.starts`, a subset of the flagged ones).
 
 ## 4. Client side: `core.js` + `graph.js`
 

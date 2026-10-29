@@ -6,8 +6,10 @@
    *
    * The page model holds the start items, every work item the server reached (levels up to the parameter, in the
    * parameter direction) and every link of the selected roles between them. The browser recomputes the analysis for
-   * the shown roles, directions and levels: one breadth-first search per direction from the start items (a path never
-   * changes direction, SPEC Q12), each item at its lowest level. Columns: upstream levels on the left, the start
+   * the shown roles, directions and levels: one breadth-first search per direction from the start items selected in the
+   * "Start items" panel (a path never changes direction, SPEC Q12), each item at its lowest level. The selection is a
+   * subset of the server start items, so the server reached everything reachable from it: the result is exact unless a
+   * cap cut the traversal off (warning F16). Columns: upstream levels on the left, the start
    * document, downstream levels on the right. Edges: o = document of the link targets (left), c = document of the link
    * sources; arrows follow the link direction (arrowAtOrigin).
    */
@@ -36,6 +38,9 @@
     });
     return cats;
   }
+
+  // Picker entries rendered at most (the search narrows the list).
+  var PICK_CAP = 300;
 
   // Work item ids in natural order: prefix, then number (VIA-2 before VIA-10).
   function idCompare(a, b) {
@@ -70,6 +75,13 @@
       model.items.push(item);
       model.byId[item.id] = item;
     });
+    // Type names "id|name;" (the picker shows the id when the name is missing).
+    model.typeNames = {};
+    var ty = root.querySelector('.bw-model .ai-ty');
+    ((ty && ty.dataset.v) || '').split(';').forEach(function (part) {
+      var f = part.split('|');
+      if (f[0] && f[1]) { model.typeNames[f[0]] = f[1]; }
+    });
     // Links "source|target|role;" between reached items, indexed both ways.
     model.links = [];
     model.bySource = {};
@@ -102,6 +114,10 @@
     st.maxLevel = this.levels;
     st.hidden = {};
     st.baseLines = 5;
+    // Start items of the analysis: the server start items, narrowed in the "Start items" panel.
+    this.startItems = this.model.items.filter(function (it) { return it.start; }).sort(function (a, b) { return idCompare(a.id, b.id); });
+    st.starts = {};
+    this.startItems.forEach(function (it) { st.starts[it.id] = true; });
     this.build();
     this.render(true);
   }
@@ -110,6 +126,7 @@
   Widget.prototype.build = function () {
     var self = this;
     var bar = el('div', { 'class': 'bw-toolbar' }, this.root);
+    this.startPicker(bar);
     this.docPicker(bar);
     this.kindChecks(bar, 'Roles:');
     if (this.dirParam === 'both') {
@@ -173,6 +190,75 @@
     btn.textContent = 'Documents (' + this.model.nodes.length + '/' + this.model.nodes.length + ')';
   };
 
+  Widget.prototype.typeLabel = function (t) {
+    return this.model.typeNames[t] || t;
+  };
+
+  // In-widget start item selector (SPEC F17): narrows the server start items; the analysis is recomputed at once.
+  // Search on id or title, filter by type; "Select shown" / "Clear shown" act on the items the filters show.
+  Widget.prototype.startPicker = function (bar) {
+    var self = this;
+    var st = this.state;
+    var all = this.startItems;
+    var wrap = el('span', { 'class': 'ai-pick' }, bar);
+    var btn = this.button(wrap, 'Start items', 'Choose the start items of the analysis among the items of the start document (or of the start query)', function () {
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+    var panel = el('div', { 'class': 'ai-pick-panel ai-st-panel' }, wrap);
+    panel.style.display = 'none';
+    var row = el('div', { 'class': 'ai-st-row' }, panel);
+    var search = el('input', { 'class': 'bw-ctl ai-st-search', type: 'search', placeholder: 'Search id or title' + ELLIPSIS }, row);
+    this.button(row, 'Select shown', 'Select the start items the search and the type filter show', function () { setShown(true); });
+    this.button(row, 'Clear shown', 'Unselect the start items the search and the type filter show', function () { setShown(false); });
+    var types = [];
+    all.forEach(function (it) { if (types.indexOf(it.type) < 0) { types.push(it.type); } });
+    types.sort(function (a, b) { return self.typeLabel(a).localeCompare(self.typeLabel(b)); });
+    var typeOn = {};
+    if (types.length > 1) {
+      var trow = el('div', { 'class': 'ai-st-row ai-st-types' }, panel);
+      el('span', { 'class': 'bw-muted' }, trow, 'Types:');
+      types.forEach(function (t) {
+        typeOn[t] = true;
+        self.checkbox(trow, self.typeLabel(t) || DASH, true, function (on) { typeOn[t] = on; list(); });
+      });
+    } else if (types.length) {
+      typeOn[types[0]] = true;
+    }
+    var info = el('div', { 'class': 'bw-muted ai-st-info' }, panel);
+    var box = el('div', { 'class': 'ai-st-list' }, panel);
+    search.addEventListener('input', list);
+    function shownItems() {
+      var q = search.value.trim().toLowerCase();
+      return all.filter(function (it) {
+        return typeOn[it.type] && (!q || it.id.toLowerCase().indexOf(q) >= 0 || it.title.toLowerCase().indexOf(q) >= 0);
+      });
+    }
+    function list() {
+      box.textContent = '';
+      var items = shownItems();
+      items.slice(0, PICK_CAP).forEach(function (it) {
+        var lab = self.checkbox(box, it.id + ': ' + it.title + (types.length > 1 ? ' [' + self.typeLabel(it.type) + ']' : ''), !!st.starts[it.id], function (on) {
+          if (on) { st.starts[it.id] = true; } else { delete st.starts[it.id]; }
+          update();
+        });
+        lab.style.display = 'flex';
+      });
+      info.textContent = items.length + ' of ' + all.length + ' start items shown' +
+        (items.length > PICK_CAP ? ' (first ' + PICK_CAP + ' listed: refine the search)' : '');
+    }
+    function setShown(on) {
+      shownItems().forEach(function (it) { if (on) { st.starts[it.id] = true; } else { delete st.starts[it.id]; } });
+      list();
+      update();
+    }
+    function update() {
+      btn.textContent = 'Start items (' + Object.keys(st.starts).length + '/' + all.length + ')';
+      self.render(true);
+    }
+    btn.textContent = 'Start items (' + all.length + '/' + all.length + ')';
+    list();
+  };
+
   Widget.prototype.legend = function (box) {
     this.legendKinds(box);
     el('span', { 'class': 'bw-muted' }, box, 'Upstream documents on the left, the start document, downstream documents on the right; ' +
@@ -190,7 +276,7 @@
       if (!st.dirs[d]) { return; }
       var lv = {};
       var frontier = [];
-      m.items.forEach(function (it) { if (it.start) { lv[it.id] = 0; frontier.push(it.id); } });
+      m.items.forEach(function (it) { if (it.start && st.starts[it.id]) { lv[it.id] = 0; frontier.push(it.id); } });
       for (var k = 1; k <= st.maxLevel && frontier.length; k++) {
         var next = [];
         frontier.forEach(function (id) {
@@ -229,7 +315,7 @@
     });
     // Documents: side and level of their lowest item (start document: 0), impacted items.
     var start = m.start;
-    if (start) { res.docs[start.key] = { side: 'start', level: 0, items: [], starts: 0 }; }
+    if (start && Object.keys(st.starts).length) { res.docs[start.key] = { side: 'start', level: 0, items: [], starts: 0 }; }
     m.items.forEach(function (it) {
       if (!it.doc || res.lvl[it.id] === undefined) { return; }
       var L = res.lvl[it.id];
@@ -366,6 +452,8 @@
   };
 
   Widget.prototype.render = function (refit) {
+    var nStarts = Object.keys(this.state.starts).length;
+    this.emptyText = nStarts ? 'No document to show.' : 'No start item selected: choose them with the Start items button.';
     this.res = this.compute();
     var edges = this.relations(this.res);
     this.layoutAndDraw(edges, refit);
@@ -380,8 +468,7 @@
     var dirs = [];
     if (this.state.dirs.down) { dirs.push('downstream'); }
     if (this.state.dirs.up) { dirs.push('upstream'); }
-    var starts = this.model.items.filter(function (it) { return it.start; }).length;
-    this.status.textContent = starts + ' start items' + (this.query ? ' (query: ' + this.query + ')' : '') + ', ' +
+    this.status.textContent = (nStarts === this.startItems.length ? nStarts : nStarts + ' of ' + this.startItems.length) + ' start items' + (this.query ? ' (query: ' + this.query + ')' : '') + ', ' +
       nImp + ' impacted work items in ' + nDocs + ' documents, ' + (dirs.join(' and ') || 'no direction') + ', ' +
       st.maxLevel + ' of ' + this.levels + ' levels shown (deepest reached: ' + deepest + ')' +
       (this.warn ? ' ' + DASH + ' ' + this.warn : '');
@@ -535,12 +622,22 @@
         pathLinks.push({ r: paths.length - 1, c: 0, url: absUrl(itemUrl(n.project, it.id, n.col)) });
       });
     });
+    var starts = [['Start item', 'Title', 'Type', 'Document']];
+    var startLinks = [];
+    var sd = this.model.start;
+    this.startItems.forEach(function (it) {
+      if (!self.state.starts[it.id]) { return; }
+      starts.push([it.id, it.title, self.typeLabel(it.type), it.doc ? self.docLabel(it.doc) : '']);
+      if (sd) { startLinks.push({ r: starts.length - 1, c: 0, url: absUrl(itemUrl(sd.project, it.id, sd.col)) }); }
+    });
+    if (this.query) { starts.push(['(start query)', this.query, '', '']); }
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
         widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8]) },
       { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 12, 12, 11, 20, 12, 7, 12, 10] },
       { name: 'Impacted items', rows: items, links: itemLinks, widths: [16, 50, 16, 34, 12, 7, 40] },
-      { name: 'Impact paths', rows: paths, links: pathLinks, widths: [16, 50, 34, 12, 7, 50, 50] }
+      { name: 'Impact paths', rows: paths, links: pathLinks, widths: [16, 50, 34, 12, 7, 50, 50] },
+      { name: 'Start items', rows: starts, links: startLinks, widths: [16, 50, 20, 34] }
     ]);
   };
 

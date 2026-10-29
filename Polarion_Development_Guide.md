@@ -12,12 +12,13 @@
 
 | If the task is… | Read |
 |---|---|
-| Build a dashboard / report widget | §1, §2, §3, §6 |
+| Build a dashboard / report widget | §1, §2, §3, §6; interactive widgets also §11.5–§11.7 |
 | Automate a status transition, validate on save, run a nightly job | §4, §5 |
 | Write a query (search bar, widget, macro, API) | §6 |
 | Write a SQL report query | §7 |
 | Integrate an external system | §8 (REST), §9 (Java) |
 | Locate or interpret project configuration | §6.2, §10 |
+| Traverse links over several levels (impact analysis) | §3.3, §6.4, §7.1, §7.4 |
 | Check work before submitting | §13 |
 
 **Golden rule for agents**: Polarion has *four* distinct programming surfaces with *different* APIs and *different* rules — Velocity (rendering), Polarion Scripting (ECMAScript, server-side automation), Lucene/SQL (querying), and Java/REST (integration). Identify which surface the task belongs to **before** writing code. Mixing their idioms is the most common cause of broken Polarion code.
@@ -260,6 +261,11 @@ To process active Work Items that actually belong to the selected LiveDoc, in do
 ```
 
 `Document.items().contained()` returns the active contained Work Items in document order. This is preferable to reconstructing a document query when the document originated from an `@document` selector.
+
+> **Verified on 2512 (advImpact spike)**: the single-select form above works as written: `.allowMultipleValues(false)`,
+> `singleValue()` returns the option, `getModelObject()` the document. For the document's space and name, use
+> `getModelObject().getOldApi()` (`getModuleFolder()`, `getId()`). To restrict a user query to that document, see §6.3
+> *Documents*.
 
 > **Verified on 2512 (selector objects)**:
 > - `@document` (multi): `values()` → `ProxyEnumOption`; `getModelObject()` → `ProxyDocument` (check `isUnresolvable()`
@@ -614,7 +620,9 @@ Always use the `([...])` array delimiters.
 | Method chain split across lines | **Error (seen on 2512)**: `ParseException: Encountered "\n .addEnumItem…" … Was expecting one of: "," … ")"` | One chain per line |
 | Map literal `#set($m = {})` | **Error (seen on 2512)**: `TokenMgrError: Lexical error … Encountered: "{" (123)` | `$objectFactory.newMap()` (§3.4) |
 | Backslash in a Velocity string literal, e.g. `$s.matches("[a-z\-]+")` | **Error (seen on 2512)**: `TokenMgrError: Lexical error … Encountered: "-" (45)` | No backslashes; put `-` last in a regex class: `"[a-z_.-]+"` |
-| A directive name in plain text, e.g. `<code>#include</code>` in HTML | **Parse error** (Velocity 1.4 check) | Rephrase, or write `&#35;include` |
+| A directive name in plain text, e.g. `<code>#include</code>` in HTML, or directive-like text such as `#end(` or `#if(` in a sentence or a JS string | **Parse error** (Velocity 1.4 check): `Encountered "#end"` | Rephrase, write `&#35;include`, or put the text in a variable |
+| Arithmetic inside a method argument, e.g. `$list.subList(0, $n + 1)` | **Parse error** (Velocity 1.4 check, hit while writing a widget): `ParseException: Encountered "+" … Was expecting one of: "," … ")"` | Compute first: `#set($m = $n + 1)` then `$list.subList(0, $m)` |
+| A method call on a string literal, e.g. `#set($y = "$x".replace("a", "b"))` | **Parse error** (Velocity 1.4 check): `Lexical error … Encountered: "r" (114), after : "."` | Intermediate variable: `#set($s = "$x")` then `#set($y = $s.replace("a", "b"))` |
 | Unparsed block `#[[ … ]]#` | No error, but **not unparsed**: `#[[`/`]]#` are emitted as text and `$`/`#` inside are still interpreted | Keep `$` out of inline JS, or load JS as a widget resource |
 | `#break`, `$foreach.count`, `$foreach.hasNext` | No error, but **no effect**: emitted as literal text | Manual counter and `#if` guards: `#set($n = $n + 1)` |
 
@@ -630,6 +638,11 @@ Velocity 1.4 behaviours to design around (seen with `velocity-1.4.jar`; the widg
 - `#set($x = $obj.get())` with a **null** result keeps the previous value of `$x`. Reset first: `#set($x = "")`, then
   `#set($x = $obj.get())`.
 - `#foreach` iterates Lists, Collections and arrays; an object that is only an `Iterator`/`Iterable` was not iterated.
+- A Java **array** (e.g. the result of `$s.split("[|]")`) has no methods in Velocity 1.4: `$parts.get(1)` and
+  `$parts.size()` are emitted as literal text; only `#foreach` over it works. Store tuples as lists
+  (`#set($t = [$a, $b, $c])`, then `$t.get(1)`) rather than joined strings you split again later.
+- A method returning **null inside a string** is not empty: `#set($n = "$obj.getName()")` gives the literal text
+  `$obj.getName()`. Reset, set, then stringify: `#set($n = "")`, `#set($n = $obj.getName())`, `#set($n = "$n")`.
 - An inline `#set` after a reference on the same line (`$a$b#set($s = ";")#end` inside a one-line `#foreach`) was
   emitted as text. To join a list on one line, write the separator after each entry
   (`#foreach($x in $list)$esc.html($x);#end`) and ignore the empty last part when reading it.
@@ -728,6 +741,25 @@ $renderApiWI.render().withLinks()
   #end
 #end
 ```
+
+> **Verified on 2512 (advImpact spike)**: `getLinkedWorkItemsStructsBack()` exists and returns `LinkedWorkItemStruct`s whose
+> `getLinkedItem()` is the link **source** (the item that links to this one); `getLinkRole().getId()` is readable. With
+> `…Direct()` (targets) this walks both directions without SQL, and gave the same items per level as SQL.
+
+**Multi-level traversal (practice; fast on 2512 up to 7 levels, advImpact)**: walk level by level, not item by item.
+- One query per level and direction on `STRUCT_WORKITEM_LINKEDWORKITEMS` (§7.4): downstream = the link **sources** whose
+  target is in the frontier, upstream = the link **targets** whose source is in the frontier. Frontier ids go into
+  `IN (…)` lists of at most 500 ids (one query per chunk).
+- One visited map per direction (id → level): an item is expanded once, at its lowest level; cycles and the inherited
+  links of copies of copies (§7.4) are then counted once.
+- Cap the new items per level and the reached items in total, and show a warning when a cap cuts the traversal off.
+- "Both directions" = a pure downstream and a pure upstream analysis, combined. A path that changes direction would
+  reach siblings (from a system requirement up to *other* customer requirements it satisfies), which is rarely the
+  intended impact.
+- Then read the links between the reached items once (`…StructsDirect()` of each reached item) for the page model
+  (§11.5).
+- Alternatives that ran on 2512 but were not chosen: one recursive SQL query (§7.1) and `linkedWorkItemsOf` (§6.4,
+  downstream only).
 
 ### 3.4 Collections & Data Structures
 
@@ -1620,6 +1652,18 @@ document.title:("Document_name_1" "Document_name_2")     # ALWAYS parenthesise m
 ```
 Without parentheses, `document.title:"A" "B"` also matches items containing "B" anywhere (title, description, comments, fields).
 
+> **Verified on 2512 (advImpact spike)**: a user query can be restricted to one document in
+> `$trackerService.queryWorkItems(query, "id")` either with `document.id:"Name"` (space as above) or with an `SQL:(…)`
+> clause; both returned the same subset. The `SQL:` form needs no double quotes inside a Velocity string:
+> ```velocity
+> #set($startSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${folderQ}' AND m.c_id = '${nameQ}'")
+> #set($query = "project.id:${projectId} AND SQL:(${startSql}) AND (${userQuery})")
+> #set($items = $trackerService.queryWorkItems($query, "id"))
+> ```
+> Take the space and name from the selected document (`getOldApi()`, §2.1), never from the selector option id, and
+> double the single quotes in them (`$name.replace("'", "''")`). Keep the parentheses around the user query so that its
+> `OR`s stay inside the restriction, and check the result's document again in Velocity.
+
 #### Outline numbers
 ```
 outlineNumber:1.1.*
@@ -1708,6 +1752,12 @@ linkedWorkItemsOf:([{"filter":"id:DP\\-337","follows":["refines"],"steps":1},{"f
 linkedWorkItemsOf:([{"filter":"id:DP\\-337","follows":["refines"]},{"filter":"type:softwarerequirement","follows":["verifies"]},{"filter":"type:softwaretestcase","follows":["triggered_by"]}])
 ```
 
+> **Verified on 2512 (advImpact spike)**: `linkedWorkItemsOf` follows **incoming links only**: it returns the items that
+> link *to* the filter set (for `satisfies`/`verifies`, the downstream items). From an item nothing links to, it returns
+> nothing, whatever it links to itself. The result holds levels 1..`steps` together and **never** the filter items; it
+> matched level-by-level SQL downstream. There is no upstream variant: use SQL or `getLinkedWorkItemsStructsDirect()`
+> (§3.3). An `SQL:(…)` filter inside it is accepted.
+
 **Escaping**: the UI escapes automatically; hand-written queries must **double-escape**.
 - `id:DP\-337` → `"filter":"id:DP\\-337"`
 - `TEST_RECORDS:("x",@any)` → `"filter":"TEST_RECORDS:(\"x\",@any)"`
@@ -1776,6 +1826,11 @@ Polarion applies the configurable `com.polarion.platform.sql.invalidCommands` bl
 - Treat user-provided identifiers and values as untrusted input; validate identifiers against an allowlist and bind values where the calling API supports parameters.
 - Scope report queries narrowly, normally by project, and select only the columns required by the consumer.
 - Check the configured invalid-command list instead of assuming that a query accepted by one Polarion installation will run on another.
+
+> **Seen on one 2512 instance (advImpact spike)**: `IDataService.sqlSearch` accepted `WITH RECURSIVE` (both link
+> directions) and several levels of nested `IN (SELECT … FROM STRUCT_WORKITEM_LINKEDWORKITEMS …)` sub-selects. This
+> depends on the installation's blocklist: keep a single-`SELECT` design (e.g. one query per level, §3.3) as the default
+> and use recursive SQL only where it was checked on the target server.
 
 ### 7.2 Query Shape & Environment Conventions
 
@@ -2508,6 +2563,12 @@ Caveats: the limited list sorts differently from the full Linked Work Items sect
    list and print them with a `#foreach` directly in the output (practice).
 8. **Pass data to inline JavaScript as hidden `data-*` attributes**, escaped with `$esc.html`, with separators replaced
    inside values. Cap what is written per page and show a warning when the cap is reached (practice).
+9. **Chunk `IN (…)` lists** of ids in SQL (500 ids per query in this project's widgets; practice).
+10. **Compute once on the server, recompute views in the browser** (practice): the server writes the reached objects and
+    the relations between them to the page model; toggles (roles, directions, levels, a subset of the start items)
+    recompute in JavaScript without a reload. A browser filter can only *narrow* what the server computed: any subset of
+    the start items reaches only items the server already reached, so the result is exact unless a server cap cut the
+    traversal off (keep that warning shown).
 
 ### 11.6 CSS & Export
 
@@ -2516,6 +2577,17 @@ Caveats: the limited list sorts differently from the full Linked Work Items sect
 3. **Use inline CSS** for PDF/Print rendering (external stylesheets may not load).
 4. **Avoid `overflow:hidden`** in PDF (content can be clipped).
 5. **Branch on `$widgetContext.target().isPdf()` / `isPrint()`** and drop JavaScript in those modes.
+
+### 11.7 Interactive Widget UI
+
+1. **Use buttons or checkboxes for toolbar choices, not a `<select>`** (seen on 2512, advImpact 0.1.0): a `<select>`
+   wrapped in a `<label>` in the widget toolbar did not react when the viewer chose a value; one button per value
+   worked. The cause was not isolated; prefer buttons for short lists and a checkbox panel for long ones.
+2. **No partial refresh of one widget was found** in view mode: a widget is rendered with its page, so re-running it
+   means reloading the page, and every widget of the page is rendered again (seen on 2512). Name such a control for
+   what it does (e.g. *Reload page*).
+3. **Search-and-tick panels for long lists** (practice): a search box, optional type filter checkboxes, *Select shown* /
+   *Clear shown*, and a cap on the rendered entries (e.g. 300) with a hint to refine the search.
 
 ---
 
@@ -2808,7 +2880,7 @@ selected collection's model object before using it.
 10. [ ] All parameters have fallbacks/defaults, and missing required parameters render a warning
 11. [ ] User-supplied field values are escaped before being emitted as HTML
 12. [ ] PDF/Print branch avoids JavaScript and external stylesheets
-13. [ ] Velocity 1.4 dialect only (§3.1.9): single-line method chains, no `{}` map literals, no backslashes in string literals, no directive names in plain text; `#[[ ]]#`, `#break` and `$foreach` do nothing
+13. [ ] Velocity 1.4 dialect only (§3.1.9): single-line method chains, no `{}` map literals, no backslashes in string literals, no directive names in plain text, no arithmetic inside method arguments, no method call on a string literal, no method calls on arrays (`split()` results); `#[[ ]]#`, `#break` and `$foreach` do nothing
 14. [ ] Every `.vm` file parses with `velocity-1.4.jar` before upload
 15. [ ] Collection-aware widgets: fallback `@collection` parameter for the PDF export (no context there); link targets resolved through the collection tables, not `getLinkedItem()` (HEAD)
 
@@ -2914,6 +2986,10 @@ selected collection's model object before using it.
 
 - Collection context is null in the Polarion PDF export; `getLinkedItem()` returns the HEAD target even for an item read at a collection revision (§2.8)
 - The `@document` selector lists the current project only, even with other projects in scope (§2.1)
+- `linkedWorkItemsOf` follows incoming links only (downstream); it cannot walk upstream (§6.4)
+- `getLinkedWorkItemsStructsBack()` → `getLinkedItem()` is the link **source**, not a target (§3.3)
+- `"$obj.method()"` with a null result is the literal method text, not an empty string (§3.1.9)
+- A toolbar `<select>` inside a `<label>` did not react on 2512; no way to refresh one widget alone was found (§11.7)
 
 #### Polarion Scripting
 - Wrong terminal expression (Save Hook returning a number → save always fails)

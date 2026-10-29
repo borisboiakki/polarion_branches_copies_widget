@@ -17,6 +17,9 @@
   .ai-pick { position: relative; display: inline-block; }
   .ai-pick-panel { position: absolute; z-index: 30; top: 24px; left: 0; min-width: 260px; max-height: 320px; overflow: auto; background: rgb(255,255,255); border: 1px solid rgb(170,178,195); box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 6px 8px; }
   .ai-pick-panel .bw-check { margin: 2px 0; }
+  .ai-pick-panel .ai-st-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0 4px; }
+  .ai-pick-panel .ai-st-list { max-height: 220px; overflow: auto; border-top: 1px solid rgb(220,224,232); padding-top: 2px; }
+  .ai-st-panel { min-width: 380px; max-height: 420px; }
   .ai-lvl .bw-btn { padding: 1px 7px; }
   .ai-lvl .ai-lvl-on { font-weight: 700; border-color: rgb(51,103,214); background: rgb(220,230,250); }
 </style>
@@ -834,8 +837,11 @@
 #foreach($d in $docList)
     <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
 #end
+## Type names of the reached items, filled by the item loop: "id|name;" (start item picker).
+#set($typeNames = $objectFactory.newMap())
 ## Reached items "id|document index|type|start flag|title;" (separators in titles replaced) and links "source|target|role;".
-    <i class="ai-it" data-v="#foreach($id in $itemOrder)#set($w = $items.get($id))#set($wT = '')#set($wT = $w.getTitle())#set($wT = "$wT")#set($wT = $wT.replace('|', ' '))#set($wT = $wT.replace(';', ' '))#set($wTy = '')#set($wTyO = false)#set($wTyO = $w.getType())#if($wTyO)#set($wTy = "$wTyO.getId()")#end#set($dk = $itemDoc.get($id))#set($dx = -1)#if($docIdx.containsKey($dk))#set($dx = $docIdx.get($dk))#end#set($sf = 0)#if($startIds.containsKey($id))#set($sf = 1)#end$esc.html("${id}|${dx}|${wTy}|${sf}|${wT}");#end"></i>
+    <i class="ai-it" data-v="#foreach($id in $itemOrder)#set($w = $items.get($id))#set($wT = '')#set($wT = $w.getTitle())#set($wT = "$wT")#set($wT = $wT.replace('|', ' '))#set($wT = $wT.replace(';', ' '))#set($wTy = '')#set($wTyO = false)#set($wTyO = $w.getType())#if($wTyO)#set($wTy = "$wTyO.getId()")#if(!$typeNames.containsKey($wTy))#set($wTyN = '')#set($wTyN = $wTyO.getName())#set($wTyN = "$wTyN")#set($wTyN = $wTyN.replace('|', ' '))#set($wTyN = $wTyN.replace(';', ' '))#set($void = $typeNames.put($wTy, $wTyN))#end#end#set($dk = $itemDoc.get($id))#set($dx = -1)#if($docIdx.containsKey($dk))#set($dx = $docIdx.get($dk))#end#set($sf = 0)#if($startIds.containsKey($id))#set($sf = 1)#end$esc.html("${id}|${dx}|${wTy}|${sf}|${wT}");#end"></i>
+    <i class="ai-ty" data-v="#foreach($ty in $typeNames.keySet())#set($tyN = $typeNames.get($ty))$esc.html("${ty}|${tyN}");#end"></i>
     <i class="ai-ln" data-v="#foreach($ln in $links)#set($s = $ln.get(0))#set($t = $ln.get(1))#set($role = $ln.get(2))$esc.html("${s}|${t}|${role}");#end"></i>
   </div>
 </div>

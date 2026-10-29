@@ -170,7 +170,7 @@ depends on them, level after level.
 | Parameter | Default | What it does | Live |
 |---|---|---|---|
 | Start document | none, **must be set** | The LiveDoc the analysis starts from (documents of the current project) | — |
-| Start items: work item query | empty = all items | A Polarion query (Lucene) to start from some work items of the start document only, e.g. `type:stakeholderrequirement AND status:in_analysis`. Use the type and status **ids** of your project. If no item matches, the widget says so | — |
+| Start items: work item query | empty = all items | A Polarion query (Lucene) to start from some work items of the start document only, e.g. `type:stakeholderrequirement AND status:in_analysis`. Use the type and status **ids** of your project. If no item matches, the widget says so | **Start items** button: narrow the start items |
 | Link roles (1 to 5) | none, **must be set** | The link roles followed, e.g. `satisfies`, `verifies` | Each role can be hidden or shown |
 | Direction | Downstream | Downstream, Upstream or Both (see above) | With *Both*: each direction can be hidden or shown |
 | Levels of analysis (1 to 7) | 3 | How many link steps are followed | **Levels** buttons: fewer levels, not more |
@@ -182,6 +182,12 @@ depends on them, level after level.
 When you hide a role or a direction, or choose fewer levels, the analysis is **recalculated**: items reached only
 through the hidden links disappear, and the others can move to a higher level. Hiding a document with the **Documents**
 button only hides its box: the analysis still goes through its items.
+
+The **Start items (k/N)** button opens the list of the start items, the items of the start document or those of the
+query. Search on id or title, filter by type, tick the items to start from (*Select shown* / *Clear shown* act on the
+items the search and the filter show): the analysis is recalculated at once. You can only narrow the start items of
+the page: to choose freely in the whole document, leave the query empty. The Excel workbook lists the chosen items in
+its *Start items* sheet; the PDF export always uses all start items.
 
 For very large analyses a direction stops after a level with more than 5 000 new work items, or when 20 000 work
 items are reached; a warning in the status line says so.
@@ -195,6 +201,7 @@ items are reached; a warning in the status line says so.
 | Control | What it does |
 |---|---|
 | *Only documents with relations* / *All documents* | Show only the connected documents, or every analysed document (unconnected ones in a grid below) |
+| **Start items (k/N)** (Impact) | Choose the start items of the analysis among the start document's items (or the query's): search, type filter, *Select shown* / *Clear shown* |
 | **Documents (n/m)** (Coverage, Impact) | Choose which of the analysed documents are shown |
 | **Indirect relations** (Branches only) | Show the relations inherited through an intermediate copy |
 | **Relations:** Copies / Branches / Derived (Branches), **Roles:** one per role (Coverage) | Show or hide each kind of line |
@@ -255,7 +262,7 @@ The workbook follows the current toolbar choices, and every item and document ha
 |---|---|
 | Branches and Copies | Relations, Documents, Linked items (up to 30 per document pair) |
 | Coverage | Relations, Documents (with coverage and the collection revision), Uncovered items (up to 500 per document), Linked items (all links of the shown lines) |
-| Impact | Relations, Documents (position, level, impacted items), Impacted items (direction, level, reached from), Impact paths (one path from a start item to each impacted item, with the links along it) |
+| Impact | Relations, Documents (position, level, impacted items), Impacted items (direction, level, reached from), Impact paths (one path from a start item to each impacted item, with the links along it), Start items (the chosen start items and the query) |
 
 If the browser blocks the Excel library, the button downloads the relations as a CSV file instead, and the status line
 says so.

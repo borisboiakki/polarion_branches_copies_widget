@@ -44,7 +44,8 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
 
 ## Using the widget
 
-- **Toolbar**: **Documents** picker (hide documents from the graph; the analysis still goes through them), roles,
+- **Toolbar**: **Start items** picker (search on id or title, type filter; narrows the start items of the page and
+  recomputes the analysis; leave the query empty to pick from the whole document), **Documents** picker (hide documents from the graph; the analysis still goes through them), roles,
   direction (when the parameter is *Both*), **Levels** buttons (1 to the parameter; the status line shows the deepest
   level reached), item counts, extra fields, highlight, Fit / zoom, Table / Graph, SVG, Excel, Reload page (reloads the
   whole page: Polarion cannot re-run one widget alone). Changing roles, direction or levels recomputes the analysis in the browser.
@@ -53,16 +54,17 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
   outgoing links, opposite name for incoming ones), the linked document and the linked item's level.
 - **Hover / click a line** for the links between the two documents.
 - **Excel**: sheets Relations, Documents (position, level, impacted items), Impacted items (with "reached from"),
-  Impact paths (one path from a start item to each impacted item, with the links along it). CSV fallback when the Excel
+  Impact paths (one path from a start item to each impacted item, with the links along it), Start items. CSV fallback when the Excel
   library is not loaded.
 - **PDF export / print**: static graph, documents table, relations table and the first 200 impacted work items (no JavaScript).
 
 ![PDF view](preview-pdf.png)
 
-## Known limitations (0.1.0)
+## Known limitations (0.2.0)
 
 - Current project only: links to work items of other projects are not followed (later version, SPEC F15).
 - No collection context yet (later version, SPEC F15).
-- No in-widget picker of start items yet (later version, SPEC Q1): use the work item query.
+- The **Start items** picker narrows the start items of the page (whole document or query); it cannot add other items
+  without changing the query. The PDF export uses all start items.
 - Work items outside a LiveDoc are followed but not drawn (they have no document).
 - Permission filtering for viewers who cannot read some documents has not been checked (same open check as the other widgets).
