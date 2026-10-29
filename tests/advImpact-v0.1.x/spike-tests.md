@@ -1,7 +1,7 @@
 # Spike plan — advImpact (multi-level impact analysis)
 
-**Status:** run 1 and part A (with its redo) **done** on 2512 (2026-10-29, project `EOLE_AI_MCP_TESTS`, small test set, see
-"Findings"); next: parts B and C of the run sheet. Results go into the "Result" column below, into `widgets/advImpact/SPECIFICATION.md` and into the CLAUDE.md
+**Status:** run 1, part A (with its redo) and part B **done** on 2512 (2026-10-29, project `EOLE_AI_MCP_TESTS`, small test set, see
+"Findings"); next: part C of the run sheet. Results go into the "Result" column below, into `widgets/advImpact/SPECIFICATION.md` and into the CLAUDE.md
 "Verified" notes. The mocks are aligned with a result only once it is known.
 
 ## Questions
@@ -12,7 +12,7 @@
 | I2 | Level by level in SQL: frontier ids in `IN (...)` lists of at most 500, one query per chunk, level and direction. Time per level, largest frontier | Default design | `bfs` mode `sql` | run 1 (down, 3 levels, 6 start items): **runs**, 1 query per level, new items 5 / 2 / 0, a few ms per level. Large set: to run |
 | I3 | Level by level with the Open API: `getLinkedWorkItemsStructsDirect()` (upstream) and `getLinkedWorkItemsStructsBack()` (downstream) per frontier item. Does `Back` exist on 2512, does its `getLinkedItem()` return the **source** item? Same counts as mode `sql`? | No SQL at all; parents and roles for free | `bfs` mode `api` (probe table) | **Answered.** `getLinkedWorkItemsStructsBack()` exists, its `getLinkedItem()` is the **source** item (`LinkedWorkItemStruct`, role id readable). Mode api gives the same items per level as SQL, down (A9: 5 / 3 / 0) and both (A10 = A8: 9 items) |
 | I4 | Start items: a) all items of the document by SQL; b) the user's Lucene query restricted to the document with `document.id:"space/name"` (`_default` space omitted) or with an `SQL:(…)` clause, through `trackerService.queryWorkItems(query, "id")` | Start subset (F2, Q1) | `start` | **Answered.** Both forms work and agree: `type:stakeholderrequirement AND (status:in_analysis)` gave 4 of the 6 items with `document.id:"CustomerSpecSpike"` and with `SQL:(…)`, 0 outside the document (A6); `bfs` from that subset works (A11) |
-| I5 | Inherited links of copies (spike R2) and cycles: the visited set counts each item once, at its lowest level | Correct levels | `bfs` (column "rows already visited") | B1 (`VforIA`, `duplicates`, down from SRS_Test): **as expected**. Level 1: 10 items (5 of the copy, 5 of the copy of a copy through its inherited links); level 2: 0 new, 5 rows already visited (the copy of a copy also links to the copy); 18 items, 15 links between them. Note: through the inherited links the copy of a copy is at **level 1**, not 2. B2: to run |
+| I5 | Inherited links of copies (spike R2) and cycles: the visited set counts each item once, at its lowest level | Correct levels | `bfs` (column "rows already visited") | B1 (`VforIA`, `duplicates`, down from SRS_Test): **as expected**. Level 1: 10 items (5 of the copy, 5 of the copy of a copy through its inherited links); level 2: 0 new, 5 rows already visited (the copy of a copy also links to the copy); 18 items, 15 links between them. Note: through the inherited links the copy of a copy is at **level 1**, not 2. B2 (up from the copy of a copy): **as expected**, mirror of B1: 5 start items; level 1: 10 (5 of the copy, 5 of SRS_Test); level 2: 0 new, 5 rows already visited (the copy links to SRS_Test); 15 items, 15 links. **I5 answered** |
 | I9 | Direction "both" = a pure downstream and a pure upstream traversal, combined (PO, Q12): time of the two passes, combined documents | "Both" costs two analyses | `bfs` direction both | A8 (SystemSpec_1, sql): down 3 items (TestSpec1, subSysSpec1, subSysSpec2), up 2 (CustomerSpecSpike), **SystemSpec_2 not reached** (Q12 behaviour confirmed), 9 items in total, 8 ms. Times on the large set: part C |
 | I6 | Times for 3 and 7 levels, directions down, up and both, on `EOLE_AI_MCP_TESTS` (120 docs) and on a large project | Level cap (Q6), item cap per level (Q11) | `bfs` | open |
 | I7 | Page model size: parent links per reached item, and all links of the selected roles between reached items (needed for the viewer toggles, SPEC §6.2), with the time of that scan | Size caps | `bfs` with paths `yes` | run 1: 9 parent links (305 characters), 9 links between the 13 reached items (269 characters); one item with 2 parents. Large set: to run |
@@ -106,7 +106,7 @@ Note on the parameter "Work item query": it is used only by the test `start` and
 | # | Test | Start document | Other parameters | Expected |
 |---|---|---|---|---|
 | B1 (done) | `bfs` | SRS_Test | Direction down | Level 1: the items of the copies that link to SRS_Test, including the inherited links of the copy of a copy (spike R2); level 2: "rows already visited" > 0 (the copy of a copy also links to the first copy), no item counted twice |
-| B2 | `bfs` | the copy of a copy (`SRS_Test_Copy_of_B_TestE`) | Direction up | Level 1: items of the first copy **and** of SRS_Test (inherited links); level 2: rows already visited, no new items |
+| B2 (done) | `bfs` | the copy of a copy (`SRS_Test_Copy_of_B_TestE`) | Direction up | Level 1: items of the first copy **and** of SRS_Test (inherited links); level 2: rows already visited, no new items |
 
 **Part C — size and time (I6, I7, I9): the largest document chain you have** (a start document with many linked items,
 roles of that chain). Note the number of start items. Run each line once; stop going up in levels when one run is slow.
