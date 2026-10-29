@@ -1,0 +1,644 @@
+## Advanced Impact - spike I1-I8. Read-only diagnostics, one test per widget instance.
+## See tests/advImpact-v0.1.x/spike-tests.md for what each test checks and what to report.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+## An exception stops the render: for a failing SQL the error text of the page IS the finding (report it).
+## Times: Long arithmetic does not compute on 2512, so start and end stamps (ms) are printed.
+<style>
+  .ais { font-family: Arial, sans-serif; font-size: 12px; }
+  .ais h4 { margin: 4px 0 8px 0; }
+  .ais table { border-collapse: collapse; margin: 6px 0; }
+  .ais td, .ais th { border: 1px solid rgb(187,187,187); padding: 2px 6px; text-align: left; vertical-align: top; }
+  .ais th { background: rgb(238,238,238); }
+  .ais .ok { color: rgb(26,127,55); font-weight: bold; }
+  .ais .ko { color: rgb(198,40,40); font-weight: bold; }
+  .ais pre, .ais code.h { background: rgb(246,246,246); padding: 4px; white-space: pre-wrap; word-break: break-all; }
+</style>
+
+## ---------------------------------------------------------------- parameters
+#set($test = "sql")
+#set($tmp = "")
+#set($tmp = $parameters.test.singleValue)
+#set($tmp = $parameters.test.singleValue())
+#if("$tmp" != "")
+  #set($test = "$tmp")
+#end
+#set($direction = "down")
+#set($tmp = "")
+#set($tmp = $parameters.direction.singleValue)
+#set($tmp = $parameters.direction.singleValue())
+#if("$tmp" != "")
+  #set($direction = "$tmp")
+#end
+#set($mode = "sql")
+#set($tmp = "")
+#set($tmp = $parameters.mode.singleValue)
+#set($tmp = $parameters.mode.singleValue())
+#if("$tmp" != "")
+  #set($mode = "$tmp")
+#end
+#set($paths = "yes")
+#set($tmp = "")
+#set($tmp = $parameters.paths.singleValue)
+#set($tmp = $parameters.paths.singleValue())
+#if("$tmp" != "")
+  #set($paths = "$tmp")
+#end
+#set($startMode = "all")
+#set($tmp = "")
+#set($tmp = $parameters.startMode.singleValue)
+#set($tmp = $parameters.startMode.singleValue())
+#if("$tmp" != "")
+  #set($startMode = "$tmp")
+#end
+#set($sqlKind = "nested")
+#set($tmp = "")
+#set($tmp = $parameters.sqlKind.singleValue)
+#set($tmp = $parameters.sqlKind.singleValue())
+#if("$tmp" != "")
+  #set($sqlKind = "$tmp")
+#end
+#set($aiInt = 0)
+#set($levels = 3)
+#set($tmp = "")
+#set($tmp = $parameters.levels.value)
+#set($tmp = $parameters.levels.value())
+#set($tmpS = "$tmp")
+#if($tmpS.matches("[0-9]{1,2}"))
+  #set($levels = $aiInt.parseInt($tmpS))
+#end
+#if($levels < 1)
+  #set($levels = 1)
+#end
+#if($levels > 7)
+  #set($levels = 7)
+#end
+#set($cap = 5000)
+#set($tmp = "")
+#set($tmp = $parameters.cap.value)
+#set($tmp = $parameters.cap.value())
+#set($tmpS = "$tmp")
+#if($tmpS.matches("[0-9]{1,7}"))
+  #set($cap = $aiInt.parseInt($tmpS))
+#end
+#set($maxRows = 30)
+#set($tmp = "")
+#set($tmp = $parameters.maxRows.value)
+#set($tmp = $parameters.maxRows.value())
+#set($tmpS = "$tmp")
+#if($tmpS.matches("[0-9]{1,5}"))
+  #set($maxRows = $aiInt.parseInt($tmpS))
+#end
+#set($tmp = "")
+#set($tmp = $parameters.startQuery.value)
+#set($tmp = $parameters.startQuery.value())
+#set($startQuery = "$tmp")
+#set($tmp = "")
+#set($tmp = $parameters.customSql.value)
+#set($tmp = $parameters.customSql.value())
+#set($customSql = "$tmp")
+#set($tmp = "")
+#set($tmp = $parameters.excludedTypes.value)
+#set($tmp = $parameters.excludedTypes.value())
+#set($excludedTypesStr = "$tmp")
+#set($typeSql = "")
+#set($excludedTypes = [])
+#foreach($p in $excludedTypesStr.split(","))
+  #set($pt = $p.trim())
+  #if($pt.matches("[A-Za-z0-9_.-]+"))
+    #set($void = $excludedTypes.add($pt))
+    #if($typeSql != "")
+      #set($typeSql = "${typeSql},")
+    #end
+    #set($typeSql = "${typeSql}'${pt}'")
+  #end
+#end
+#set($roleIds = [])
+#set($roleVals = false)
+#set($roleVals = $parameters.roles.values)
+#set($roleVals = $parameters.roles.values())
+#if($roleVals)
+  #foreach($v in $roleVals)
+    #set($rId = "")
+    #set($rId = $v.id())
+    #set($rIdS = "$rId")
+    #if($rIdS.matches("[A-Za-z0-9_.-]+") && !$roleIds.contains($rIdS))
+      #set($void = $roleIds.add($rIdS))
+    #end
+  #end
+#end
+#set($roleSql = "")
+#foreach($r in $roleIds)
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+#set($projectId = "")
+#set($projectId = $page.getReference().projectId())
+#set($ds = $trackerService.getDataService())
+#set($isPdf = "")
+#set($isPdf = $widgetContext.target().isPdf())
+
+## ---------------------------------------------------------------- start document (first selected, current project)
+#set($docVals = false)
+#set($docVals = $parameters.doc.values)
+#set($docVals = $parameters.doc.values())
+#set($sdMod = false)
+#if($docVals)
+  #foreach($v in $docVals)
+    #if(!$sdMod)
+      #set($mo = false)
+      #set($mo = $v.getModelObject())
+      #set($moUr = "unknown")
+      #if($mo)
+        #set($moUr = $mo.isUnresolvable())
+      #end
+      #if("$moUr" == "false")
+        #set($sdMod = $mo.getOldApi())
+      #end
+    #end
+  #end
+#end
+#set($sdFolder = "")
+#set($sdName = "")
+#if($sdMod)
+  #set($sdFolder = "$sdMod.getModuleFolder()")
+  #set($sdName = "$sdMod.getId()")
+#end
+#set($sdFolderQ = $sdFolder.replace("'", "''"))
+#set($sdNameQ = $sdName.replace("'", "''"))
+#set($projectS = "$projectId")
+#set($projectQ = $projectS.replace("'", "''"))
+
+## Document key project/space/name of an Open API module.
+#macro(aiKey $mod)
+  #set($aiKeyOut = "")
+  #set($aiUr = "unknown")
+  #if($mod)
+    #set($aiUr = $mod.isUnresolvable())
+  #end
+  #if("$aiUr" == "false")
+    #set($aiKp = "")
+    #set($aiKp = $mod.getProjectId())
+    #set($aiKf = "")
+    #set($aiKf = $mod.getModuleFolder())
+    #set($aiKn = "")
+    #set($aiKn = $mod.getId())
+    #if("$aiKn" != "")
+      #set($aiKeyOut = "${aiKp}/${aiKf}/${aiKn}")
+    #end
+  #end
+#end
+
+## Resolved, not excluded Open API work item of the current project: $aiOk = true, $aiId = id.
+#macro(aiItem $w)
+  #set($aiOk = false)
+  #set($aiId = "")
+  #set($aiWUr = "unknown")
+  #if($w)
+    #set($aiWUr = $w.isUnresolvable())
+  #end
+  #if("$aiWUr" == "false")
+    #set($aiId = "$w.getId()")
+    #set($aiType = "")
+    #set($aiTypeObj = false)
+    #set($aiTypeObj = $w.getType())
+    #if($aiTypeObj)
+      #set($aiType = "$aiTypeObj.getId()")
+    #end
+    #set($aiProj = "$w.getProjectId()")
+    #if(!$excludedTypes.contains($aiType) && $aiProj == $projectId)
+      #set($aiOk = true)
+    #end
+  #end
+#end
+
+## Start items SQL: all items of the start document, without the excluded types.
+#set($startTypeSql = "")
+#if($typeSql != "")
+  #set($startTypeSql = " AND w.c_type NOT IN (${typeSql})")
+#end
+#set($startFrom = "FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'${startTypeSql}")
+#set($startSql = "SELECT w.c_uri ${startFrom}")
+#set($startSub = "SELECT w.c_id ${startFrom}")
+
+<div class="ais">
+<h4>Advanced Impact spike &mdash; test <code>$!esc.html($test)</code> &mdash; project <code>$!esc.html($projectId)</code> &mdash; PDF: <code>$!isPdf</code></h4>
+<p>Start document: <code>$!esc.html($sdFolder) / $!esc.html($sdName)</code> &mdash; roles: <code>$!esc.html($roleSql)</code> &mdash; direction <b>$direction</b>, levels <b>$levels</b>, excluded types <code>$!esc.html($typeSql)</code></p>
+#if(!$sdMod || $roleSql == "")
+  <p class="ko">Select a start document and at least one link role in the parameters.</p>
+#elseif($test == "sql")
+## ================================================================ I1 / I3 one SQL for several levels
+  #set($sqlOut = "")
+  #if($sqlKind == "custom")
+    #set($sqlOut = $customSql)
+  #elseif($sqlKind == "join3")
+    #set($sqlOut = "SELECT DISTINCT w3.c_uri FROM struct_workitem_linkedworkitems l1 INNER JOIN struct_workitem_linkedworkitems l2 ON l2.fk_uri_workitem = l1.fk_uri_p_workitem INNER JOIN struct_workitem_linkedworkitems l3 ON l3.fk_uri_workitem = l2.fk_uri_p_workitem INNER JOIN workitem w3 ON w3.c_uri = l3.fk_uri_p_workitem INNER JOIN workitem w0 ON w0.c_uri = l1.fk_uri_workitem INNER JOIN module m ON m.c_uri = w0.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE l1.c_role IN (${roleSql}) AND l2.c_role IN (${roleSql}) AND l3.c_role IN (${roleSql}) AND p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'")
+  #elseif($sqlKind == "rec")
+    #set($sqlOut = "WITH RECURSIVE t(u, lvl) AS (SELECT l.fk_uri_p_workitem, 1 FROM struct_workitem_linkedworkitems l INNER JOIN workitem w0 ON w0.c_uri = l.fk_uri_workitem INNER JOIN module m ON m.c_uri = w0.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE l.c_role IN (${roleSql}) AND p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}' UNION SELECT l.fk_uri_p_workitem, t.lvl + 1 FROM struct_workitem_linkedworkitems l INNER JOIN t ON l.fk_uri_workitem = t.u WHERE l.c_role IN (${roleSql}) AND t.lvl < ${levels}) SELECT w.c_uri FROM workitem w WHERE w.c_uri IN (SELECT u FROM t)")
+  #else
+    ## nested: level 1 = links whose far end is in the start document; each further level wraps the previous one.
+    ## down: the result is the link SOURCE (fk_uri_p_workitem), the previous level is the TARGET (fk_uri_workitem).
+    #set($nestNear = "fk_uri_workitem")
+    #set($nestFar = "fk_uri_p_workitem")
+    #if($direction == "up")
+      #set($nestNear = "fk_uri_p_workitem")
+      #set($nestFar = "fk_uri_workitem")
+    #end
+    #set($nest = "SELECT w0.c_uri FROM workitem w0 INNER JOIN module m ON m.c_uri = w0.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'")
+    #foreach($lv in [1..7])
+      #if($lv <= $levels)
+        #set($nest = "SELECT l.${nestFar} FROM struct_workitem_linkedworkitems l WHERE l.c_role IN (${roleSql}) AND l.${nestNear} IN (${nest})")
+      #end
+    #end
+    #set($sqlOut = "SELECT w.c_uri FROM workitem w WHERE w.c_uri IN (${nest})")
+    #if($direction == "both")
+      <p class="ko">The nested variant runs one direction; "both" is shown as downstream (the union needs two queries, tested in bfs).</p>
+      #set($nestNear = "fk_uri_workitem")
+    #end
+  #end
+  <pre>$esc.html($sqlOut)</pre>
+  #set($t0 = $date.systemTime)
+  #set($res = $ds.sqlSearch($sqlOut))
+  #set($cnt = 0)
+  #set($docs = $objectFactory.newMap())
+  #foreach($w in $res)
+    #set($cnt = $cnt + 1)
+    #set($wm = false)
+    #set($wm = $w.getModule())
+    #aiKey($wm)
+    #if($aiKeyOut != "")
+      #if($docs.containsKey($aiKeyOut))
+        #set($dc = $docs.get($aiKeyOut) + 1)
+        #set($void = $docs.put($aiKeyOut, $dc))
+      #else
+        #set($void = $docs.put($aiKeyOut, 1))
+      #end
+    #end
+  #end
+  #set($t1 = $date.systemTime)
+  <p class="ok">The query ran. Result class <code>$!esc.html($res.getClass().getName())</code>: <b>$cnt</b> work item(s) (levels 1..$levels together, start items themselves excluded only if they are not linked back), start / end $t0 / $t1 ms (SQL + scan of modules).</p>
+  <table>
+    <tr><th>Document</th><th>Work items</th></tr>
+    #foreach($k in $docs.keySet())
+      <tr><td>$!esc.html($k)</td><td>$docs.get($k)</td></tr>
+    #end
+  </table>
+  <p>Report: did it run (yes / the error text of the page), the count, the times, and whether the counts equal those of the <i>bfs</i> test for the same levels.</p>
+
+#elseif($test == "start")
+## ================================================================ I4 start items
+  #set($t0 = $date.systemTime)
+  #set($res = $ds.sqlSearch($startSql))
+  #set($cnt = $res.size())
+  #set($t1 = $date.systemTime)
+  <p><b>a)</b> All items of the start document by SQL (without excluded types): <b>$cnt</b>, start / end $t0 / $t1 ms.</p>
+  <pre>$esc.html($startSql)</pre>
+  #if($startQuery != "")
+    #set($q0 = $date.systemTime)
+    #set($qres = $trackerService.queryWorkItems($startQuery, "id"))
+    #set($qn = 0)
+    #set($qIn = 0)
+    #set($qOut = 0)
+    #foreach($w in $qres)
+      #set($qn = $qn + 1)
+      #set($qm = false)
+      #set($qm = $w.getModule())
+      #aiKey($qm)
+      #if($aiKeyOut == "${projectId}/${sdFolder}/${sdName}")
+        #aiItem($w)
+        #if($aiOk)
+          #set($qIn = $qIn + 1)
+        #end
+      #else
+        #set($qOut = $qOut + 1)
+      #end
+    #end
+    #set($q1 = $date.systemTime)
+    <p><b>b)</b> <code>trackerService.queryWorkItems("$!esc.html($startQuery)", "id")</code>: result class <code>$!esc.html($qres.getClass().getName())</code>,
+      <b>$qn</b> item(s) in the project, <b>$qIn</b> in the start document (not excluded), $qOut elsewhere; start / end $q0 / $q1 ms.</p>
+  #end
+  <p>Report: both counts and times. If b) throws, report the error: then try another way (SQL on a Lucene result, a different method) before the next test.
+  Expected: b) &lt;= a) when the query selects a subset of the document.</p>
+
+#elseif($test == "cols1")
+## ================================================================ I8a transaction.objects().searchBySql
+  #set($t0 = $date.systemTime)
+  #set($res = $transaction.objects().searchBySql($customSql))
+  #set($n = 0)
+  #foreach($o in $res)
+    #set($n = $n + 1)
+    #if($n <= $maxRows)
+      <p>No. $n class <code>$!esc.html($o.getClass().getName())</code>: <code>$!esc.html("$o")</code></p>
+    #end
+  #end
+  #set($t1 = $date.systemTime)
+  <p>Result class <code>$!esc.html($res.getClass().getName())</code>, $n row(s), start / end $t0 / $t1 ms.</p>
+  <p>Report: whether it runs outside a collection, and what the elements are (objects or rows with columns).</p>
+
+#elseif($test == "cols2")
+## ================================================================ I8b sqlSearch with several columns
+  <pre>$esc.html($customSql)</pre>
+  #set($res = $ds.sqlSearch($customSql))
+  #set($n = 0)
+  #foreach($o in $res)
+    #set($n = $n + 1)
+    #if($n <= $maxRows)
+      <p>No. $n class <code>$!esc.html($o.getClass().getName())</code>: <code>$!esc.html("$o")</code></p>
+    #end
+  #end
+  <p>Result class <code>$!esc.html($res.getClass().getName())</code>, $n row(s).</p>
+  <p>Report: set the custom SQL to <code>select l.fk_uri_p_workitem, l.fk_uri_workitem, l.c_role from struct_workitem_linkedworkitems l</code>.
+  Are the elements work items, rows or an error? If rows are usable, parents of reached items can come from SQL.</p>
+
+#elseif($test == "bfs")
+## ================================================================ I2 / I3 / I5 / I6 / I7 traversal by level
+  #set($visited = $objectFactory.newMap())
+  #set($frontier = [])
+  #set($docMin = $objectFactory.newMap())
+  #set($docLvCnt = $objectFactory.newMap())
+  #set($docKeys = [])
+  #set($edges = [])
+  #set($edgeChars = 0)
+  #set($stop = false)
+  #set($stopLv = 0)
+  #set($rowsAll = [])
+  #set($tAll0 = $date.systemTime)
+
+  ## ---- level 0: start items
+  #set($startList = [])
+  #if($startMode == "query" && $startQuery != "")
+    #foreach($w in $trackerService.queryWorkItems($startQuery, "id"))
+      #set($wm = false)
+      #set($wm = $w.getModule())
+      #aiKey($wm)
+      #if($aiKeyOut == "${projectId}/${sdFolder}/${sdName}")
+        #aiItem($w)
+        #if($aiOk)
+          #set($void = $startList.add($w))
+        #end
+      #end
+    #end
+  #else
+    #set($startList = $ds.sqlSearch($startSql))
+  #end
+  #foreach($w in $startList)
+    #set($sid = "$w.getId()")
+    #if(!$visited.containsKey($sid))
+      #set($void = $visited.put($sid, 0))
+      #set($void = $frontier.add($w))
+    #end
+  #end
+  #set($t0 = $date.systemTime)
+  #set($void = $rowsAll.add("<tr><td>0</td><td>$frontier.size()</td><td></td><td></td><td></td><td></td><td></td><td>$tAll0 / $t0</td></tr>"))
+
+  #foreach($lv in [1..7])
+    #if($lv <= $levels && $frontier.size() > 0 && !$stop)
+      #set($lt0 = $date.systemTime)
+      #set($next = [])
+      #set($again = 0)
+      #set($queries = 0)
+      #set($edgeN = 0)
+      #set($fIds = $objectFactory.newMap())
+      #foreach($f in $frontier)
+        #set($void = $fIds.put("$f.getId()", true))
+      #end
+      #if($mode == "sql")
+        ## IN lists of at most 500 ids
+        #set($chunks = [])
+        #set($cur = "")
+        #set($cn = 0)
+        #foreach($f in $frontier)
+          #set($fid = "$f.getId()")
+          #if($fid.matches("[A-Za-z0-9_.-]+"))
+            #if($cn == 500)
+              #set($void = $chunks.add($cur))
+              #set($cur = "")
+              #set($cn = 0)
+            #end
+            #if($cur != "")
+              #set($cur = "${cur},")
+            #end
+            #set($cur = "${cur}'${fid}'")
+            #set($cn = $cn + 1)
+          #end
+        #end
+        #if($cn > 0)
+          #set($void = $chunks.add($cur))
+        #end
+        #set($dirs = [])
+        #if($direction == "down" || $direction == "both")
+          #set($void = $dirs.add("down"))
+        #end
+        #if($direction == "up" || $direction == "both")
+          #set($void = $dirs.add("up"))
+        #end
+        #set($rTypeSql = "")
+        #foreach($dir in $dirs)
+          #foreach($chunk in $chunks)
+            #if($dir == "down")
+              #if($typeSql != "")
+                #set($rTypeSql = " AND ws.c_type NOT IN (${typeSql})")
+              #end
+              #set($sql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = wt.fk_uri_project WHERE p.c_id = '${projectQ}' AND ws.fk_uri_project = wt.fk_uri_project AND l.c_role IN (${roleSql}) AND wt.c_id IN (${chunk})${rTypeSql}")
+            #else
+              #if($typeSql != "")
+                #set($rTypeSql = " AND wt.c_type NOT IN (${typeSql})")
+              #end
+              #set($sql = "SELECT DISTINCT wt.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectQ}' AND ws.fk_uri_project = wt.fk_uri_project AND l.c_role IN (${roleSql}) AND ws.c_id IN (${chunk})${rTypeSql}")
+            #end
+            #set($queries = $queries + 1)
+            #foreach($r in $ds.sqlSearch($sql))
+              #set($rid = "$r.getId()")
+              #if($visited.containsKey($rid))
+                #set($again = $again + 1)
+              #else
+                #set($void = $visited.put($rid, $lv))
+                #set($void = $next.add($r))
+              #end
+            #end
+          #end
+        #end
+        ## item paths (I7): parent of each new item, from the object links
+        #if($paths == "yes")
+          #foreach($x in $next)
+            #set($xid = "$x.getId()")
+            #foreach($ls in $x.getLinkedWorkItemsStructsDirect())
+              #set($role = "$ls.getLinkRole().getId()")
+              #if($roleIds.contains($role))
+                #set($tgt = $ls.getLinkedItem())
+                #set($tUr = "unknown")
+                #if($tgt)
+                  #set($tUr = $tgt.isUnresolvable())
+                #end
+                #if("$tUr" == "false")
+                  #set($tid = "$tgt.getId()")
+                  #if($fIds.containsKey($tid) && ($direction == "down" || $direction == "both"))
+                    #set($e = "${xid}|${lv}|${tid}|${role}")
+                    #set($void = $edges.add($e))
+                    #set($el = $e.length())
+#set($edgeChars = $edgeChars + $el + 1)
+                    #set($edgeN = $edgeN + 1)
+                  #end
+                #end
+              #end
+            #end
+          #end
+          #if($direction == "up" || $direction == "both")
+            #foreach($f in $frontier)
+              #set($fid = "$f.getId()")
+              #foreach($ls in $f.getLinkedWorkItemsStructsDirect())
+                #set($role = "$ls.getLinkRole().getId()")
+                #if($roleIds.contains($role))
+                  #set($tgt = $ls.getLinkedItem())
+                  #set($tUr = "unknown")
+                  #if($tgt)
+                    #set($tUr = $tgt.isUnresolvable())
+                  #end
+                  #if("$tUr" == "false")
+                    #set($tid = "$tgt.getId()")
+                    #if($visited.containsKey($tid) && $visited.get($tid) == $lv)
+                      #set($e = "${tid}|${lv}|${fid}|${role}")
+                      #set($void = $edges.add($e))
+                      #set($el = $e.length())
+#set($edgeChars = $edgeChars + $el + 1)
+                      #set($edgeN = $edgeN + 1)
+                    #end
+                  #end
+                #end
+              #end
+            #end
+          #end
+        #end
+      #else
+        ## mode api: Open API links per frontier item (down = getLinkedWorkItemsStructsBack, up = Direct)
+        #foreach($f in $frontier)
+          #set($fid = "$f.getId()")
+          #set($lists = [])
+          #if($direction == "down" || $direction == "both")
+            #set($bk = false)
+            #set($bk = $f.getLinkedWorkItemsStructsBack())
+            #if($bk)
+              #set($void = $lists.add($bk))
+            #end
+          #end
+          #if($direction == "up" || $direction == "both")
+            #set($void = $lists.add($f.getLinkedWorkItemsStructsDirect()))
+          #end
+          #foreach($lst in $lists)
+            #foreach($ls in $lst)
+              #set($role = "$ls.getLinkRole().getId()")
+              #if($roleIds.contains($role))
+                #set($x = $ls.getLinkedItem())
+                #aiItem($x)
+                #if($aiOk)
+                  #set($xid = $aiId)
+                  #if($visited.containsKey($xid))
+                    #set($again = $again + 1)
+                  #else
+                    #set($void = $visited.put($xid, $lv))
+                    #set($void = $next.add($x))
+                  #end
+                  #if($visited.get($xid) == $lv)
+                    #set($e = "${xid}|${lv}|${fid}|${role}")
+                    #set($void = $edges.add($e))
+                    #set($el = $e.length())
+#set($edgeChars = $edgeChars + $el + 1)
+                    #set($edgeN = $edgeN + 1)
+                  #end
+                #end
+              #end
+            #end
+          #end
+        #end
+      #end
+      ## documents of the new items
+      #foreach($x in $next)
+        #set($xm = false)
+        #set($xm = $x.getModule())
+        #aiKey($xm)
+        #set($dk = $aiKeyOut)
+        #if($dk == "")
+          #set($dk = "(no document)")
+        #end
+        #if(!$docMin.containsKey($dk))
+          #set($void = $docMin.put($dk, $lv))
+          #set($void = $docKeys.add($dk))
+        #end
+        #set($lk = "${dk}|${lv}")
+        #if($docLvCnt.containsKey($lk))
+          #set($dc = $docLvCnt.get($lk) + 1)
+          #set($void = $docLvCnt.put($lk, $dc))
+        #else
+          #set($void = $docLvCnt.put($lk, 1))
+        #end
+      #end
+      #set($lt1 = $date.systemTime)
+      #set($void = $rowsAll.add("<tr><td>$lv</td><td>$frontier.size()</td><td>$queries</td><td>$next.size()</td><td>$again</td><td>$edgeN</td><td>$visited.size()</td><td>$lt0 / $lt1</td></tr>"))
+      #if($next.size() > $cap)
+        #set($stop = true)
+        #set($stopLv = $lv)
+      #end
+      #set($frontier = $next)
+    #end
+  #end
+  #set($tAll1 = $date.systemTime)
+  <p>Mode <b>$mode</b>, start items <b>$startMode</b> ($startList.size()), paths <b>$paths</b>. Total start / end $tAll0 / $tAll1 ms.</p>
+  #if($stop)
+    <p class="ko">Stopped after level $stopLv: more than $cap new items (parameter "Stop when..."). Expected behaviour of the cap.</p>
+  #end
+  <table>
+    <tr><th>Level</th><th>Frontier (items expanded)</th><th>SQL queries</th><th>New items</th><th>Rows already visited (cycles / inherited / several paths)</th><th>Item paths (edges)</th><th>Visited so far</th><th>Start / end (ms)</th></tr>
+    #foreach($rw in $rowsAll)
+      $rw
+    #end
+  </table>
+  <p>Page model estimate for the item paths (I7): <b>$edges.size()</b> edge(s), <b>$edgeChars</b> characters (id|level|parent|role;). Compare with the page model budget of the guide (11.5).</p>
+  <table>
+    <tr><th>Document</th><th>First level</th><th>Items per level</th></tr>
+    #foreach($k in $docKeys)
+      <tr><td>$!esc.html($k)</td><td>$docMin.get($k)</td><td>#foreach($lv in [1..7])#set($lk = "${k}|${lv}")#if($docLvCnt.containsKey($lk))L$lv: $docLvCnt.get($lk) #end#end</td></tr>
+    #end
+  </table>
+  <p>First $maxRows edges (id|level|parent|role):</p>
+  <pre>#set($en = 0)#foreach($e in $edges)#set($en = $en + 1)#if($en <= $maxRows)$esc.html($e)
+#end#end</pre>
+  #if($mode == "api")
+    #set($probe = false)
+    #foreach($w in $startList)
+      #if(!$probe)
+        #set($probe = $w)
+      #end
+    #end
+    #if($probe)
+      <p>API probe on start item <code>$!esc.html($probe.getId())</code> (I3: what do Direct and Back return?):</p>
+      <table>
+        <tr><th>List</th><th>#</th><th>struct class</th><th>role id</th><th>getLinkedItem(): class / id</th></tr>
+        #foreach($side in ["Direct", "Back"])
+          #set($pl = false)
+          #if($side == "Direct")
+            #set($pl = $probe.getLinkedWorkItemsStructsDirect())
+          #else
+            #set($pl = $probe.getLinkedWorkItemsStructsBack())
+          #end
+          #if(!$pl)
+            <tr><td>$side</td><td colspan="4" class="ko">null (method missing?)</td></tr>
+          #else
+            #set($pn = 0)
+            #foreach($ls in $pl)
+              #set($pn = $pn + 1)
+              #if($pn <= 5)
+                #set($li = $ls.getLinkedItem())
+                <tr><td>$side</td><td>$pn</td><td>$!esc.html($ls.getClass().getName())</td><td>$!esc.html("$ls.getLinkRole().getId()")</td><td>$!esc.html($li.getClass().getName()) / $!esc.html("$li.getId()")</td></tr>
+              #end
+            #end
+            <tr><td>$side</td><td colspan="4">$pl.size() link(s) in total</td></tr>
+          #end
+        #end
+      </table>
+    #end
+  #end
+  <p>Report: the level table (new items per level and times), the document table, the edge estimate, and for both modes and directions
+  (down, up, both) whether the items per level agree between mode sql and mode api and with the sql test (nested).</p>
+#end
+</div>

@@ -103,11 +103,21 @@ public class WidgetHarness {
         public boolean isUnresolvable() { return unresolvable; }
         public String getProjectId() { return module.project; }
         public List<Link> getLinkedWorkItemsStructsDirect() { return links; }
+        /** Incoming links as Link objects whose linked item is the link source (assumption of the advImpact spike, I3; not verified on 2512). */
+        public List<Link> getLinkedWorkItemsStructsBack() {
+            List<Link> out = new ArrayList<Link>();
+            for (WorkItem o : ITEMS.values()) {
+                for (Link l : o.links) { if (l.target == this && o != this) { out.add(new Link(l.role.getId(), o)); } }
+            }
+            return out;
+        }
     }
 
     static final List<Module> MODULES = new ArrayList<Module>();
     static final Map<String, WorkItem> ITEMS = new LinkedHashMap<String, WorkItem>();
     static int SQL_COUNT = 0;
+    /** Optional SQL handler tried first by DataService.sqlSearch (returns null = not handled); used by the advImpact spike harness. */
+    static java.util.function.Function<String, List<Object>> SQL_HOOK = null;
 
     static Module doc(String name) {
         Module m = new Module("Requirements", name, name);
@@ -206,6 +216,7 @@ public class WidgetHarness {
     public static class DataService {
         public List<Object> sqlSearch(String sql) {
             SQL_COUNT++;
+            if (SQL_HOOK != null) { List<Object> hooked = SQL_HOOK.apply(sql); if (hooked != null) { return hooked; } }
             List<Object> out = new ArrayList<Object>();
             Set<String> excluded = listAfter(sql, "c_type NOT IN (");
             // Projects of the documents (p) and, in docBranches, of the link targets (pt).
@@ -325,6 +336,8 @@ public class WidgetHarness {
         private final DataService ds = new DataService();
         public DataService getDataService() { return ds; }
         public TrackerProject getTrackerProject(String projectId) { return new TrackerProject(); }
+        /** Mock of queryWorkItems(query, sort): returns every work item (the query text is not evaluated). */
+        public List<WorkItem> queryWorkItems(String query, String sort) { return new ArrayList<WorkItem>(ITEMS.values()); }
     }
 
     public static class ObjectFactory {
