@@ -130,6 +130,12 @@ Verified through web search (2026-10-27):
   `getRevision()` empty for a document added without revision = HEAD). Links in the collection:
   `#/project/P/collection/ID/wiki/<space>/<doc>`, `…/workitem?id=`, other project `#/project/P/collection/CP//ID/…`.
   docCoverage 0.3.0 implements it (verified by the PO on 2512).
+- **Verified by the advImpact spike run 1 on 2512** (`tests/advImpact-v0.1.x/spike-tests.md`): `sqlSearch` accepts nested
+  `IN (SELECT … FROM struct_workitem_linkedworkitems …)` sub-selects (several levels in one query, union with `OR`);
+  `$trackerService.queryWorkItems(query, "id")` accepts `document.id:"Name"` and `SQL:(…)` restrictions; Lucene
+  `linkedWorkItemsOf:([{"filter":"SQL:(…)","follows":[roles],"steps":3}])` runs and returned the items linking to the filter set,
+  levels 1..3, without the start items (same result as the level-by-level SQL downstream). Single-select `@document`:
+  `singleValue()` → option with `getModelObject()`.
 - **Verified by the PO on 2512 with docCoverage 0.4.0**: traceability matrix export (item titles via `getTitle()`, link role
   opposite names via `getOppositeName()`, all link pairs in the page model).
 

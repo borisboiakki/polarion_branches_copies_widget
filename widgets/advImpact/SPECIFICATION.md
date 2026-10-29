@@ -107,7 +107,8 @@ docCoverage (`pairCap`, `itemCap`).
 
 Q1–Q12 answered on 2026-10-29 (decisions log).
 
-Open: the spike results I1–I8; the in-widget picker design (later version).
+Open: the spike results (run 1 on 2512: nested SQL, `linkedWorkItemsOf` and the level-by-level SQL give the same 7 items on a
+small set; the other runs follow the run sheet in `tests/advImpact-v0.1.x/spike-tests.md`); the in-widget picker design (later version).
 
 ## 9. Decisions log
 
