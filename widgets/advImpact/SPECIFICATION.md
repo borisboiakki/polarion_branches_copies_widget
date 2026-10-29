@@ -137,3 +137,4 @@ matrix, PDF export, rendering time on the largest chain.
 | 2026-10-29 | Q11: sizing as the other widgets (~100 docs / 20k items); **cap of items per level** (about 5,000, to tune in spike I6) with a visible warning | PO |
 | 2026-10-29 | Spike closed: all methods agree, very fast up to 7 levels (PO, part C). Method: SQL per level + Open API links; levels 1–7, default 3; cap 5000 new items per level | Dev, PO results |
 | 2026-10-29 | 0.1.0 implemented as specified: F1–F14 and F16 (F15 projects / collection later). Item paths in the browser = one path per item (first parent at each step); the details list every parent | Dev |
+| 2026-10-29 | 0.1.1 (PO test of 0.1.0 on 2512): the Levels select did not react: replaced by one button per level, status line shows levels shown and the deepest level reached. Refresh renamed **Reload page** in all widgets: a widget cannot be re-rendered alone in view mode (PO) | PO, Dev |

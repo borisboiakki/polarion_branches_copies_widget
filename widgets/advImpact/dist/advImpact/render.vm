@@ -10,7 +10,7 @@
 ## levels from them for the toggles (roles, direction, levels).
 ## Terms: a link is stored on its source item and points to its target (verified on 2512). Downstream = items whose link
 ## points to the frontier (link sources); upstream = targets of the links of the frontier.
-#set($bwVersion = "0.1.0")
+#set($bwVersion = "0.1.1")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -45,6 +45,8 @@
   .ai-pick { position: relative; display: inline-block; }
   .ai-pick-panel { position: absolute; z-index: 30; top: 24px; left: 0; min-width: 260px; max-height: 320px; overflow: auto; background: rgb(255,255,255); border: 1px solid rgb(170,178,195); box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 6px 8px; }
   .ai-pick-panel .bw-check { margin: 2px 0; }
+  .ai-lvl .bw-btn { padding: 1px 7px; }
+  .ai-lvl .ai-lvl-on { font-weight: 700; border-color: rgb(51,103,214); background: rgb(220,230,250); }
 </style>
 
 ## ======================================================================= parameters
@@ -1685,7 +1687,8 @@
     });
     this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
     this.button(btns, 'Excel', 'Download the shown documents and relations as an Excel workbook', function () { self.exportExcel(); });
-    this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
+    // Polarion cannot re-render one widget alone in view mode: the analysis runs again by reloading the page.
+    this.button(btns, 'Reload page', 'Reload the whole page to run the analysis again (all widgets of the page are reloaded)', function () { window.location.reload(); });
     return btns;
   };
 
@@ -2141,12 +2144,19 @@
         self.checkbox(dbox, d[1], true, function (on) { self.state.dirs[d[0]] = on; self.render(true); });
       });
     }
-    var lab = el('label', { 'class': 'bw-check' }, bar);
-    el('span', { 'class': 'bw-muted' }, lab, 'Levels:');
-    var sel = el('select', { 'class': 'bw-ctl', title: 'Levels of analysis shown (the widget parameter sets the maximum)' }, lab);
-    for (var i = 1; i <= this.levels; i++) { el('option', { value: String(i) }, sel, String(i)); }
-    sel.value = String(this.levels);
-    sel.addEventListener('change', function () { self.state.maxLevel = toInt(sel.value); self.render(true); });
+    // Levels shown: one button per level (a select inside a label did not react on 2512, PO test of 0.1.0).
+    var lbox = el('span', { 'class': 'bw-fields ai-lvl' }, bar);
+    el('span', { 'class': 'bw-muted' }, lbox, 'Levels:');
+    this.levelBtns = [];
+    for (var i = 1; i <= this.levels; i++) {
+      (function (k) {
+        var lb = self.button(lbox, String(k), 'Show the analysis up to level ' + k + ' (the widget parameter sets the maximum)', function () {
+          self.state.maxLevel = k;
+          self.render(true);
+        });
+        self.levelBtns.push(lb);
+      })(i);
+    }
     this.countsCheck(bar).title = 'Show the number of links on the lines';
     this.fieldChecks(bar);
     this.searchBox(bar);
@@ -2384,7 +2394,11 @@
     this.res = this.compute();
     var edges = this.relations(this.res);
     this.layoutAndDraw(edges, refit);
+    var st = this.state;
+    this.levelBtns.forEach(function (lb, i) { lb.className = 'bw-btn' + (i + 1 === st.maxLevel ? ' ai-lvl-on' : ''); });
     var res = this.res;
+    var deepest = 0;
+    Object.keys(res.lvl).forEach(function (id) { deepest = Math.max(deepest, res.lvl[id]); });
     var nImp = 0;
     var nDocs = 0;
     Object.keys(res.docs).forEach(function (k) { var i = res.docs[k]; nImp += i.items.length; if (i.items.length) { nDocs++; } });
@@ -2394,7 +2408,8 @@
     var starts = this.model.items.filter(function (it) { return it.start; }).length;
     this.status.textContent = starts + ' start items' + (this.query ? ' (query: ' + this.query + ')' : '') + ', ' +
       nImp + ' impacted work items in ' + nDocs + ' documents, ' + (dirs.join(' and ') || 'no direction') + ', ' +
-      this.state.maxLevel + ' levels' + (this.warn ? ' ' + DASH + ' ' + this.warn : '');
+      st.maxLevel + ' of ' + this.levels + ' levels shown (deepest reached: ' + deepest + ')' +
+      (this.warn ? ' ' + DASH + ' ' + this.warn : '');
     if (this.details.style.display !== 'none') {
       if (this.detailDoc && !this.state.hidden[this.detailDoc.key] && res.docs[this.detailDoc.key]) { this.showDocDetails(this.detailDoc); }
       else { this.details.style.display = 'none'; }

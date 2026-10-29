@@ -45,8 +45,9 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
 ## Using the widget
 
 - **Toolbar**: **Documents** picker (hide documents from the graph; the analysis still goes through them), roles,
-  direction (when the parameter is *Both*), **Levels** shown, item counts, extra fields, highlight, Fit / zoom,
-  Table / Graph, SVG, Excel, Refresh. Changing roles, direction or levels recomputes the analysis in the browser.
+  direction (when the parameter is *Both*), **Levels** buttons (1 to the parameter; the status line shows the deepest
+  level reached), item counts, extra fields, highlight, Fit / zoom, Table / Graph, SVG, Excel, Reload page (reloads the
+  whole page: Polarion cannot re-run one widget alone). Changing roles, direction or levels recomputes the analysis in the browser.
 - **Click a document** for its impacted work items, each with its direction, level and the item it was reached from.
   **Traceability matrix (Excel)** in the details: each reached work item of the document with its links (role name for
   outgoing links, opposite name for incoming ones), the linked document and the linked item's level.

@@ -47,7 +47,7 @@ Target: Polarion 2512 (keep compatible with 2606). Requirements: [`widgets/docCo
 - **Graph**: upstream documents on the left; the arrow follows the link, from the downstream document to the upstream
   one. Each line shows the role names and link counts. Each upstream document shows its coverage.
 - **Toolbar**: documents shown (only with relations / all), **Documents** picker (hide or show documents), roles,
-  item counts, extra fields, highlight, Fit / zoom, Table / Graph, SVG, Excel, Refresh.
+  item counts, extra fields, highlight, Fit / zoom, Table / Graph, SVG, Excel, Reload page (reloads the whole page, all its widgets).
 - **Click a document** for its coverage and the uncovered items (with a link to open the document).
   **Hover / click a line** for the links per role, the downstream items with links and the upstream items covered.
 - **Traceability matrix (Excel)** (0.4.0, button in the details of a document or a line): each work item with its

@@ -442,7 +442,8 @@
     });
     this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
     this.button(btns, 'Excel', 'Download the shown documents and relations as an Excel workbook', function () { self.exportExcel(); });
-    this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
+    // Polarion cannot re-render one widget alone in view mode: the analysis runs again by reloading the page.
+    this.button(btns, 'Reload page', 'Reload the whole page to run the analysis again (all widgets of the page are reloaded)', function () { window.location.reload(); });
     return btns;
   };
 

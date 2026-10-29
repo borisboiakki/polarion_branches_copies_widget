@@ -119,12 +119,19 @@
         self.checkbox(dbox, d[1], true, function (on) { self.state.dirs[d[0]] = on; self.render(true); });
       });
     }
-    var lab = el('label', { 'class': 'bw-check' }, bar);
-    el('span', { 'class': 'bw-muted' }, lab, 'Levels:');
-    var sel = el('select', { 'class': 'bw-ctl', title: 'Levels of analysis shown (the widget parameter sets the maximum)' }, lab);
-    for (var i = 1; i <= this.levels; i++) { el('option', { value: String(i) }, sel, String(i)); }
-    sel.value = String(this.levels);
-    sel.addEventListener('change', function () { self.state.maxLevel = toInt(sel.value); self.render(true); });
+    // Levels shown: one button per level (a select inside a label did not react on 2512, PO test of 0.1.0).
+    var lbox = el('span', { 'class': 'bw-fields ai-lvl' }, bar);
+    el('span', { 'class': 'bw-muted' }, lbox, 'Levels:');
+    this.levelBtns = [];
+    for (var i = 1; i <= this.levels; i++) {
+      (function (k) {
+        var lb = self.button(lbox, String(k), 'Show the analysis up to level ' + k + ' (the widget parameter sets the maximum)', function () {
+          self.state.maxLevel = k;
+          self.render(true);
+        });
+        self.levelBtns.push(lb);
+      })(i);
+    }
     this.countsCheck(bar).title = 'Show the number of links on the lines';
     this.fieldChecks(bar);
     this.searchBox(bar);
@@ -362,7 +369,11 @@
     this.res = this.compute();
     var edges = this.relations(this.res);
     this.layoutAndDraw(edges, refit);
+    var st = this.state;
+    this.levelBtns.forEach(function (lb, i) { lb.className = 'bw-btn' + (i + 1 === st.maxLevel ? ' ai-lvl-on' : ''); });
     var res = this.res;
+    var deepest = 0;
+    Object.keys(res.lvl).forEach(function (id) { deepest = Math.max(deepest, res.lvl[id]); });
     var nImp = 0;
     var nDocs = 0;
     Object.keys(res.docs).forEach(function (k) { var i = res.docs[k]; nImp += i.items.length; if (i.items.length) { nDocs++; } });
@@ -372,7 +383,8 @@
     var starts = this.model.items.filter(function (it) { return it.start; }).length;
     this.status.textContent = starts + ' start items' + (this.query ? ' (query: ' + this.query + ')' : '') + ', ' +
       nImp + ' impacted work items in ' + nDocs + ' documents, ' + (dirs.join(' and ') || 'no direction') + ', ' +
-      this.state.maxLevel + ' levels' + (this.warn ? ' ' + DASH + ' ' + this.warn : '');
+      st.maxLevel + ' of ' + this.levels + ' levels shown (deepest reached: ' + deepest + ')' +
+      (this.warn ? ' ' + DASH + ' ' + this.warn : '');
     if (this.details.style.display !== 'none') {
       if (this.detailDoc && !this.state.hidden[this.detailDoc.key] && res.docs[this.detailDoc.key]) { this.showDocDetails(this.detailDoc); }
       else { this.details.style.display = 'none'; }

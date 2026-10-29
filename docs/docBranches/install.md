@@ -51,7 +51,7 @@ document relation is marked *indirect* (unless document metadata confirms it), a
 ## Using the widget
 
 - **Toolbar**: documents shown (all / only related), indirect relations, relation kinds (copies / branches / derived), item counts on the lines, extra fields, highlight search,
-  Fit / zoom, Table / Graph, SVG download, Excel download, Refresh (reloads the page and re-runs the analysis).
+  Fit / zoom, Table / Graph, SVG download, Excel download, Reload page (reloads the whole page, all its widgets, and re-runs the analysis).
 - **Click a document** to open it. **Hover a line** for counts and coverage; **click a line** for the
   list of linked work items (up to 30).
 - **Excel**: a workbook with the shown relations (counts, metadata, coverage), the shown documents and the linked

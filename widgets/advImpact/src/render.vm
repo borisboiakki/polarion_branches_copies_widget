@@ -17,6 +17,8 @@
   .ai-pick { position: relative; display: inline-block; }
   .ai-pick-panel { position: absolute; z-index: 30; top: 24px; left: 0; min-width: 260px; max-height: 320px; overflow: auto; background: rgb(255,255,255); border: 1px solid rgb(170,178,195); box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 6px 8px; }
   .ai-pick-panel .bw-check { margin: 2px 0; }
+  .ai-lvl .bw-btn { padding: 1px 7px; }
+  .ai-lvl .ai-lvl-on { font-weight: 700; border-color: rgb(51,103,214); background: rgb(220,230,250); }
 </style>
 
 ## ======================================================================= parameters

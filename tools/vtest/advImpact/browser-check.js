@@ -38,7 +38,9 @@ async function clickDoc(p, name) {
   await p.screenshot({ path: dir + '/shot-graph.png', fullPage: true });
   const status = async () => p.textContent('.bw-status');
   console.log('status:', await status());
-  expect((await status()).startsWith('4 start items, 8 impacted work items in 4 documents, downstream, 3 levels'), 'status: start items, impacted items, documents');
+  expect((await status()).startsWith('4 start items, 8 impacted work items in 4 documents, downstream, 3 of 3 levels shown (deepest reached: 3)'),
+    'status: start items, impacted items, documents, levels shown and deepest level');
+  expect(await p.textContent('.ai-lvl .ai-lvl-on') === '3', 'level button of the parameter value active');
 
   // Columns: start document left, then downstream levels 1, 2, 3 to the right.
   const xs = await p.evaluate(() => {
@@ -86,11 +88,15 @@ async function clickDoc(p, name) {
     mrows.some(r => r.join('|') === 'VIA-31|Title VIA-31|VIA-41|Title VIA-41|verifies|_default / Test_T|downstream 3'),
     'traceability matrix: outgoing (role name) and incoming (opposite name) links, linked document and level');
 
-  // Levels toggle: 2 levels -> Test_T gone.
-  await p.selectOption('.bw-toolbar select', '2');
+  // Level buttons (real mouse clicks): 2 levels -> Test_T gone, 1 level -> only level 1.
+  await p.click('.ai-lvl button:has-text("2")');
   await p.waitForTimeout(150);
-  expect((await status()).startsWith('4 start items, 7 impacted work items in 3 documents, downstream, 2 levels'), 'levels toggle: level 3 left out');
-  await p.selectOption('.bw-toolbar select', '3');
+  expect((await status()).startsWith('4 start items, 7 impacted work items in 3 documents, downstream, 2 of 3 levels shown (deepest reached: 2)')
+    && await p.textContent('.ai-lvl .ai-lvl-on') === '2', 'level 2 button: level 3 left out, button active');
+  await p.click('.ai-lvl button:has-text("1")');
+  await p.waitForTimeout(150);
+  expect((await status()).indexOf('5 impacted work items in 2 documents') >= 0 && (await nodeText('SwReq_C')) === '', 'level 1 button: only level 1');
+  await p.click('.ai-lvl button:has-text("3")');
   await p.waitForTimeout(150);
   // Role toggle: without verifies, Test_T is not reached.
   await p.click('label:has-text("verifies") input');

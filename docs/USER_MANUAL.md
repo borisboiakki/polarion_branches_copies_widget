@@ -173,7 +173,7 @@ depends on them, level after level.
 | Start items: work item query | empty = all items | A Polarion query (Lucene) to start from some work items of the start document only, e.g. `type:stakeholderrequirement AND status:in_analysis`. Use the type and status **ids** of your project. If no item matches, the widget says so | — |
 | Link roles (1 to 5) | none, **must be set** | The link roles followed, e.g. `satisfies`, `verifies` | Each role can be hidden or shown |
 | Direction | Downstream | Downstream, Upstream or Both (see above) | With *Both*: each direction can be hidden or shown |
-| Levels of analysis (1 to 7) | 3 | How many link steps are followed | **Levels** list: fewer levels, not more |
+| Levels of analysis (1 to 7) | 3 | How many link steps are followed | **Levels** buttons: fewer levels, not more |
 | Work item types not followed | Heading | Items of these types are neither start items nor followed | — |
 | Link counts on the lines by default | Shown | Or *Hidden* | yes |
 | Extra document fields shown by default | none | Type, status, created, updated, work item count | yes |
@@ -199,7 +199,7 @@ items are reached; a warning in the status line says so.
 | **Indirect relations** (Branches only) | Show the relations inherited through an intermediate copy |
 | **Relations:** Copies / Branches / Derived (Branches), **Roles:** one per role (Coverage) | Show or hide each kind of line |
 | **Direction:** Downstream / Upstream (Impact, parameter *Both*) | Show or hide each direction of the analysis |
-| **Levels** (Impact) | Number of levels shown (up to the parameter) |
+| **Levels: 1 2 3 …** (Impact) | Number of levels shown, one button per level up to the parameter (the active one is highlighted). The status line says how many levels are shown and the deepest level actually reached: choosing more levels than the data have changes nothing |
 | **Item counts** | Show or hide the numbers on the lines |
 | **Fields:** Type, Status, Created, Updated, Work items | Extra lines in the document boxes |
 | **Highlight documents…** | Type part of a document name or title to highlight it |
@@ -207,7 +207,7 @@ items are reached; a warning in the status line says so.
 | **Table** / **Graph** | Switch between the graph and a table of the same information |
 | **SVG** | Download the graph as an SVG image |
 | **Excel** | Download an Excel workbook with what is currently shown (see below) |
-| **Refresh** | Reload the page and run the analysis again (e.g. after links were changed) |
+| **Reload page** | Reload the whole page and run the analysis again (e.g. after links were changed). Polarion cannot re-run one widget alone: every widget of the page is reloaded |
 
 ### Mouse
 
@@ -276,6 +276,6 @@ there; the PDF uses the **parameter defaults** of the widget.
 - Link roles and work item types are chosen from the current project's configuration. Other projects must use the
   same role and type ids for their links and items to be found.
 - Links between items of the same document and links to items you cannot read are ignored.
-- The analysis runs when the page opens. Use **Refresh** after changing links.
+- The analysis runs when the page opens. Use **Reload page** after changing links.
 - The version of a widget is shown in the PDF header. Give it when reporting a problem.
 - If a widget shows "select at least one link role", edit its parameters and choose the link roles.
