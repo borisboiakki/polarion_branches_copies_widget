@@ -288,7 +288,7 @@
     #end
     #set($sqlOut = "SELECT w.c_uri FROM workitem w WHERE (${orSql})${resType}")
     #if($direction == "both")
-      <p class="ko">The nested variant runs one direction: "both" is run as downstream (the union per level is tested in bfs).</p>
+      <p class="ko">The nested variant runs one direction: "both" is run as downstream (run it again with "up"; the combined result is tested in bfs).</p>
     #end
   #end
   #if($sqlKind == "rec")
@@ -427,15 +427,18 @@
 
 #elseif($test == "bfs")
 ## ================================================================ I2 / I3 / I5 / I6 / I7 traversal by level
+## "both" = a pure downstream traversal and a pure upstream one, each with its own visited set, combined at the end
+## (PO, Q12): a path never changes direction. An item reached in both keeps the lower level.
   #set($visited = $objectFactory.newMap())
+  #set($allVisited = $objectFactory.newMap())
+  #set($startItems = [])
+  #set($stops = [])
   #set($frontier = [])
   #set($docMin = $objectFactory.newMap())
   #set($docLvCnt = $objectFactory.newMap())
   #set($docKeys = [])
   #set($edges = [])
   #set($edgeChars = 0)
-  #set($stop = false)
-  #set($stopLv = 0)
   #set($rowsAll = [])
   #set($reached = [])
   #set($noBack = false)
@@ -472,14 +475,24 @@
   #end
   #foreach($w in $startList)
     #set($sid = "$w.getId()")
-    #if(!$visited.containsKey($sid))
-      #set($void = $visited.put($sid, 0))
-      #set($void = $frontier.add($w))
+    #if(!$allVisited.containsKey($sid))
+      #set($void = $allVisited.put($sid, 0))
       #set($void = $reached.add($w))
+      #set($void = $startItems.add($w))
     #end
   #end
+  #foreach($pass in $dirs)
+  #set($passDirs = [])
+  #set($void = $passDirs.add($pass))
+  #set($visited = $objectFactory.newMap())
+  #set($frontier = [])
+  #foreach($w in $startItems)
+    #set($void = $visited.put("$w.getId()", 0))
+    #set($void = $frontier.add($w))
+  #end
+  #set($stop = false)
   #set($t0 = $date.systemTime)
-  #set($void = $rowsAll.add("<tr><td>0</td><td>$frontier.size()</td><td></td><td></td><td></td><td></td><td></td><td>$tAll0 / $t0</td></tr>"))
+  #set($void = $rowsAll.add("<tr><td>$pass</td><td>0</td><td>$frontier.size()</td><td></td><td></td><td></td><td></td><td>$visited.size()</td><td>$tAll0 / $t0</td></tr>"))
 
   #foreach($lv in [1..7])
     #if($lv <= $levels && $frontier.size() > 0 && !$stop)
@@ -516,7 +529,7 @@
           #set($void = $chunks.add($cur))
         #end
         #set($rTypeSql = "")
-        #foreach($dir in $dirs)
+        #foreach($dir in $passDirs)
           #foreach($chunk in $chunks)
             #if($dir == "down")
               #if($typeSql != "")
@@ -555,7 +568,7 @@
                 #end
                 #if("$tUr" == "false")
                   #set($tid = "$tgt.getId()")
-                  #if($fIds.containsKey($tid) && ($direction == "down" || $direction == "both"))
+                  #if($fIds.containsKey($tid) && $pass == "down")
                     #set($e = "${xid}|${lv}|${tid}|${role}|d")
                     #set($void = $edges.add($e))
                     #set($el = $e.length())
@@ -566,7 +579,7 @@
               #end
             #end
           #end
-          #if($direction == "up" || $direction == "both")
+          #if($pass == "up")
             #foreach($f in $frontier)
               #set($fid = "$f.getId()")
               #foreach($ls in $f.getLinkedWorkItemsStructsDirect())
@@ -596,7 +609,7 @@
         ## mode api: Open API links per frontier item (down = getLinkedWorkItemsStructsBack, up = Direct)
         #foreach($f in $frontier)
           #set($fid = "$f.getId()")
-          #foreach($dir in $dirs)
+          #foreach($dir in $passDirs)
             #set($lst = false)
             #if($dir == "down")
               #set($lst = $f.getLinkedWorkItemsStructsBack())
@@ -638,37 +651,50 @@
           #end
         #end
       #end
-      ## documents of the new items
+      ## combined result: first time reached in any direction, or a lower level than in the other direction
       #foreach($x in $next)
-        #set($xm = false)
-        #set($xm = $x.getModule())
-        #aiKey($xm)
-        #set($dk = $aiKeyOut)
-        #if($dk == "")
-          #set($dk = "(no document)")
+        #set($xid = "$x.getId()")
+        #if(!$allVisited.containsKey($xid))
+          #set($void = $allVisited.put($xid, $lv))
+          #set($void = $reached.add($x))
+        #elseif($allVisited.get($xid) > $lv)
+          #set($void = $allVisited.put($xid, $lv))
         #end
-        #if(!$docMin.containsKey($dk))
-          #set($void = $docMin.put($dk, $lv))
-          #set($void = $docKeys.add($dk))
-        #end
-        #set($lk = "${dk}|${lv}")
-        #if($docLvCnt.containsKey($lk))
-          #set($dc = $docLvCnt.get($lk) + 1)
-          #set($void = $docLvCnt.put($lk, $dc))
-        #else
-          #set($void = $docLvCnt.put($lk, 1))
-        #end
-      #end
-      #foreach($x in $next)
-        #set($void = $reached.add($x))
       #end
       #set($lt1 = $date.systemTime)
-      #set($void = $rowsAll.add("<tr><td>$lv</td><td>$frontier.size()</td><td>$queries</td><td>$next.size()</td><td>$again</td><td>$edgeN</td><td>$visited.size()</td><td>$lt0 / $lt1</td></tr>"))
+      #set($void = $rowsAll.add("<tr><td>$pass</td><td>$lv</td><td>$frontier.size()</td><td>$queries</td><td>$next.size()</td><td>$again</td><td>$edgeN</td><td>$visited.size()</td><td>$lt0 / $lt1</td></tr>"))
       #if($next.size() > $cap)
         #set($stop = true)
-        #set($stopLv = $lv)
+        #set($void = $stops.add("${pass} after level ${lv}"))
       #end
       #set($frontier = $next)
+    #end
+  #end
+  #end
+  ## documents of the combined result, each item at its lowest level
+  #foreach($x in $reached)
+    #set($xl = $allVisited.get("$x.getId()"))
+    #if($xl > 0)
+      #set($xm = false)
+      #set($xm = $x.getModule())
+      #aiKey($xm)
+      #set($dk = $aiKeyOut)
+      #if($dk == "")
+        #set($dk = "(no document)")
+      #end
+      #if(!$docMin.containsKey($dk))
+        #set($void = $docMin.put($dk, $xl))
+        #set($void = $docKeys.add($dk))
+      #elseif($docMin.get($dk) > $xl)
+        #set($void = $docMin.put($dk, $xl))
+      #end
+      #set($lk = "${dk}|${xl}")
+      #if($docLvCnt.containsKey($lk))
+        #set($dc = $docLvCnt.get($lk) + 1)
+        #set($void = $docLvCnt.put($lk, $dc))
+      #else
+        #set($void = $docLvCnt.put($lk, 1))
+      #end
     #end
   #end
   #set($tAll1 = $date.systemTime)
@@ -690,7 +716,7 @@
           #end
           #if("$tUr" == "false")
             #set($tid = "$tgt.getId()")
-            #if($visited.containsKey($tid) && $tid != $rid)
+            #if($allVisited.containsKey($tid) && $tid != $rid)
               #set($allN = $allN + 1)
               #set($e = "${rid}|${tid}|${role}")
               #set($el = $e.length())
@@ -703,11 +729,12 @@
   #end
   #set($ta1 = $date.systemTime)
   <p>Mode <b>$mode</b>, start items <b>$startMode</b> ($startList.size()), paths <b>$paths</b>. Total start / end $tAll0 / $tAll1 ms.</p>
-  #if($stop)
-    <p class="ko">Stopped after level $stopLv: more than $cap new items (parameter "Stop when..."). Expected behaviour of the cap.</p>
+  #foreach($st in $stops)
+    <p class="ko">Stopped ($st): more than $cap new items in that level (parameter "Stop when..."). Expected behaviour of the cap.</p>
   #end
+  <p>Combined result: <b>$reached.size()</b> items including the start items; documents below (each item counted once, at its lowest level).</p>
   <table>
-    <tr><th>Level</th><th>Frontier (items expanded)</th><th>SQL queries</th><th>New items</th><th>Rows already visited (cycles / inherited / several paths)</th><th>Item paths (edges)</th><th>Visited so far</th><th>Start / end (ms)</th></tr>
+    <tr><th>Direction</th><th>Level</th><th>Frontier (items expanded)</th><th>SQL queries</th><th>New items</th><th>Rows already visited (cycles / inherited / several paths)</th><th>Item paths (edges)</th><th>Visited so far (this direction)</th><th>Start / end (ms)</th></tr>
     #foreach($rw in $rowsAll)
       $rw
     #end

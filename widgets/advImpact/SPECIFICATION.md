@@ -1,8 +1,8 @@
 # Specification — Advanced Impact Analysis widget (advImpact)
 
-**Status:** v0.2 DRAFT, 2026-10-29: PO answers Q1–Q11 recorded (§9), reviewed against the dev guide. **Nothing is
+**Status:** v0.2 DRAFT, 2026-10-29: PO answers Q1–Q12 recorded (§9), reviewed against the dev guide. **Nothing is
 implemented**; the folder holds the scaffold (parameters, properties, VERSION 0.0.0). The spike (diagnostic widget `aiSpike`,
-plan `tests/advImpact-v0.1.x/spike-tests.md`) is ready, not run yet. Items marked `[?]` need a spike result or a PO answer (§8).
+plan `tests/advImpact-v0.1.x/spike-tests.md`) is ready, not run yet. Items marked `[?]` need a spike result (§8).
 
 ## 1. Goal
 
@@ -33,9 +33,10 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
   item`, source = the other item). **Upstream direction**: from an item to the targets of its own links
   (`fk_uri_p_workitem = item`). Link storage verified on 2512 (spikes A2, C3): the link is stored on the source item and
   points to the target. Which of these two is "impact" depends on the role, hence the explicit parameter (§4 F4).
-- **Both directions** (Q2, union per level): each item of level n is expanded in both directions, so a path may change
-  direction (e.g. down to a system requirement, then up to the other customer requirements it satisfies). This reaches more
-  items than "downstream chains + upstream chains" kept apart `[?]` Q12.
+- **Both directions** (Q2, Q12): a pure **downstream** analysis and a pure **upstream** analysis from the same start
+  items, each with its own visited set, **combined** at the end. A path never changes direction: going down to a system
+  requirement never continues up to the other customer requirements it satisfies ("siblings" are not reached). An item
+  reached in both analyses is shown once, at the lower of its two levels.
 - **Impacted document**: document containing at least one item reached at some level. The level of a document is the
   smallest level at which one of its items is reached.
 
@@ -46,7 +47,7 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | F1 | **Start document**: a single-select document selector (`@document`, current project; same limitation as docCoverage) | Must |
 | F2 | **Start item subset**: a work item **query parameter** (Lucene) restricted to the start document (empty = all counted items of the document). The restriction is added by the widget: `document.id:"space/name"` or an `SQL:(…)` clause, whichever works (spike I4). In-widget picker = later version (Q1) | Must |
 | F3 | **Link roles**: multi-select `workitem-link-role`, **1 to 5** (more: first 5 + warning) | Must |
-| F4 | **Direction**: downstream, upstream or both (union per level, Q2; §3), as a parameter. With "both", a **viewer toggle** can narrow to one direction | Must |
+| F4 | **Direction**: downstream, upstream or both (the two analyses combined, Q2/Q12; §3), as a parameter. With "both", a **viewer toggle** shows one direction or both | Must |
 | F5 | **Multi-level traversal**: the analysis does not stop at the first impacted document; from the items reached at level n it continues with the items linked to them (same roles at every level, Q4; direction as F4) up to **N levels** | Must |
 | F6 | **Levels**: default **3**; parameter 1–7 (integer, capped at 7 server side). If the traversal cannot be done in the budget for 7, the cap is lowered (spike I2/I6); hard-coded 3 is the fallback | Must (3), Should (up to 7) |
 | F7 | **Cycle guard**: an item is expanded once, at the lowest level it is reached; links back to already visited items are not followed | Must |
@@ -82,9 +83,10 @@ docCoverage (`pairCap`, `itemCap`).
    Widget SQL returns objects, not rows (guide §7.2): the parent and role of a reached item come from the Open API links.
 2. **Page model**: documents (reuse `shared/vm/documents.vm`), the reached items once (id, title, type, document, level) and
    **all links of the selected roles between reached items** (source, target, role). The browser recomputes the levels for
-   the toggles (F9) with a BFS on these links: narrowing roles, direction or levels gives exactly the result the server would
-   give, because every item reachable with fewer roles/directions within N levels is already in the set. The server computes
-   with the parameter values; the viewer can only narrow them (Q6).
+   the toggles (F9) with one BFS per shown direction on these links (downstream: from target to source; upstream: from source
+   to target) and combines them as the server does (§3). Narrowing roles, direction or levels gives exactly the result the
+   server would give, because every item reachable with fewer roles within N levels in one direction is already in the set.
+   The server computes with the parameter values; the viewer can only narrow them (Q6).
 3. **Client**: `widgets/advImpact/src/graph.js` on top of `shared/js/core.js` (layered layout by level, categories = roles,
    level toggle). New root class `ai-root`.
 4. **Excel**: same xlsx library; sheets built from the page model.
@@ -99,16 +101,13 @@ docCoverage (`pairCap`, `itemCap`).
 | R3 | Inherited links of copies (spike R2) add links to items already reached | visited set (F7): an item is counted once, at its lowest level; reuse roles only when selected (Q7) |
 | R4 | Page model too large for 7 levels | store items once, cap detail lists, counts only beyond the cap |
 | R5 | "Impact" semantic differs per role (direction) | explicit direction parameter + viewer toggle |
-| R6 | "Both" with mixed directions per path reaches many items (siblings through a common target) | item cap per level; Q12 |
+| R6 | "Both" doubles the queries (two analyses) | each analysis is bounded by the levels and the item cap per level |
 
 ## 8. Open questions for the PO
 
-Q1–Q11 answered on 2026-10-29 (decisions log). Open:
+Q1–Q12 answered on 2026-10-29 (decisions log).
 
-12. **Q12 "Both" with mixed directions**: with the union per level, a path may go down then up (§3), which also reaches the
-    "siblings" of an impacted item (other items linked to the same target). Is that wanted, or should "both" be the union of a
-    pure downstream and a pure upstream analysis? The spike measures the first one; the second is cheap to add.
-13. Spike results I1–I8; the in-widget picker design (later version).
+Open: the spike results I1–I8; the in-widget picker design (later version).
 
 ## 9. Decisions log
 
@@ -117,7 +116,8 @@ Q1–Q11 answered on 2026-10-29 (decisions log). Open:
 | 2026-10-29 | Own widget `advImpact` in this repository, shares `shared/` | PO |
 | 2026-10-29 | 3 levels default, up to 7 if feasible and configurable, else hard-coded 3; max 5 link roles; toggles; Excel as docCoverage | PO |
 | 2026-10-29 | Q1: start items chosen by a **query parameter** (restricted to the start document) in v1; **in-widget picker** in a later version | PO |
-| 2026-10-29 | Q2: direction "both" = **union per level**; viewer can still hide one direction | PO |
+| 2026-10-29 | Q2: direction "both" = **union** of the two directions; viewer can still hide one direction | PO |
+| 2026-10-29 | Q12: "both" = a pure downstream and a pure upstream analysis, **combined** (a path never changes direction; no siblings) | PO |
 | 2026-10-29 | Q3: one level = **one work item link hop**; a document's level = lowest level of its items | PO |
 | 2026-10-29 | Q4: the **same roles** at every level (1-5) | PO |
 | 2026-10-29 | Q5: output = document graph + **impacted items with their item paths** (details, Excel) | PO |

@@ -34,11 +34,15 @@ public class AdvImpactSpikeHarness {
     }
 
     static String run(String dir, String out, String name, String test, String direction, String mode, int levels, String startMode) throws Exception {
+        return run(dir, out, name, test, direction, mode, levels, startMode, "SRS_Test");
+    }
+
+    static String run(String dir, String out, String name, String test, String direction, String mode, int levels, String startMode, String docName) throws Exception {
         List<Object> roles = new ArrayList<Object>();
         roles.add(new WidgetHarness.RoleOpt("duplicates"));
         // Single-select @document: singleValue() = model-backed option (guide 2.1).
         WidgetHarness.DocOpt doc = null;
-        for (WidgetHarness.Module m : WidgetHarness.MODULES) { if (m.getId().equals("SRS_Test") && m.project.equals("VforIA")) { doc = new WidgetHarness.DocOpt(m); } }
+        for (WidgetHarness.Module m : WidgetHarness.MODULES) { if (m.getId().equals(docName) && m.project.equals("VforIA")) { doc = new WidgetHarness.DocOpt(m); } }
         Map<String, WidgetHarness.Param> p = new HashMap<String, WidgetHarness.Param>();
         p.put("test", new WidgetHarness.Param(test, null));
         p.put("doc", new WidgetHarness.Param(doc, null));
@@ -75,17 +79,24 @@ public class AdvImpactSpikeHarness {
             && h.contains("document.id:&quot;Requirements/SRS_Test&quot; AND (type:systemRequirement)"), "start: both query scopes rendered");
         WidgetHarness.check(h.contains("(read with singleValue())"), "start: start document read with singleValue()");
         h = run(dir, out, "bfs-sql-down", "bfs", "down", "sql", 3, "all");
-        WidgetHarness.check(h.contains("<tr><td>1</td><td>5</td><td>1</td><td>10</td>"), "bfs sql down: level 1 reaches B (5) and E (5, inherited links to A)");
-        WidgetHarness.check(h.contains("<tr><td>2</td><td>10</td><td>1</td><td>0</td><td>5</td>"), "bfs sql down: level 2 expands the 10 items, 5 rows already visited (E links to B and A)");
+        WidgetHarness.check(h.contains("<tr><td>down</td><td>1</td><td>5</td><td>1</td><td>10</td>"), "bfs sql down: level 1 reaches B (5) and E (5, inherited links to A)");
+        WidgetHarness.check(h.contains("<tr><td>down</td><td>2</td><td>10</td><td>1</td><td>0</td><td>5</td>"), "bfs sql down: level 2 expands the 10 items, 5 rows already visited (E links to B and A)");
         h = run(dir, out, "bfs-api-down", "bfs", "down", "api", 3, "all");
-        WidgetHarness.check(h.contains("<tr><td>1</td><td>5</td><td>0</td><td>10</td>"), "bfs api down: same level 1 as the SQL mode, no queries");
+        WidgetHarness.check(h.contains("<tr><td>down</td><td>1</td><td>5</td><td>0</td><td>10</td>"), "bfs api down: same level 1 as the SQL mode, no queries");
         WidgetHarness.check(h.contains("API probe on start item"), "bfs api: probe of Direct and Back");
         WidgetHarness.check(h.contains("VIA-516|1|VIA-509|duplicates|d") && !h.contains("returned nothing usable"), "bfs api: parent edge with direction");
         WidgetHarness.check(Pattern.compile("all links between the 15 reached items <b>15</b>").matcher(h).find(), "bfs api: all links between reached items (B->A 5, E->A 5, E->B 5)");
         h = run(dir, out, "bfs-sql-up", "bfs", "up", "sql", 2, "docid");
-        WidgetHarness.check(h.contains("<tr><td>0</td><td>5</td>"), "bfs sql up: start items from the query (5 requirements of the document)");
-        h = run(dir, out, "bfs-both", "bfs", "both", "sql", 3, "all");
-        WidgetHarness.check(h.contains("Total start / end"), "bfs both: renders");
+        WidgetHarness.check(h.contains("<tr><td>up</td><td>0</td><td>5</td>"), "bfs sql up: start items from the query (5 requirements of the document)");
+        // Both = pure downstream + pure upstream from B (copy of A, copied by E): down reaches E, up reaches A, combined.
+        h = run(dir, out, "bfs-both", "bfs", "both", "sql", 3, "all", "SRS_Test_Reuse_TestB");
+        WidgetHarness.check(h.contains("<tr><td>down</td><td>1</td><td>5</td><td>1</td><td>5</td>") && h.contains("<tr><td>up</td><td>1</td><td>5</td><td>1</td><td>5</td>"),
+            "bfs both: one downstream and one upstream traversal, 5 items each at level 1");
+        WidgetHarness.check(h.contains("<tr><td>up</td><td>2</td><td>5</td><td>1</td><td>0</td>"), "bfs both: the upstream pass does not turn downstream (A is not expanded back to E)");
+        WidgetHarness.check(h.contains("Combined result: <b>15</b> items") && h.contains("SRS_Test_Copy_of_B_TestE</td><td>1</td>")
+            && h.contains("VforIA/Requirements/SRS_Test</td><td>1</td>"), "bfs both: combined documents A and E at level 1");
+        h = run(dir, out, "bfs-both-api", "bfs", "both", "api", 3, "all", "SRS_Test_Reuse_TestB");
+        WidgetHarness.check(h.contains("Combined result: <b>15</b> items"), "bfs both api: same combined result");
         h = run(dir, out, "lucene", "lucene", "down", "sql", 3, "all");
         WidgetHarness.check(h.contains("linkedWorkItemsOf:([{&quot;filter&quot;:&quot;SQL:(SELECT w.c_uri FROM workitem w") && h.contains("&quot;follows&quot;:[&quot;duplicates&quot;],&quot;steps&quot;:3}])"), "lucene: linkedWorkItemsOf query built");
         h = run(dir, out, "sql-nested", "sql", "down", "sql", 3, "all");
