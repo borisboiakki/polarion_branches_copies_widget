@@ -3,7 +3,7 @@
 **Status:** v0.3, 2026-10-29: PO answers Q1–Q12 recorded (§9), reviewed against the dev guide, **spike closed** on 2512
 (`tests/advImpact-v0.1.x/spike-tests.md`, conclusion at its end). **0.1.0 implemented** (`widgets/advImpact/src`), tested
 with Velocity 1.4 on mocks and in Chromium (`tools/vtest/advImpact/`); to be validated on 2512. Install guide:
-`docs/advImpact/install.md`. **0.2.0**: in-widget start item picker (F17).
+`docs/advImpact/install.md`. **0.2.0**: in-widget start item picker (F17), validated by the PO on 2512.
 
 ## 1. Goal
 
@@ -119,7 +119,7 @@ Checks on 2512 for 0.1.0 (not possible in the sandbox): upload and parameters (s
 direction, levels), numbers against the spike results (run 1 / part A sets), toggles, details, Excel and traceability
 matrix, PDF export, rendering time on the largest chain.
 
-Checks on 2512 for 0.2.0: type names in the picker (`ITypeOpt.getName()`, the id is shown when it is missing), picker
+Checks on 2512 for 0.2.0 (PO, 2026-10-29: the picker works as expected). Still worth watching: type names in the picker (`ITypeOpt.getName()`, the id is shown when it is missing), picker
 speed with a start document of several thousand items (the list renders at most 300 entries; the search narrows it).
 
 ## 9. Decisions log
@@ -143,3 +143,4 @@ speed with a start document of several thousand items (the list renders at most 
 | 2026-10-29 | 0.1.0 implemented as specified: F1–F14 and F16 (F15 projects / collection later). Item paths in the browser = one path per item (first parent at each step); the details list every parent | Dev |
 | 2026-10-29 | 0.1.1 (PO test of 0.1.0 on 2512): the Levels select did not react: replaced by one button per level, status line shows levels shown and the deepest level reached. Refresh renamed **Reload page** in all widgets: a widget cannot be re-rendered alone in view mode (PO) | PO, Dev |
 | 2026-10-29 | In-widget start item picker (Q1 follow-up, 0.2.0): a **browser picker** that narrows the server start set (whole document or query subset), with a search on id or title and a filter by type; no page reload. A page parameter with reload (any query) is not planned. To pick from the whole document, leave the start query empty | PO |
+| 2026-10-29 | 0.2.0 validated on 2512: the start item picker works as expected | PO |
