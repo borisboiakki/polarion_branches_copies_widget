@@ -40,7 +40,7 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | ID | Requirement | Priority |
 |---|---|---|
 | F1 | **Start document**: a single-select document selector (`@document`, current project; same limitation as docCoverage) | Must |
-| F2 | **Start item subset**: restrict the start items to a subset of the start document. Mechanism open `[?]` Q1 (candidates: a work item query parameter; a viewer-side picker in the widget; a work item selector if available — spike I4). Nothing selected = all counted items of the document | Must |
+| F2 | **Start item subset**: a work item **query parameter** restricted to the start document (empty = all counted items of the document). In-widget picker = later version (Q1) | Must |
 | F3 | **Link roles**: multi-select `workitem-link-role`, **1 to 5** (more: first 5 + warning) | Must |
 | F4 | **Direction**: downstream, upstream or both, default parameter plus **viewer toggle** `[?]` Q2 (does "both" mean per level the union, or the two analyses side by side) | Must |
 | F5 | **Multi-level traversal**: the analysis does not stop at the first impacted document; from the items reached at level n it continues with the items linked to them (same roles, same direction) up to **N levels** | Must |
@@ -53,7 +53,7 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | F12 | **Excel export** similar to docCoverage (sheets Relations, Documents, Impacted items, Impact paths) and **traceability matrix**-style export per document; SVG export; CSV fallback | Must |
 | F13 | Excluded work item types (default `heading`) are neither start items nor followed | Must |
 | F14 | Links to unresolvable items ignored; `isUnresolvable()` guard on every referenced object | Must |
-| F15 | **Projects** parameter and **collection context** as docCoverage F16/F17 | Could (later version) `[?]` Q9 |
+| F15 | **Projects** parameter and **collection context** as docCoverage F16/F17 | Later versions (Q8/Q9) |
 | F16 | Warning in the widget when a traversal was cut off (level cap, item cap, time cap) | Must |
 
 ## 5. Non-functional requirements
@@ -90,18 +90,7 @@ budget** (guide §11.5) – impacted items are stored once with their level and 
 
 ## 8. Open questions for the PO
 
-See the questions asked in the session of 2026-10-29; answers are recorded here (decisions log) as they come.
-
-1. **Q1 Subset selection** of start items: query parameter, viewer-side picker, other?
-2. **Q2 Direction "both"**: union per level, or two separate analyses?
-3. **Q3 Level definition**: one link hop = one level (item level), or one document hop = one level?
-4. **Q4 Same roles at every level?** Or a role set per level / per direction?
-5. **Q5 Output**: documents only, or also the impacted items as a tree (item -> item -> item) in the UI?
-6. **Q6 Toggles**: may the viewer raise the level above the parameter value (needs a re-render), or only lower it?
-7. **Q7 Copies/branches**: ignore or follow reuse roles (`duplicates`, `branched_from`, ...)?
-8. **Q8 Start document scope**: current project only, or other projects too?
-9. **Q9 Projects / collection context** in v1 or later?
-10. **Q10 Excel**: sheet list, path export (one row per path or per reached item)?
+All of Q1–Q11 answered on 2026-10-29 (see the decisions log). Remaining open: the spike results (I1–I7) and the picker design.
 
 ## 9. Decisions log
 
@@ -109,3 +98,13 @@ See the questions asked in the session of 2026-10-29; answers are recorded here 
 |---|---|---|
 | 2026-10-29 | Own widget `advImpact` in this repository, shares `shared/` | PO |
 | 2026-10-29 | 3 levels default, up to 7 if feasible and configurable, else hard-coded 3; max 5 link roles; toggles; Excel as docCoverage | PO |
+| 2026-10-29 | Q1: start items chosen by a **query parameter** (restricted to the start document) in v1; **in-widget picker** in a later version | PO |
+| 2026-10-29 | Q2: direction "both" = **union per level**; viewer can still hide one direction | PO |
+| 2026-10-29 | Q3: one level = **one work item link hop**; a document's level = lowest level of its items | PO |
+| 2026-10-29 | Q4: the **same roles** at every level (1-5) | PO |
+| 2026-10-29 | Q5: output = document graph + **impacted items with their item paths** (details, Excel) | PO |
+| 2026-10-29 | Q6: viewer can only **lower** the level; the parameter value (max 7) is what the server computes | PO |
+| 2026-10-29 | Q7: reuse roles are followed only if the user selects them; no special handling | PO |
+| 2026-10-29 | Q8/Q9: **current project only** in v1; projects scope and collection context in later versions (keep the SQL layer separable) | PO |
+| 2026-10-29 | Q10: Excel sheets Relations, Documents, Impacted items, Impact paths, plus traceability matrix per document | PO |
+| 2026-10-29 | Q11: sizing as the other widgets (~100 docs / 20k items); **cap of items per level** (about 5,000, to tune in spike I6) with a visible warning | PO |

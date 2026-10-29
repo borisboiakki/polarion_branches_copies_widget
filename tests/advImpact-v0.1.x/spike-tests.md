@@ -13,3 +13,5 @@ Mocks for the harness are extended only after a result is known.
 | I5 | Transitive/inherited links (copy of a copy, spike R2): do they inflate the levels? Cycle guard (visited set) cost | Correct level counts | open |
 | I6 | Timing and page-model size for 3 and 7 levels on `EOLE_AI_MCP_TESTS` (120 docs) and on a 20k-item project, both directions | Decide cap of levels, items per page model | open |
 | I7 | Item-level path (item -> item -> item) storage: can the page model carry parent item per reached item without exceeding the size budget (guide §11.5)? | Excel trace export, details | open |
+
+I4 narrowed by the PO (Q1): v1 uses a work item query parameter restricted to the start document; test how to apply it (Lucene `sqlSearch` vs `getWorkItemsByQuery`) and combine with the document filter.
