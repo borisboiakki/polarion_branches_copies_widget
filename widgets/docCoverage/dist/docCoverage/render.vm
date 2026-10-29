@@ -5,7 +5,7 @@
 ## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
 ## Terms: upstream document = document of the link targets (e.g. customer specification), downstream document =
 ## document of the link sources. Verified for "satisfies" on 2512 (spike C3). Edge "up>down": o = upstream, c = downstream.
-#set($bwVersion = "0.4.0")
+#set($bwVersion = "0.4.1")
 ## Shared snippet style.vm (shared/vm), inlined by tools/build-widget.py at "## BW_SHARED style.vm".
 ## CSS of the interactive view and the static (PDF/print) table. Root classes: bw-root, cw-root.
 <style>
@@ -1762,7 +1762,8 @@
     });
     this.button(btns, 'SVG', 'Download the graph as SVG', function () { self.exportSvg(); });
     this.button(btns, 'Excel', 'Download the shown documents and relations as an Excel workbook', function () { self.exportExcel(); });
-    this.button(btns, 'Refresh', 'Re-run the analysis (reloads the page)', function () { window.location.reload(); });
+    // Polarion cannot re-render one widget alone in view mode: the analysis runs again by reloading the page.
+    this.button(btns, 'Reload page', 'Reload the whole page to run the analysis again (all widgets of the page are reloaded)', function () { window.location.reload(); });
     return btns;
   };
 

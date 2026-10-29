@@ -1,0 +1,1 @@
+Diagnostic widget for the Advanced Impact Analysis widget: multi-level link traversal from one document (SQL, Lucene linkedWorkItemsOf, Open API), with timings. Each instance runs one test selected in its parameters. Read-only.

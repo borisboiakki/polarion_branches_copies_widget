@@ -54,4 +54,10 @@ if [ "$which" = all ]; then
   "$root/tools/vcheck.sh" "$root/tests/docCoverage-v0.3.x/spike-widget/ccSpike/"*.vm
   javac -nowarn -cp "$cp" -d "$out/cls" "$root/tools/vtest/docBranches/WidgetHarness.java" "$root/tools/vtest/ccSpike/CollectionSpikeHarness.java" 2>&1 | grep -v '^Picked up\|^Note:' || true
   java -cp "$out/cls:$cp" CollectionSpikeHarness "$root/tests/docCoverage-v0.3.x/spike-widget/ccSpike" "$out" 2>&1 | grep -v '^Picked up'
+  echo "=== aiSpike"
+  out="$base/aiSpike"
+  mkdir -p "$out/cls"
+  "$root/tools/vcheck.sh" "$root/tests/advImpact-v0.1.x/spike-widget/aiSpike/"*.vm
+  javac -nowarn -cp "$cp" -d "$out/cls" "$root/tools/vtest/docBranches/WidgetHarness.java" "$root/tools/vtest/aiSpike/AdvImpactSpikeHarness.java" 2>&1 | grep -v '^Picked up\|^Note:' || true
+  java -cp "$out/cls:$cp" AdvImpactSpikeHarness "$root/tests/advImpact-v0.1.x/spike-widget/aiSpike" "$out" 2>&1 | grep -v '^Picked up'
 fi

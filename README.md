@@ -5,17 +5,20 @@ between them, deduced from work item links. They share one client core, one buil
 
 | Widget | What it shows | Status | Docs |
 |---|---|---|---|
-| <img src="docs/docBranches/icon.svg" width="32" alt=""> **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.4.3** (0.4.0 validated on Polarion 2512; 0.4.1–0.4.3 = shared code only) | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
-| <img src="docs/docCoverage/icon.svg" width="32" alt=""> **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.4.0** (traceability matrix export) validated on Polarion 2512 | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) · [collection spike](tests/docCoverage-v0.3.x/spike-tests.md) |
+| <img src="docs/docBranches/icon.svg" width="32" alt=""> **docBranches** — Document Branches and Copies | Which documents are **branches**, **copies** (reuse) or **derived** from which | **0.4.4** (0.4.0 validated on Polarion 2512; 0.4.1–0.4.4 = shared code only) | [install](docs/docBranches/install.md) · [specification](widgets/docBranches/SPECIFICATION.md) |
+| <img src="docs/docCoverage/icon.svg" width="32" alt=""> **docCoverage** — Document Coverage | For selected documents and 1–5 link roles, which document covers which: link counts, coverage % and uncovered items | **0.4.1** (0.4.0 traceability matrix export validated on Polarion 2512; 0.4.1 = Reload page button) | [install](docs/docCoverage/install.md) · [specification](widgets/docCoverage/SPECIFICATION.md) · [spike](tests/docCoverage-v0.1.x/spike-tests.md) · [collection spike](tests/docCoverage-v0.3.x/spike-tests.md) |
+| <img src="docs/advImpact/icon.svg" width="32" alt=""> **advImpact** — Advanced Impact Analysis | From one document or a subset of its work items, follows the links of 1–5 roles over 1–7 levels (downstream, upstream or both) to the impacted documents and work items | **0.1.1** (0.1.0 tested by the PO on 2512; 0.1.1 = level buttons, Reload page) | [install](docs/advImpact/install.md) · [specification](widgets/advImpact/SPECIFICATION.md) · [spike](tests/advImpact-v0.1.x/spike-tests.md) |
 
 **Users: see the [user manual](docs/USER_MANUAL.md)** (deployment, adding the widgets to a page, parameters, toolbar).
 
-Download the packages from the [releases](../../releases) (`docBranches-N.N.N.zip`, `docCoverage-N.N.N.zip`). Still
+Download the packages from the [releases](../../releases) (`docBranches-N.N.N.zip`, `docCoverage-N.N.N.zip`, `advImpact-N.N.N.zip`). Still
 open for both widgets: behaviour for viewers who cannot read some documents (see each specification).
 
 ![docBranches preview rendered from the VforIA test set (mock data)](docs/docBranches/preview-graph.png)
 
 ![docCoverage preview rendered from the mock coverage set](docs/docCoverage/preview-graph.png)
+
+![advImpact preview rendered from the mock impact set (direction both)](docs/advImpact/preview-both.png)
 
 ## Common features
 
@@ -78,6 +81,7 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
 | `tools/vtest/<widget>/` | Velocity 1.4 harness with mock Polarion objects (`WidgetHarness.java`) and browser check (`browser-check.js`) |
 | `tests/v0.1.x/` | Spike of docBranches 0.1.x, kept for reference: test plan with the findings, diagnostic widget (see its [README](tests/v0.1.x/README.md)) |
 | `tests/docCoverage-v0.1.x/` | Spike of docCoverage 0.1.x: test plan C1–C4 and diagnostic widget `cvSpike` (see its [README](tests/docCoverage-v0.1.x/README.md)) |
+| `tests/advImpact-v0.1.x/` | Spike of advImpact 0.1.x: test plan, findings on 2512 and diagnostic widget `aiSpike` (see its [README](tests/advImpact-v0.1.x/README.md)) |
 | `CLAUDE.md` | Instructions for Claude Code working in this repo |
 | `Polarion_Development_Guide.md` | Polarion development best practices (baseline: Polarion 2512) |
 

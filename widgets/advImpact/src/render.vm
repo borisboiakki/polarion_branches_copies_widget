@@ -1,0 +1,848 @@
+## Advanced Impact Analysis - render.vm
+## Source: widgets/advImpact/src/render.vm. tools/build-widget.py inlines the shared snippets (shared/vm) at the
+## BW_SHARED markers and shared/js/core.js + graph.js at the BW_INLINE_JS marker, checks the result with
+## Velocity 1.4 and writes widgets/advImpact/dist/advImpact.zip.
+## Velocity 1.4 dialect (guide 3.1.9): no map literals, one statement per line, no backslashes in strings.
+## Method (spike tests/advImpact-v0.1.x, closed on 2512): start items of one document, then level by level one SQL query
+## per direction on struct_workitem_linkedworkitems (frontier ids in IN lists of at most 500), each direction with its own
+## visited set ("both" = a downstream and an upstream analysis, combined: a path never changes direction). Then the links of
+## the selected roles between the reached items (Open API, getLinkedWorkItemsStructsDirect): the browser recomputes the
+## levels from them for the toggles (roles, direction, levels).
+## Terms: a link is stored on its source item and points to its target (verified on 2512). Downstream = items whose link
+## points to the frontier (link sources); upstream = targets of the links of the frontier.
+#set($bwVersion = "0.1.0")
+## BW_SHARED style.vm
+<style>
+  .ai-root { position: relative; font-family: Segoe UI, Arial, sans-serif; font-size: 12px; color: rgb(30,35,45); }
+  .ai-pick { position: relative; display: inline-block; }
+  .ai-pick-panel { position: absolute; z-index: 30; top: 24px; left: 0; min-width: 260px; max-height: 320px; overflow: auto; background: rgb(255,255,255); border: 1px solid rgb(170,178,195); box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 6px 8px; }
+  .ai-pick-panel .bw-check { margin: 2px 0; }
+  .ai-lvl .bw-btn { padding: 1px 7px; }
+  .ai-lvl .ai-lvl-on { font-weight: 700; border-color: rgb(51,103,214); background: rgb(220,230,250); }
+</style>
+
+## ======================================================================= parameters
+## BW_SHARED params.vm
+
+## advImpact limits (spike conclusion, SPEC 6.1): link roles used, levels, new items per level and direction (the analysis
+## of that direction stops after a level above it), reached items and links written to the page model (whole page).
+#set($maxRoles = 5)
+#set($maxLevels = 7)
+#set($levelCap = 5000)
+#set($itemCap = 20000)
+#set($linkCap = 40000)
+#set($chunkSize = 500)
+
+## ======================================================================= lists
+## BW_SHARED common.vm
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.direction.singleValue)
+#set($tmp = $parameters.direction.singleValue())
+#set($direction = "down")
+#if("$tmp" == "up" || "$tmp" == "both")
+  #set($direction = "$tmp")
+#end
+#set($dirs = [])
+#if($direction == "down" || $direction == "both")
+  #set($void = $dirs.add("down"))
+#end
+#if($direction == "up" || $direction == "both")
+  #set($void = $dirs.add("up"))
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.levels.value)
+#set($tmp = $parameters.levels.value())
+#set($tmpS = "$tmp")
+#set($levels = 3)
+#if($tmpS.matches("[0-9]{1,2}"))
+  #set($levels = $bwInt.parseInt($tmpS))
+#end
+#if($levels < 1)
+  #set($levels = 1)
+#end
+#if($levels > $maxLevels)
+  #set($levels = $maxLevels)
+#end
+
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.startQuery.value)
+#set($tmp = $parameters.startQuery.value())
+#set($startQuery = "")
+#if("$tmp" != $bwUnset)
+  #set($startQuery = "$tmp")
+  #set($startQuery = $startQuery.trim())
+#end
+
+## Start document: single-select @document parameter. singleValue() is the model-backed option (verified on 2512, spike
+## A/run 1); values() is tried as a fallback. getModelObject() -> ProxyDocument (isUnresolvable first) -> getOldApi() = Module.
+#set($sdVals = [])
+#set($sdOpt = false)
+#set($sdOpt = $parameters.doc.singleValue())
+#if($sdOpt)
+  #set($void = $sdVals.add($sdOpt))
+#else
+  #set($sdAll = false)
+  #set($sdAll = $parameters.doc.values())
+  #if($sdAll)
+    #set($sdVals = $sdAll)
+  #end
+#end
+#set($sdMod = false)
+#set($sdSelected = false)
+#foreach($v in $sdVals)
+  #if(!$sdMod)
+    #set($sdSelected = true)
+    #set($mo = false)
+    #set($mo = $v.getModelObject())
+    #set($moUr = "unknown")
+    #if($mo)
+      #set($moUr = $mo.isUnresolvable())
+    #end
+    #if("$moUr" == "false")
+      #set($sdMod = $mo.getOldApi())
+    #end
+  #end
+#end
+#bwKey($sdMod)
+#set($startKey = $bwKeyOut)
+#set($sdFolder = "")
+#set($sdName = "")
+#if($startKey != "")
+  #set($sdFolder = $sdMod.getModuleFolder())
+  #set($sdFolder = "$sdFolder")
+  #set($sdName = $sdMod.getId())
+  #set($sdName = "$sdName")
+#end
+
+## Link roles: selector values (id() = role id). At most maxRoles. Names and opposite names from the project's
+## link role enumeration (docCoverage spike C2); the id when not found.
+#set($roleAll = [])
+#set($roleVals = false)
+#set($roleVals = $parameters.roles.values)
+#set($roleVals = $parameters.roles.values())
+#bwOptionIds($roleVals $roleAll)
+#set($roleIds = [])
+#foreach($r in $roleAll)
+  #if($roleIds.size() < $maxRoles)
+    #set($void = $roleIds.add($r))
+  #end
+#end
+#set($rolesDropped = $roleAll.size() - $roleIds.size())
+#set($roleName = $objectFactory.newMap())
+#set($roleOpp = $objectFactory.newMap())
+#foreach($r in $roleIds)
+  #set($void = $roleName.put($r, $r))
+  #set($void = $roleOpp.put($r, $r))
+#end
+#if($projectOk && $roleIds.size() > 0)
+  #set($tp = false)
+  #set($tp = $trackerService.getTrackerProject($projectId))
+  #set($roleEnum = false)
+  #if($tp)
+    #set($roleEnum = $tp.getWorkItemLinkRoleEnum())
+  #end
+  #if($roleEnum)
+    #foreach($o in $roleEnum.getAllOptions())
+      #set($oId = "")
+      #set($oId = $o.getId())
+      #set($oIdS = "$oId")
+      #if($roleName.containsKey($oIdS))
+        #set($oName = "")
+        #set($oName = $o.getName())
+        #if("$oName" != "")
+          #set($void = $roleName.put($oIdS, "$oName"))
+          #set($void = $roleOpp.put($oIdS, "$oName"))
+        #end
+        #set($oOpp = "")
+        #set($oOpp = $o.getOppositeName())
+        #if("$oOpp" != "")
+          #set($void = $roleOpp.put($oIdS, "$oOpp"))
+        #end
+      #end
+    #end
+  #end
+#end
+#set($roleSql = "")
+#foreach($r in $roleIds)
+  #if($roleSql != "")
+    #set($roleSql = "${roleSql},")
+  #end
+  #set($roleSql = "${roleSql}'${r}'")
+#end
+## Line styles of the roles, in selection order (same palette as graph.js).
+#set($roleColors = ["rgb(51,103,214)", "rgb(198,40,40)", "rgb(26,127,55)", "rgb(142,68,173)", "rgb(211,84,0)"])
+#set($roleDashes = ["", "9,5", "2,4", "6,3", "12,4,2,4"])
+
+## Resolved work item of the current project, not of an excluded type: aiOk = true, aiId = its id.
+#macro(aiItem $aiW)
+  #set($aiOk = false)
+  #set($aiId = "")
+  #set($aiWUr = "unknown")
+  #if($aiW)
+    #set($aiWUr = $aiW.isUnresolvable())
+  #end
+  #if("$aiWUr" == "false")
+    #set($aiId = "$aiW.getId()")
+    #set($aiType = "")
+    #set($aiTypeObj = false)
+    #set($aiTypeObj = $aiW.getType())
+    #if($aiTypeObj)
+      #set($aiType = "$aiTypeObj.getId()")
+    #end
+    #set($aiProj = "$aiW.getProjectId()")
+    #if(!$excludedTypes.contains($aiType) && $aiProj == $projectId)
+      #set($aiOk = true)
+    #end
+  #end
+#end
+
+#if(!$projectOk)
+  <div class="bw-warn">Advanced Impact Analysis: place this widget on a page of a project.</div>
+#elseif($startKey == "")
+  #if($sdSelected)
+  <div class="bw-warn">Advanced Impact Analysis: the start document cannot be read (deleted, or no access).</div>
+  #else
+  <div class="bw-warn">Advanced Impact Analysis: select the start document in the widget parameters.</div>
+  #end
+#elseif($roleIds.size() == 0)
+  <div class="bw-warn">Advanced Impact Analysis: select at least one link role in the widget parameters.</div>
+#else
+#set($ds = $trackerService.getDataService())
+#set($warn = "")
+#if($rolesDropped > 0)
+  #set($warn = "Only the first $maxRoles link roles are used ($rolesDropped ignored).")
+#end
+#if($scopeWarn != "")
+  #set($warn = "${warn} ${scopeWarn}")
+#end
+
+## ======================================================================= start items
+## All items of the start document (excluded types left out), or the work item query restricted to it with an SQL:()
+## clause (verified on 2512, spike A6/A11). The restriction is checked again in Velocity.
+#set($projectQ = $projectId.replace("'", "''"))
+#set($sdFolderQ = $sdFolder.replace("'", "''"))
+#set($sdNameQ = $sdName.replace("'", "''"))
+#set($startTypeSql = "")
+#if($typeSql != "")
+  #set($startTypeSql = " AND w.c_type NOT IN (${typeSql})")
+#end
+#set($startSql = "SELECT w.c_uri FROM workitem w INNER JOIN module m ON m.c_uri = w.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'${startTypeSql}")
+#set($startCand = [])
+#if($startQuery != "")
+  #set($startLucene = "project.id:${projectId} AND SQL:(${startSql}) AND (${startQuery})")
+  #set($startCand = $trackerService.queryWorkItems($startLucene, "id"))
+#else
+  #set($startCand = $ds.sqlSearch($startSql))
+#end
+## items: id -> work item (all reached items, start items first); itemDoc: id -> document key
+#set($items = $objectFactory.newMap())
+#set($itemOrder = [])
+#set($itemDoc = $objectFactory.newMap())
+#set($startIds = $objectFactory.newMap())
+#foreach($w in $startCand)
+  #aiItem($w)
+  #if($aiOk && !$items.containsKey($aiId))
+    #set($wm = false)
+    #set($wm = $w.getModule())
+    #bwKey($wm)
+    #if($bwKeyOut == $startKey)
+      #set($void = $items.put($aiId, $w))
+      #set($void = $itemOrder.add($aiId))
+      #set($void = $itemDoc.put($aiId, $bwKeyOut))
+      #set($void = $startIds.put($aiId, true))
+    #end
+  #end
+#end
+
+## ======================================================================= traversal
+## lvl.down / lvl.up: id -> level in that direction (start items 0). One pass per direction, its own visited set.
+#set($lvlD = $objectFactory.newMap())
+#set($lvlU = $objectFactory.newMap())
+#set($rTypeSqlD = "")
+#set($rTypeSqlU = "")
+#if($typeSql != "")
+  #set($rTypeSqlD = " AND ws.c_type NOT IN (${typeSql})")
+  #set($rTypeSqlU = " AND wt.c_type NOT IN (${typeSql})")
+#end
+#set($cutText = "")
+#set($reachedMax = 0)
+#foreach($pass in $dirs)
+  #set($visited = $lvlD)
+  #if($pass == "up")
+    #set($visited = $lvlU)
+  #end
+  #set($frontier = [])
+  #foreach($sid in $startIds.keySet())
+    #set($void = $visited.put($sid, 0))
+    #set($void = $frontier.add($sid))
+  #end
+  #set($stop = false)
+  #foreach($lv in [1..7])
+    #if($lv <= $levels && $frontier.size() > 0 && !$stop)
+      ## IN lists of at most chunkSize ids (ids are identifiers: checked before going into SQL)
+      #set($chunks = [])
+      #set($cur = [])
+      #foreach($fid in $frontier)
+        #if($fid.matches("[A-Za-z0-9_.-]+"))
+          #if($cur.size() == $chunkSize)
+            #set($void = $chunks.add($cur))
+            #set($cur = [])
+          #end
+          #set($void = $cur.add("'${fid}'"))
+        #end
+      #end
+      #if($cur.size() > 0)
+        #set($void = $chunks.add($cur))
+      #end
+      #set($next = [])
+      #foreach($chunk in $chunks)
+        #set($inSql = "")
+        #foreach($q in $chunk)
+          #if($inSql != "")
+            #set($inSql = "${inSql},")
+          #end
+          #set($inSql = "${inSql}${q}")
+        #end
+        #if($pass == "down")
+          #set($sql = "SELECT DISTINCT ws.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = wt.fk_uri_project WHERE p.c_id = '${projectQ}' AND ws.fk_uri_project = wt.fk_uri_project AND l.c_role IN (${roleSql}) AND wt.c_id IN (${inSql})${rTypeSqlD}")
+        #else
+          #set($sql = "SELECT DISTINCT wt.c_uri FROM struct_workitem_linkedworkitems l INNER JOIN workitem ws ON ws.c_uri = l.fk_uri_p_workitem INNER JOIN workitem wt ON wt.c_uri = l.fk_uri_workitem INNER JOIN project p ON p.c_uri = ws.fk_uri_project WHERE p.c_id = '${projectQ}' AND ws.fk_uri_project = wt.fk_uri_project AND l.c_role IN (${roleSql}) AND ws.c_id IN (${inSql})${rTypeSqlU}")
+        #end
+        #foreach($r in $ds.sqlSearch($sql))
+          #set($rid = "$r.getId()")
+          #if(!$visited.containsKey($rid))
+            #set($void = $visited.put($rid, $lv))
+            #set($void = $next.add($rid))
+            #if(!$items.containsKey($rid))
+              #set($void = $items.put($rid, $r))
+              #set($void = $itemOrder.add($rid))
+            #end
+          #end
+        #end
+      #end
+      #if($lv > $reachedMax && $next.size() > 0)
+        #set($reachedMax = $lv)
+      #end
+      #if($next.size() > $levelCap)
+        #set($stop = true)
+        #set($cutText = "${cutText} The ${pass}stream analysis stopped after level ${lv}: more than ${levelCap} new work items in that level.")
+      #end
+      #if($items.size() > $itemCap)
+        #set($stop = true)
+        #set($cutText = "${cutText} The ${pass}stream analysis stopped after level ${lv}: more than ${itemCap} work items reached.")
+      #end
+      #set($frontier = $next)
+    #end
+  #end
+#end
+#if($cutText != "")
+  #set($warn = "${warn}${cutText}")
+#end
+
+## ======================================================================= documents of the reached items
+#set($docOnly = [])
+#foreach($id in $itemOrder)
+  #if(!$itemDoc.containsKey($id))
+    #set($w = $items.get($id))
+    #set($wm = false)
+    #set($wm = $w.getModule())
+    #bwKey($wm)
+    #set($void = $itemDoc.put($id, $bwKeyOut))
+  #end
+  #set($dk = $itemDoc.get($id))
+  #if($dk != "" && !$docOnly.contains($dk))
+    #set($void = $docOnly.add($dk))
+  #end
+#end
+#if(!$docOnly.contains($startKey))
+  #set($void = $docOnly.add($startKey))
+#end
+## BW_SHARED documents.vm
+## Items outside any document (not in a LiveDoc) are grouped under a pseudo document key "".
+
+## ======================================================================= links between the reached items
+## All links of the selected roles from a reached item to another reached item (the browser recomputes the levels from
+## them, SPEC 6.2). Ids are written as is: Polarion ids contain no "|" or ";".
+#set($links = [])
+#set($linkN = 0)
+#foreach($id in $itemOrder)
+  #set($w = $items.get($id))
+  #foreach($ls in $w.getLinkedWorkItemsStructsDirect())
+    #set($role = "")
+    #set($roleObj = false)
+    #set($roleObj = $ls.getLinkRole())
+    #if($roleObj)
+      #set($role = "$roleObj.getId()")
+    #end
+    #if($roleIds.contains($role))
+      #set($tgt = false)
+      #set($tgt = $ls.getLinkedItem())
+      #set($tUr = "unknown")
+      #if($tgt)
+        #set($tUr = $tgt.isUnresolvable())
+      #end
+      #if("$tUr" == "false")
+        #set($tid = "$tgt.getId()")
+        #set($tProj = "$tgt.getProjectId()")
+        #if($tid != $id && $tProj == $projectId && $items.containsKey($tid))
+          #if($linkN < $linkCap)
+            #set($trip = [$id, $tid, $role])
+            #set($void = $links.add($trip))
+          #end
+          #set($linkN = $linkN + 1)
+        #end
+      #end
+    #end
+  #end
+#end
+#if($linkN > $linkCap)
+  #set($warn = "${warn} Large page: only the first ${linkCap} links are written to the page (${linkN} found).")
+#end
+
+## ======================================================================= levels, documents and relations (server copy
+## of the browser computation, used by the static view): item level = lowest level over the directions; a document is on
+## the side and level of its lowest item (start document: 0). Relations = links along a path of the analysis
+## (downstream: source one level below its target; upstream: target one level above its source), o = document of the
+## target (left), c = document of the source.
+#set($docLvl = $objectFactory.newMap())
+#set($docSide = $objectFactory.newMap())
+#set($docImp = $objectFactory.newMap())
+#set($void = $docLvl.put($startKey, 0))
+#set($void = $docSide.put($startKey, "start"))
+#foreach($id in $itemOrder)
+  #set($dk = $itemDoc.get($id))
+  #if($dk != "" && $docByKey.containsKey($dk))
+    #set($best = -1)
+    #set($bestSide = "")
+    #if($lvlD.containsKey($id))
+      #set($best = $lvlD.get($id))
+      #set($bestSide = "down")
+    #end
+    #if($lvlU.containsKey($id))
+      #set($lu = $lvlU.get($id))
+      #if($best < 0 || $lu < $best)
+        #set($best = $lu)
+        #set($bestSide = "up")
+      #end
+    #end
+    #if($best > 0)
+      #set($n = 0)
+      #if($docImp.containsKey($dk))
+        #set($n = $docImp.get($dk))
+      #end
+      #set($n = $n + 1)
+      #set($void = $docImp.put($dk, $n))
+    #end
+    #if(!$docLvl.containsKey($dk) || $docLvl.get($dk) > $best)
+      #set($void = $docLvl.put($dk, $best))
+      #set($void = $docSide.put($dk, $bestSide))
+    #end
+  #end
+#end
+#set($edges = $objectFactory.newMap())
+#set($edgeKeys = [])
+#foreach($ln in $links)
+  #set($s = $ln.get(0))
+  #set($t = $ln.get(1))
+  #set($role = $ln.get(2))
+  #set($onPath = false)
+  #if($lvlD.containsKey($s) && $lvlD.containsKey($t))
+    #set($ls1 = $lvlD.get($s))
+    #set($lt1 = $lvlD.get($t))
+    #set($lt1 = $lt1 + 1)
+    #if($ls1 == $lt1)
+      #set($onPath = true)
+    #end
+  #end
+  #if($lvlU.containsKey($s) && $lvlU.containsKey($t))
+    #set($ls1 = $lvlU.get($s))
+    #set($lt1 = $lvlU.get($t))
+    #set($ls1 = $ls1 + 1)
+    #if($ls1 == $lt1)
+      #set($onPath = true)
+    #end
+  #end
+  #set($ok = $itemDoc.get($t))
+  #set($ck = $itemDoc.get($s))
+  #if($onPath && $ok != $ck && $docByKey.containsKey($ok) && $docByKey.containsKey($ck))
+    #set($ek = "${ok}>${ck}")
+    #if(!$edges.containsKey($ek))
+      #set($e = $objectFactory.newMap())
+      #set($void = $e.put("o", $ok))
+      #set($void = $e.put("c", $ck))
+      #set($void = $e.put("links", $objectFactory.newMap()))
+      #foreach($r in $roleIds)
+        #set($void = $e.get("links").put($r, 0))
+      #end
+      #set($void = $edges.put($ek, $e))
+      #set($void = $edgeKeys.add($ek))
+    #end
+    #set($e = $edges.get($ek))
+    #set($nl = $e.get("links").get($role))
+    #set($nl = $nl + 1)
+    #set($void = $e.get("links").put($role, $nl))
+  #end
+#end
+
+## Text helpers for the output
+#macro(aiRolesLabel $aiEd $aiWithCounts)
+  #set($aiLabel = "")
+  #foreach($aiR in $roleIds)
+    #set($aiN = $aiEd.get("links").get($aiR))
+    #if($aiN > 0)
+      #if($aiLabel != "")
+        #set($aiLabel = "${aiLabel} + ")
+      #end
+      #set($aiNm = $roleName.get($aiR))
+      #if($aiWithCounts)
+        #set($aiLabel = "${aiLabel}${aiNm} ${aiN}")
+      #else
+        #set($aiLabel = "${aiLabel}${aiNm}")
+      #end
+    #end
+  #end
+#end
+#macro(aiSideLabel $aiK)
+  #set($aiSideOut = "")
+  #set($aiSd = $docSide.get($aiK))
+  #set($aiLv = $docLvl.get($aiK))
+  #if($aiSd == "start")
+    #set($aiSideOut = "Start document")
+  #elseif($aiSd == "down")
+    #set($aiSideOut = "Downstream level ${aiLv}")
+  #elseif($aiSd == "up")
+    #set($aiSideOut = "Upstream level ${aiLv}")
+  #end
+#end
+#set($impTotal = $items.size() - $startIds.size())
+#set($dirText = "downstream")
+#if($direction == "up")
+  #set($dirText = "upstream")
+#elseif($direction == "both")
+  #set($dirText = "downstream and upstream")
+#end
+
+## ======================================================================= output
+#if($isStatic)
+## ----------------------------------------------------------------- static view (PDF / print)
+## No JavaScript. Elements limited to rect, line, polygon and text (rendered in PDF, docBranches spike V7).
+## Columns: upstream levels on the left, the start document, downstream levels on the right.
+#set($upMax = 0)
+#set($downMax = 0)
+#foreach($k in $docLvl.keySet())
+  #set($sd = $docSide.get($k))
+  #set($lv = $docLvl.get($k))
+  #if($sd == "up" && $lv > $upMax)
+    #set($upMax = $lv)
+  #end
+  #if($sd == "down" && $lv > $downMax)
+    #set($downMax = $lv)
+  #end
+#end
+#set($nCols = $upMax + $downMax + 1)
+#set($colOf = $objectFactory.newMap())
+#foreach($d in $docList)
+  #set($k = $d.get("key"))
+  #if($docLvl.containsKey($k))
+    #set($sd = $docSide.get($k))
+    #set($lv = $docLvl.get($k))
+    #set($ci = $upMax)
+    #if($sd == "up")
+      #set($ci = $upMax - $lv)
+    #elseif($sd == "down")
+      #set($ci = $upMax + $lv)
+    #end
+    #set($void = $colOf.put($k, $ci))
+  #end
+#end
+## Geometry (integers only)
+#set($nW = 220)
+#set($cGap = 150)
+#set($rGap = 16)
+#set($mg = 16)
+#set($nLines = 5 + $extraList.size())
+#set($nH = 16 + 14 * $nLines)
+#set($px = $objectFactory.newMap())
+#set($py = $objectFactory.newMap())
+#set($maxRows = 0)
+#set($lastCol = $nCols - 1)
+#foreach($ci in [0..$lastCol])
+  #set($ri = 0)
+  #foreach($d in $docList)
+    #set($k = $d.get("key"))
+    #if($colOf.containsKey($k) && $colOf.get($k) == $ci)
+      #set($x = $mg + $ci * ($nW + $cGap))
+      #set($y = $mg + $ri * ($nH + $rGap))
+      #set($void = $px.put($k, $x))
+      #set($void = $py.put($k, $y))
+      #set($ri = $ri + 1)
+    #end
+  #end
+  #if($ri > $maxRows)
+    #set($maxRows = $ri)
+  #end
+#end
+#set($cw = 2 * $mg + $nCols * $nW + $lastCol * $cGap)
+#set($ch = 2 * $mg + $maxRows * ($nH + $rGap))
+#set($outW = $cw)
+#set($outH = $ch)
+#if($cw > 700)
+  #set($outW = 700)
+  #set($outH = $ch * 700 / $cw)
+#end
+<div class="ai-root">
+<div><b>Advanced Impact Analysis</b> &mdash; $esc.html($scopeText) &mdash; $dirText, $levels levels, $impTotal impacted work items in $docImp.size() documents <span class="bw-muted">(widget v$bwVersion)</span></div>
+#set($legend = "")
+#set($ri = 0)
+#foreach($r in $roleIds)
+  #if($legend != "")
+    #set($legend = "${legend}, ")
+  #end
+  #set($rn = $roleName.get($r))
+  #set($rc = "solid blue")
+  #if($ri == 1)
+    #set($rc = "dashed red")
+  #elseif($ri == 2)
+    #set($rc = "dotted green")
+  #elseif($ri == 3)
+    #set($rc = "dashed purple")
+  #elseif($ri == 4)
+    #set($rc = "dash-dot orange")
+  #end
+  #set($legend = "${legend}${rn} ${rc}")
+  #set($ri = $ri + 1)
+#end
+#set($startD = $docByKey.get($startKey))
+#bwDocLabel($startD)
+#set($startTxt = "${bwDocLabelOut} ($startIds.size() work items)")
+#if($startQuery != "")
+  #set($startTxt = "${bwDocLabelOut} ($startIds.size() work items, query: ${startQuery})")
+#end
+<div class="bw-muted">Start: $esc.html($startTxt). Upstream documents on the left, downstream on the right; arrows follow the link direction. Line style: $esc.html($legend).</div>
+#if($warn.trim() != "")
+<div class="bw-warn">$esc.html($warn.trim())</div>
+#end
+#if($startIds.size() == 0)
+#set($noStartTxt = "No start work item: the start document has no work item (excluded types left out).")
+#if($startQuery != "")
+  #set($noStartTxt = "No start work item: no work item of the start document matches the query (excluded types left out).")
+#end
+<p>$esc.html($noStartTxt)</p>
+#elseif($impTotal == 0)
+<p>No work item reached with the selected link roles.</p>
+#end
+<svg xmlns="http://www.w3.org/2000/svg" width="$outW" height="$outH" viewBox="0 0 $cw $ch">
+<rect x="0" y="0" width="$cw" height="$ch" fill="rgb(255,255,255)"/>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #set($eo = $e.get("o"))
+  #set($ec = $e.get("c"))
+  #if($px.containsKey($eo) && $px.containsKey($ec))
+  #set($half = $nH / 2)
+  #set($x1 = $px.get($eo) + $nW)
+  #set($y1 = $py.get($eo) + $half)
+  #set($x2 = $px.get($ec))
+  #set($y2 = $py.get($ec) + $half)
+  #set($xm = $x1 + $cGap / 2)
+  #set($color = "")
+  #set($dash = "")
+  #set($ri = 0)
+  #foreach($r in $roleIds)
+    #if($color == "" && $e.get("links").get($r) > 0)
+      #set($color = $roleColors.get($ri))
+      #set($dash = $roleDashes.get($ri))
+    #end
+    #set($ri = $ri + 1)
+  #end
+  #aiRolesLabel($e $showCounts)
+  #set($ax = $x1 + 9)
+  #set($ay1 = $y1 - 5)
+  #set($ay2 = $y1 + 5)
+  #set($lx = $xm + 3)
+  #set($ly = $y2 - 4)
+<line x1="$ax" y1="$y1" x2="$xm" y2="$y1" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y1" x2="$xm" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$xm" y1="$y2" x2="$x2" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<polygon points="$ax,$ay1 $x1,$y1 $ax,$ay2" fill="$color"/>
+<text x="$lx" y="$ly" font-family="Arial" font-size="9" fill="$color">$esc.html($aiLabel)</text>
+  #end
+#end
+#foreach($d in $docList)
+  #set($k = $d.get("key"))
+  #if($px.containsKey($k))
+    #set($x = $px.get($k))
+    #set($y = $py.get($k))
+    #set($tx = $x + 7)
+    #set($fill = "rgb(246,248,252)")
+    #if($k == $startKey)
+      #set($fill = "rgb(255,246,230)")
+    #end
+<rect x="$x" y="$y" width="$nW" height="$nH" rx="5" fill="$fill" stroke="rgb(120,132,155)" stroke-width="1"/>
+    #set($lines = [])
+    #set($void = $lines.add($d.get("id")))
+    #set($void = $lines.add($d.get("title")))
+    #set($dSs = $d.get("space"))
+    #if($multiProject)
+      #set($dPs = $d.get("project"))
+      #set($dSs = "${dPs} / ${dSs}")
+    #end
+    #set($void = $lines.add($dSs))
+    #aiSideLabel($k)
+    #set($void = $lines.add($aiSideOut))
+    #set($imp = 0)
+    #if($docImp.containsKey($k))
+      #set($imp = $docImp.get($k))
+    #end
+    #set($dItems = $d.get("items"))
+    #if($k == $startKey)
+      #set($void = $lines.add("Start items: $startIds.size() / ${dItems}"))
+    #else
+      #set($void = $lines.add("Impacted: ${imp} / ${dItems}"))
+    #end
+    #foreach($f in $extraList)
+      #set($fv = "$d.get($f)")
+      #if($f == "items" && $fv == "-1")
+        #set($fv = "")
+      #end
+      #set($fl = $f)
+      #if($f == "type")
+        #set($fl = "Type")
+      #elseif($f == "status")
+        #set($fl = "Status")
+      #elseif($f == "created")
+        #set($fl = "Created")
+      #elseif($f == "updated")
+        #set($fl = "Updated")
+      #elseif($f == "items")
+        #set($fl = "Work items")
+      #end
+      #set($void = $lines.add("${fl}: ${fv}"))
+    #end
+    #set($li = 0)
+    #foreach($t in $lines)
+      #set($ts = "$t")
+      #if($ts.length() > 36)
+        #set($ts2 = $ts.substring(0, 35))
+        #set($ts = "${ts2}...")
+      #end
+      #set($ty = $y + 19 + $li * 14)
+      #set($fw = "normal")
+      #if($li == 0)
+        #set($fw = "bold")
+      #end
+<text x="$tx" y="$ty" font-family="Arial" font-size="11" font-weight="$fw" fill="rgb(25,35,55)">$esc.html($ts)</text>
+      #set($li = $li + 1)
+    #end
+  #end
+#end
+</svg>
+<table class="bw-table">
+<tr><th>Document</th><th>Position</th><th>Impacted work items</th><th>Work items</th></tr>
+#foreach($d in $docList)
+  #set($k = $d.get("key"))
+  #if($docLvl.containsKey($k))
+    #aiSideLabel($k)
+    #set($imp = 0)
+    #if($docImp.containsKey($k))
+      #set($imp = $docImp.get($k))
+    #end
+    #bwDocLabel($d)
+<tr><td>$esc.html($bwDocLabelOut)</td><td>$esc.html($aiSideOut)</td><td>$imp</td><td>$d.get("items")</td></tr>
+  #end
+#end
+</table>
+#if($edgeKeys.size() > 0)
+<table class="bw-table">
+<tr><th>Document (link sources)</th><th>Roles (links)</th><th>Document (link targets)</th></tr>
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #aiRolesLabel($e true)
+  #set($c = $docByKey.get($e.get("c")))
+  #bwDocLabel($c)
+  #set($cLabel = $bwDocLabelOut)
+  #set($o = $docByKey.get($e.get("o")))
+  #bwDocLabel($o)
+<tr><td>$esc.html($cLabel)</td><td>$esc.html($aiLabel)</td><td>$esc.html($bwDocLabelOut)</td></tr>
+#end
+</table>
+#end
+#if($impTotal > 0)
+<table class="bw-table">
+<tr><th>Impacted work item</th><th>Title</th><th>Document</th><th>Direction</th><th>Level</th></tr>
+#set($shownN = 0)
+#foreach($id in $itemOrder)
+  #if(!$startIds.containsKey($id) && $shownN < 200)
+    #set($w = $items.get($id))
+    #set($wT = "")
+    #set($wT = $w.getTitle())
+    #set($dk = $itemDoc.get($id))
+    #set($dLabel = "")
+    #if($docByKey.containsKey($dk))
+      #bwDocLabel($docByKey.get($dk))
+      #set($dLabel = $bwDocLabelOut)
+    #end
+    #set($iDir = "")
+    #set($iLv = "")
+    #if($lvlD.containsKey($id))
+      #set($iDir = "downstream")
+      #set($iLv = $lvlD.get($id))
+    #end
+    #if($lvlU.containsKey($id))
+      #set($lu = $lvlU.get($id))
+      #if($iDir == "" || $lu < $iLv)
+        #set($iDir = "upstream")
+        #set($iLv = $lu)
+      #end
+    #end
+<tr><td>$esc.html($id)</td><td>$!esc.html($wT)</td><td>$esc.html($dLabel)</td><td>$iDir</td><td>$iLv</td></tr>
+    #set($shownN = $shownN + 1)
+  #end
+#end
+</table>
+#if($impTotal > 200)
+<p class="bw-muted">First 200 of $impTotal impacted work items (the browser view and the Excel export list all of them).</p>
+#end
+#end
+</div>
+#else
+## ----------------------------------------------------------------- browser view (model + inlined JS)
+#set($countsFlag = "1")
+#if(!$showCounts)
+#set($countsFlag = "0")
+#end
+#set($rolesStr = "")
+#foreach($r in $roleIds)
+#if($rolesStr != "")
+#set($rolesStr = "${rolesStr};")
+#end
+#set($rn = $roleName.get($r))
+#set($ro = $roleOpp.get($r))
+#set($rolesStr = "${rolesStr}${r}|${rn}|${ro}")
+#end
+## Document index of each reached item (position in docList; -1 = not in a shown document).
+#set($docIdx = $objectFactory.newMap())
+#set($di = 0)
+#foreach($d in $docList)
+#set($void = $docIdx.put($d.get("key"), $di))
+#set($di = $di + 1)
+#end
+<div class="ai-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-mode="all" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-dir="$direction" data-levels="$levels" data-start="$esc.html($startKey)" data-query="$esc.html($startQuery)" data-warn="$esc.html($warn.trim())">
+  <div class="bw-muted">$esc.html($scopeText)</div>
+  <div class="bw-model" style="display:none">
+#foreach($d in $docList)
+    <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')"></i>
+#end
+## Reached items "id|document index|type|start flag|title;" (separators in titles replaced) and links "source|target|role;".
+    <i class="ai-it" data-v="#foreach($id in $itemOrder)#set($w = $items.get($id))#set($wT = '')#set($wT = $w.getTitle())#set($wT = "$wT")#set($wT = $wT.replace('|', ' '))#set($wT = $wT.replace(';', ' '))#set($wTy = '')#set($wTyO = false)#set($wTyO = $w.getType())#if($wTyO)#set($wTy = "$wTyO.getId()")#end#set($dk = $itemDoc.get($id))#set($dx = -1)#if($docIdx.containsKey($dk))#set($dx = $docIdx.get($dk))#end#set($sf = 0)#if($startIds.containsKey($id))#set($sf = 1)#end$esc.html("${id}|${dx}|${wTy}|${sf}|${wT}");#end"></i>
+    <i class="ai-ln" data-v="#foreach($ln in $links)#set($s = $ln.get(0))#set($t = $ln.get(1))#set($role = $ln.get(2))$esc.html("${s}|${t}|${role}");#end"></i>
+  </div>
+</div>
+## Excel export library (xlsx-js-style, resources/xlsx.js), loaded with the Widget SDK directive.
+<div class="bw-lib" style="display:none">#loadWidgetJs("resources/xlsx.js")</div>
+<script>
+## BW_INLINE_JS
+</script>
+#end
+#end

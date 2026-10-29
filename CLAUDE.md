@@ -5,13 +5,18 @@ Guidance for Claude Code when working in this repository.
 ## Project in one paragraph
 
 Polarion LiveReport widgets that display the LiveDocs of a project and the **relations between them**,
-deduced from **work item links** (and document metadata where available). Two widgets share one client core,
+deduced from **work item links** (and document metadata where available). The widgets share one client core,
 one build and one test setup:
 - **docBranches** (`widgets/docBranches/`): which document is a branch / copy / derived document of which.
 - **docCoverage** (`widgets/docCoverage/`): for selected documents and 1–5 link roles, which document
   covers which (link counts, coverage %, uncovered items). Plan agreed with the PO: (1) restructure into
   `widgets/` + `shared/` (done), (2) specification `widgets/docCoverage/SPECIFICATION.md` + spike C1–C4 on 2512
   (`tests/docCoverage-v0.1.x/`, done), (3) implementation reusing `shared/` (0.1.0 done and validated on 2512).
+- **advImpact** (`widgets/advImpact/`, branch `claude/advimpact-widget-spec-7zkne9`): multi-level impact analysis from one
+  document or item subset along 1–5 link roles (default 3 levels, up to 7). Spike on 2512 **closed** (method: SQL per level + Open API
+  links, SPEC §6.1). **0.1.0 implemented** (tested on mocks and in Chromium, not yet on 2512; harness `tools/vtest/advImpact/`);
+  the spec (PO answers Q1–Q12 recorded; "both" = downstream and upstream analyses combined) is in its `SPECIFICATION.md`, the spike plan and the diagnostic widget `aiSpike` in `tests/advImpact-v0.1.x/`
+  (`tools/vtest/aiSpike/` smoke-tests it; rebuild `aiSpike.zip` after edits).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
 
 ## Required reading before coding
@@ -126,6 +131,16 @@ Verified through web search (2026-10-27):
   `getRevision()` empty for a document added without revision = HEAD). Links in the collection:
   `#/project/P/collection/ID/wiki/<space>/<doc>`, `…/workitem?id=`, other project `#/project/P/collection/CP//ID/…`.
   docCoverage 0.3.0 implements it (verified by the PO on 2512).
+- **Verified by the advImpact spike run 1 on 2512** (`tests/advImpact-v0.1.x/spike-tests.md`): `sqlSearch` accepts nested
+  `IN (SELECT … FROM struct_workitem_linkedworkitems …)` sub-selects (several levels in one query, union with `OR`);
+  `$trackerService.queryWorkItems(query, "id")` accepts `document.id:"Name"` and `SQL:(…)` restrictions; Lucene
+  `linkedWorkItemsOf:([{"filter":"SQL:(…)","follows":[roles],"steps":3}])` runs and returned the items linking to the filter set,
+  levels 1..3, without the start items (same result as the level-by-level SQL downstream). Single-select `@document`:
+  `singleValue()` → option with `getModelObject()`. Part A: `sqlSearch` **accepts `WITH RECURSIVE`** (guide §7.1 says single
+  SELECT only: this instance allows it); `linkedWorkItemsOf` follows **incoming links only** (downstream) and `steps` = last
+  level returned; Open API `getLinkedWorkItemsStructsBack()` exists, its `getLinkedItem()` is the link **source**; recursive SQL
+  works in both directions; `queryWorkItems` with `document.id:"Name" AND (query)` or `SQL:(…) AND (query)` returns the same subset.
+  Part B: copies of copies counted once (visited set). Part C (PO): level-by-level traversal very fast up to 7 levels on the largest chain.
 - **Verified by the PO on 2512 with docCoverage 0.4.0**: traceability matrix export (item titles via `getTitle()`, link role
   opposite names via `getOppositeName()`, all link pairs in the page model).
 
@@ -167,7 +182,7 @@ test-data/                     anonymised sample structures for manual verificat
 - Update the widget's `SPECIFICATION.md` (open questions / decisions log) whenever a requirement is clarified.
 - **Shared code**: a change in `shared/` affects every widget. Rebuild and test all of them (`tools/test-widget.sh all`),
   and bump the version of each widget whose package changes. Keep widget-specific logic in `widgets/<w>/src/`.
-  Each widget has its own root class (`bw-root` for docBranches, `cw-root` for docCoverage) so that two widgets on one
+  Each widget has its own root class (`bw-root` for docBranches, `cw-root` for docCoverage, `ai-root` for advImpact) so that two widgets on one
   page never pick up each other's roots. The mock Polarion objects live in `tools/vtest/docBranches/WidgetHarness.java`
   and are compiled with every harness (`tools/vtest/<w>/*Harness.java`).
 - No customer or project-specific data in the repo. Exception agreed with the PO: the spike test set on the sandbox
@@ -186,7 +201,7 @@ test-data/                     anonymised sample structures for manual verificat
   - arithmetic is reliable on Integer only (verified: Long differences such as `$date.systemTime` ones do not compute)
 - **Always run `tools/vcheck.sh` before committing a `.vm` change.** It parses every template with Velocity 1.4
   (needs Java; it downloads the jars to `tools/.lib/` on first use).
-- After editing `tests/v0.1.x/spike-widget/bwSpike/`, `tests/docCoverage-v0.1.x/spike-widget/cvSpike/` or
+- After editing `tests/advImpact-v0.1.x/spike-widget/aiSpike/`, `tests/v0.1.x/spike-widget/bwSpike/`, `tests/docCoverage-v0.1.x/spike-widget/cvSpike/` or
   `tests/docCoverage-v0.3.x/spike-widget/ccSpike/`, rebuild its zip (folder at zip root, Deflated).
   `tools/vtest/cvSpike/SpikeHarness.java` and `tools/vtest/ccSpike/CollectionSpikeHarness.java` smoke-test them on the
   docBranches mocks (the ccSpike collection mocks are set through `WidgetHarness.TRANSACTION`).

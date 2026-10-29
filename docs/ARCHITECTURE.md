@@ -1,12 +1,12 @@
 # Architecture of the document widgets
 
-This document explains how **docBranches** and **docCoverage** are built, how the pieces fit together, and where to
+This document explains how **docBranches**, **docCoverage** and **advImpact** are built, how the pieces fit together, and where to
 make a change. Requirements and decisions are in each `widgets/<widget>/SPECIFICATION.md`. Polarion facts verified on
 2512 are listed in `CLAUDE.md`. The Velocity dialect rules are in `Polarion_Development_Guide.md` §3.1.9.
 
 ## 1. Overview
 
-Both widgets are **Velocity LiveReport widgets**, uploaded as a zip (Administration → Velocity Widgets). They have no
+The widgets are **Velocity LiveReport widgets**, uploaded as a zip (Administration → Velocity Widgets). They have no
 Java code, no CDN dependency and no server-side extension. One template (`render.vm`) runs on the Polarion server and
 produces one of two outputs:
 
@@ -88,7 +88,7 @@ Link direction (verified on 2512): a link is stored on the **source** item (`fk_
 ### Page model (contract between Velocity and JS)
 
 Both widgets write:
-- the root element `<div class="bw-root">` (docBranches) or `<div class="cw-root">` (docCoverage), whose `data-*`
+- the root element `<div class="bw-root">` (docBranches), `<div class="cw-root">` (docCoverage) or `<div class="ai-root">` (advImpact, see below), whose `data-*`
   attributes carry the settings;
 - a hidden `<div class="bw-model">` with one `<i class="bw-n">` per document and one `<i class="bw-e">` per edge.
 
@@ -107,6 +107,25 @@ root holds a visible scope line (`Project: X` / `Projects: A, B`) and, if any, t
 | `bw-e`, docCoverage | `data-r` (`role:links;…`), `data-u` / `data-d` (`role:id id;…`: upstream items covered / downstream items with links) |
 
 If you add a field, change both sides (render.vm output and `readModel` in graph.js) and the harness checks.
+
+### advImpact (multi-level impact analysis)
+
+advImpact reuses style, params, common and documents.vm but works differently from the two others (method decided by
+the spike, `tests/advImpact-v0.1.x/spike-tests.md`):
+
+| Step | advImpact |
+|---|---|
+| Own parameters | start document (`@document`, single select: `singleValue()`), start query (Lucene), link roles (1–5, names from the role enumeration), direction (`down` / `up` / `both`), levels (1–7). Limits: `levelCap` = 5 000 new items per level and direction, `itemCap` = 20 000 reached items, `linkCap` = 40 000 links, `chunkSize` = 500 ids per `IN` list |
+| Start items | all items of the start document (SQL, excluded types left out), or `queryWorkItems("project.id:P AND SQL:(<start SQL>) AND (<query>)", "id")`; the document is checked again in Velocity |
+| Traversal | one pass per direction, its own visited map (`lvlD` / `lvlU`: id → level, start items 0). Per level: one `sqlSearch` per chunk of frontier ids on `struct_workitem_linkedworkitems` (downstream: `wt.c_id IN (…)` → link sources `ws`; upstream: `ws.c_id IN (…)` → targets `wt`), same project, selected roles, excluded types left out. Stops at the levels, or with a warning after a level above `levelCap` or above `itemCap` items |
+| Documents | `$docOnly` = the documents of the reached items and the start document, then **documents.vm** |
+| Links | `getLinkedWorkItemsStructsDirect()` of every reached item: the links of a selected role to another reached item (same project), as triples `[source, target, role]` |
+| Static view | the browser computation done in Velocity: item level = lowest over the directions, document side and level of its lowest item; relations = links along a path (downstream: source level = target level + 1; upstream: target level = source level + 1), `o` = document of the target, `c` = of the source; columns: upstream levels, start document, downstream levels |
+
+Page model of advImpact: root `<div class="ai-root">` with `data-dir`, `data-levels`, `data-start` (start document
+key), `data-query`, `data-roles`, `data-warn` (and the common `data-*`); `bw-n` per document (common attributes only);
+one `<i class="ai-it" data-v="id|document index|type|start flag|title;…">` (document index = position of the `bw-n`,
+-1 outside a document; `|` and `;` in titles replaced) and one `<i class="ai-ln" data-v="source|target|role;…">`.
 
 ## 4. Client side: `core.js` + `graph.js`
 
@@ -152,6 +171,12 @@ and provides the following:
 Widget-specific client logic:
 - **docBranches:** `visibleEdges` (indirect toggle + `restrictEdge` by kind). The Excel sheets are relations,
   documents and linked items.
+- **advImpact:** `compute()` runs one breadth-first search per shown direction over the links of the shown roles, up
+  to the levels shown (each item at its lowest level, parents = links along a path); `relations()` aggregates the path
+  links per document pair. It overrides `layoutAndDraw` with its own `columns()` layout (column = signed level:
+  upstream left, start document, downstream right; barycentre ordering), keeps the core drawing (`arrowAtOrigin`),
+  and adds the document picker, document details with parents, the traceability matrix and the Excel sheets
+  Relations, Documents, Impacted items and Impact paths.
 - **docCoverage:** `compute()` restricts the edges to the shown roles and documents, then recomputes the coverage
   in the browser. The covered count is the union of the visible edges' upstream sets. The uncovered list is the
   never-covered items from the server plus the items covered only by hidden lines. Also in graph.js: the document
@@ -182,6 +207,10 @@ tools/test-widget.sh [widget|all]    build + render on mocks + Chromium checks, 
   with the SQL filters the widgets use, unresolvable objects, selector options `RoleOpt`/`DocOpt`, `Param` with
   `value()`/`singleValue()`/`values()`). It is compiled with every harness, and it is also the docBranches harness:
   test set modelled on the `VforIA` spike set.
+- `tools/vtest/advImpact/ImpactHarness.java` builds an impact test set (customer spec, two system specs, a software
+  spec, tests, a cycle, a same-document link, an unresolvable target). Its traversal SQL is answered by
+  `WidgetHarness.SQL_HOOK` and its start query by `WidgetHarness.QUERY_HOOK` (interpreters of the generated statements:
+  they check the template logic, not Polarion's SQL or Lucene, which the spike verified on 2512).
 - `tools/vtest/docCoverage/CoverageHarness.java` builds a coverage test set (customer spec, two system specs, one
   software spec) on the same mocks.
 - `tools/vtest/<w>/browser-check.js` loads the rendered browser and PDF fragments in Chromium (Playwright). It clicks
@@ -234,7 +263,8 @@ each widget whose package changes.
   Links and Excel hyperlinks open in the project of the document or item, never in a fixed project.
 - **Budget:** the interactive render must stay well within the 10 s scripting budget. Page model sizes are capped
   (docBranches: 30 samples per pair; docCoverage: 500 uncovered items per document, 20 000 link pairs and 20 000 work
-  items with titles per page for the traceability matrix, with a warning when reached). The work grows with the number of projects in scope; a
+  items with titles per page for the traceability matrix, with a warning when reached; advImpact: 5 000 new items per
+  level and direction, 20 000 reached items, 40 000 links). The work grows with the number of projects in scope; a
   warning is shown above 5 projects.
 - **No project-specific values** (types, roles, statuses) in code: they are parameters or are read from the project
   configuration.
