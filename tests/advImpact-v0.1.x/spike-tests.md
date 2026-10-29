@@ -1,7 +1,7 @@
 # Spike plan — advImpact (multi-level impact analysis)
 
-**Status:** run 1 and part A done on 2512 (2026-10-29, project `EOLE_AI_MCP_TESTS`, small test set, see "Findings");
-4 lines of part A to redo (A1b, A6, A10, A11/A12), then parts B and C (run sheet). Results go into the "Result" column below, into `widgets/advImpact/SPECIFICATION.md` and into the CLAUDE.md
+**Status:** run 1 and part A (with its redo) **done** on 2512 (2026-10-29, project `EOLE_AI_MCP_TESTS`, small test set, see
+"Findings"); next: parts B and C of the run sheet. Results go into the "Result" column below, into `widgets/advImpact/SPECIFICATION.md` and into the CLAUDE.md
 "Verified" notes. The mocks are aligned with a result only once it is known.
 
 ## Questions
@@ -10,8 +10,8 @@
 |---|---|---|---|---|
 | I1 | Does `sqlSearch` accept one query for several levels: `WITH RECURSIVE` (expected refused: guide §7.1 allows a single `SELECT`), a self-join of the link table, nested `IN` sub-selects (one per level, union of the levels)? | One query per direction instead of N | `sql` | **All run on 2512.** `WITH RECURSIVE` is **accepted** (contrary to the expectation from guide 7.1): 8 items down, same as `bfs`. `join3` runs. `nested` runs down (run 1) and up (A3: 2 items, same as `bfs` up). Recursive up: A1b |
 | I2 | Level by level in SQL: frontier ids in `IN (...)` lists of at most 500, one query per chunk, level and direction. Time per level, largest frontier | Default design | `bfs` mode `sql` | run 1 (down, 3 levels, 6 start items): **runs**, 1 query per level, new items 5 / 2 / 0, a few ms per level. Large set: to run |
-| I3 | Level by level with the Open API: `getLinkedWorkItemsStructsDirect()` (upstream) and `getLinkedWorkItemsStructsBack()` (downstream) per frontier item. Does `Back` exist on 2512, does its `getLinkedItem()` return the **source** item? Same counts as mode `sql`? | No SQL at all; parents and roles for free | `bfs` mode `api` (probe table) | A9: **`getLinkedWorkItemsStructsBack()` exists**, its `getLinkedItem()` is the **source** item (`LinkedWorkItemStruct`, role id readable). Mode api down = same new items per level as SQL (5 / 3 / 0). Api both from SystemSpec_1: A10 to run |
-| I4 | Start items: a) all items of the document by SQL; b) the user's Lucene query restricted to the document with `document.id:"space/name"` (`_default` space omitted) or with an `SQL:(…)` clause, through `trackerService.queryWorkItems(query, "id")` | Start subset (F2, Q1) | `start` | Both query forms are **accepted** (`document.id:"CustomerSpecSpike"` and `SQL:(…)`), but `type:requirement` and `type:requirement AND status:in_analysis` matched 0 items in both forms: the query, not the scope, selects nothing. Redo A6 with `HAS_VALUE:title` (must give 6) |
+| I3 | Level by level with the Open API: `getLinkedWorkItemsStructsDirect()` (upstream) and `getLinkedWorkItemsStructsBack()` (downstream) per frontier item. Does `Back` exist on 2512, does its `getLinkedItem()` return the **source** item? Same counts as mode `sql`? | No SQL at all; parents and roles for free | `bfs` mode `api` (probe table) | **Answered.** `getLinkedWorkItemsStructsBack()` exists, its `getLinkedItem()` is the **source** item (`LinkedWorkItemStruct`, role id readable). Mode api gives the same items per level as SQL, down (A9: 5 / 3 / 0) and both (A10 = A8: 9 items) |
+| I4 | Start items: a) all items of the document by SQL; b) the user's Lucene query restricted to the document with `document.id:"space/name"` (`_default` space omitted) or with an `SQL:(…)` clause, through `trackerService.queryWorkItems(query, "id")` | Start subset (F2, Q1) | `start` | **Answered.** Both forms work and agree: `type:stakeholderrequirement AND (status:in_analysis)` gave 4 of the 6 items with `document.id:"CustomerSpecSpike"` and with `SQL:(…)`, 0 outside the document (A6); `bfs` from that subset works (A11) |
 | I5 | Inherited links of copies (spike R2) and cycles: the visited set counts each item once, at its lowest level | Correct levels | `bfs` (column "rows already visited") | open |
 | I9 | Direction "both" = a pure downstream and a pure upstream traversal, combined (PO, Q12): time of the two passes, combined documents | "Both" costs two analyses | `bfs` direction both | A8 (SystemSpec_1, sql): down 3 items (TestSpec1, subSysSpec1, subSysSpec2), up 2 (CustomerSpecSpike), **SystemSpec_2 not reached** (Q12 behaviour confirmed), 9 items in total, 8 ms. Times on the large set: part C |
 | I6 | Times for 3 and 7 levels, directions down, up and both, on `EOLE_AI_MCP_TESTS` (120 docs) and on a large project | Level cap (Q6), item cap per level (Q11) | `bfs` | open |
@@ -61,15 +61,16 @@ SystemSpec_2 (3); level 2 TestSpec1, subSysSpec1, subSysSpec2 (1 each).
 | A3 `nested` up from TestSpec1 | 2 items: SystemSpec_1, CustomerSpecSpike | yes |
 | A4 `lucene` steps 1 | 5 items = level 1 only | yes |
 | A5 `lucene` from TestSpec1 | 0 items: linkedWorkItemsOf follows incoming links only (downstream) | yes |
-| A6 `start` | query `type:requirement AND status:in_analysis`: 0 items in both forms: the query matches nothing | **redo** |
+| A6 `start` | First query matched nothing. Redo with `type:stakeholderrequirement AND status:in_analysis`: a) 6, b) docid 4, sqlscope 4, 0 outside | yes (redo) |
 | A7 `bfs` up from TestSpec1 | 3 start items; level 1: 1 (SystemSpec_1), level 2: 1 (CustomerSpecSpike), level 3: 0. Same as A3 | yes |
 | A8 `bfs` both from SystemSpec_1 | Down 3, up 2, SystemSpec_2 not reached, 9 items, 11 parent links, 12 links between reached items | yes |
 | A9 `bfs` api, both, from CustomerSpecSpike | Down 5 / 3 / 0 (same as SQL and `rec`), up 0 (nothing above the customer specification). Probe: Back links = `LinkedWorkItemStruct`, role `satisfies`, linked item = the SystemSpec item (source); a Direct `parent` link is ignored (role not selected) | yes |
-| "A10" on the page | Was the sheet's A11 (start items `docid`): 0 start items, because the query matched nothing (as A6) | **redo** |
-| "A11" on the page | Was the sheet's A12 (paths no) but with start items `docid`: 0 start items | **redo** |
-| sheet A10 | (mode api, both, from SystemSpec_1) not run | **run** |
+| A1b `rec` up from TestSpec1 | 2 items: CustomerSpecSpike, SystemSpec_1 (= A3, A7). Recursive SQL works in both directions | yes (redo) |
+| A10 `bfs` api, both, from SystemSpec_1 | Down 3 / 0, up 2 / 0: the same 9 items and 4 documents as A8 (mode sql) | yes (redo) |
+| A11 `bfs` api, both, start items `docid` (query of A6) | 4 start items; down: level 1 4 items (SystemSpec_2 3, SystemSpec_1 1), level 2 3 items (TestSpec1, subSysSpec1, subSysSpec2); up: 0; 11 items in total | yes (redo) |
+| A12 `bfs` api, both, paths no | Same levels as A9 (5 / 3 / 0); the all-links scan is skipped (0 links). In mode api the parent links are always recorded (they come with the traversal), "paths" only switches the all-links scan | yes (redo) |
 
-Conclusions so far: all three ways (SQL per level, recursive / nested SQL, Open API per item) give the same items; Lucene
+Conclusions of part A: all four ways (SQL per level, recursive SQL, nested SQL, Open API per item) give the same items in both directions; Lucene
 `linkedWorkItemsOf` gives the same downstream items in one query but cannot go upstream. The "rows already visited" of
 mode api count **links** to known items, those of mode sql count **distinct items**, so the two columns differ (expected).
 
@@ -84,18 +85,18 @@ parameters listed, keep the others at their default (direction down, levels 3, m
 | # | Test | Start document | Other parameters | Expected / what it tells |
 |---|---|---|---|---|
 | A1 | `sql` | CustomerSpecSpike | SQL variant `rec` | Done: runs |
-| **A1b** | `sql` | TestSpec1 | SQL variant `rec`, direction **up** (new in the spike widget: re-upload `aiSpike.zip`) | Same 2 items as A3 (SystemSpec_1, CustomerSpecSpike) |
+| A1b | `sql` | TestSpec1 | SQL variant `rec`, direction **up** (new in the spike widget: re-upload `aiSpike.zip`) | Same 2 items as A3 (SystemSpec_1, CustomerSpecSpike) |
 | A2 | `sql` | CustomerSpecSpike | SQL variant `join3` | Ran or error; items exactly 3 hops away: expected 0 on this set |
 | A3 | `sql` | TestSpec1 | SQL variant `nested`, direction **up** | Upstream in one query: expected the SystemSpec item(s) it verifies (level 1) and CustomerSpecSpike items (level 2) |
 | A4 | `lucene` | CustomerSpecSpike | Levels **1** | Expected 5 (level 1 only) if `steps` limits the levels; 7 if it does not |
 | A5 | `lucene` | TestSpec1 | Levels 3 | **Direction of linkedWorkItemsOf**: 0 or few items = it follows incoming links only (downstream, as run 1); SystemSpec / CustomerSpecSpike items = it also follows outgoing links |
-| **A6** | `start` | CustomerSpecSpike | Work item query = **`HAS_VALUE:title`** (every item has a title), then a narrower one: open one item of the document and use its type id as shown in the URL / Administration (e.g. `type:customerRequirement`), or `title:<a word of one title>` | `HAS_VALUE:title`: both b) = 6 (= a), 0 outside. Narrower: both b) the same count, < 6 |
+| A6 | `start` | CustomerSpecSpike | Work item query = **`HAS_VALUE:title`** (every item has a title), then a narrower one: open one item of the document and use its type id as shown in the URL / Administration (e.g. `type:customerRequirement`), or `title:<a word of one title>` | `HAS_VALUE:title`: both b) = 6 (= a), 0 outside. Narrower: both b) the same count, < 6 |
 | A7 | `bfs` | TestSpec1 | Direction **up** | Same items as A3, level by level |
 | A8 | `bfs` | SystemSpec_1 | Direction **both** | Down: TestSpec1 / subSysSpec1 items linking to SystemSpec_1. Up: CustomerSpecSpike items. **SystemSpec_2 must not appear**: it is only a "sibling" through CustomerSpecSpike (Q12) |
 | A9 | `bfs` | CustomerSpecSpike | Mode **api** | Same level table as run 1 (5 / 2 / 0). Probe table: Back links with role and linked item; is the linked item the **source** (a SystemSpec item)? No red warning |
-| **A10** | `bfs` | SystemSpec_1 | Mode **api**, direction **both**, start items **all** | Same 9 items and documents as A8 |
-| **A11** | `bfs` | CustomerSpecSpike | Start items `docid`, work item query = the **narrower query of A6** (one that gave > 0) | Level table starting from the subset (level 0 = A6 count) |
-| **A12** | `bfs` | CustomerSpecSpike | Paths **no**, start items **all** (not docid) | Same levels as A9 down (5 / 3 / 0); total time without the path scans |
+| A10 | `bfs` | SystemSpec_1 | Mode **api**, direction **both**, start items **all** | Same 9 items and documents as A8 |
+| A11 | `bfs` | CustomerSpecSpike | Start items `docid`, work item query = the **narrower query of A6** (one that gave > 0) | Level table starting from the subset (level 0 = A6 count) |
+| A12 | `bfs` | CustomerSpecSpike | Paths **no**, start items **all** (not docid) | Same levels as A9 down (5 / 3 / 0); total time without the path scans |
 
 Note on the parameter "Work item query": it is used only by the test `start` and when "Start items" is `docid` or
 `sqlscope`. With "Start items" = `all` it is ignored. If a run shows **0 start items**, the query matches nothing.

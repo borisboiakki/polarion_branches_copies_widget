@@ -137,7 +137,8 @@ Verified through web search (2026-10-27):
   levels 1..3, without the start items (same result as the level-by-level SQL downstream). Single-select `@document`:
   `singleValue()` → option with `getModelObject()`. Part A: `sqlSearch` **accepts `WITH RECURSIVE`** (guide §7.1 says single
   SELECT only: this instance allows it); `linkedWorkItemsOf` follows **incoming links only** (downstream) and `steps` = last
-  level returned; Open API `getLinkedWorkItemsStructsBack()` exists, its `getLinkedItem()` is the link **source**.
+  level returned; Open API `getLinkedWorkItemsStructsBack()` exists, its `getLinkedItem()` is the link **source**; recursive SQL
+  works in both directions; `queryWorkItems` with `document.id:"Name" AND (query)` or `SQL:(…) AND (query)` returns the same subset.
 - **Verified by the PO on 2512 with docCoverage 0.4.0**: traceability matrix export (item titles via `getTitle()`, link role
   opposite names via `getOppositeName()`, all link pairs in the page model).
 
