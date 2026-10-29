@@ -75,10 +75,10 @@ docCoverage (`pairCap`, `itemCap`).
    - **SQL per level** (`sqlSearch` on `struct_workitem_linkedworkitems` joined to `workitem`, filtered on `c_role IN (roles)`
      and the frontier ids in `IN (...)` lists of at most 500): N levels = N queries per direction (spike I2).
    - **Open API per item**: `getLinkedWorkItemsStructsDirect()` (upstream) and `getLinkedWorkItemsStructsBack()` (downstream)
-     on each frontier item, no SQL (guide §3.3; to verify on 2512, spike I3).
-   - **One query for all levels**: Lucene `linkedWorkItemsOf` (Polarion 2506+, up to 10 steps, `follows` = roles, guide §6.4;
-     direction and level semantics to verify, spike I8), or SQL `WITH RECURSIVE` / nested sub-selects (spike I1). The guide
-     (§7.1) allows single-`SELECT` statements only, so `WITH RECURSIVE` is expected to be refused. A one-query result gives the
+     on each frontier item, no SQL (guide §3.3; `Back` exists on 2512 and its `getLinkedItem()` is the source item, spike A9).
+   - **One query for all levels**: SQL `WITH RECURSIVE` or nested sub-selects (both **accepted on 2512**, spike A1/A3, any
+     direction), or Lucene `linkedWorkItemsOf` (2506+, up to 10 steps, `follows` = roles; on 2512 it follows **incoming
+     links only** = downstream, returns levels 1..steps without the start items, spike A4/A5). A one-query result gives the
      set of items but not their level or parent: levels and links still come from the per-item scan.
    Widget SQL returns objects, not rows (guide §7.2): the parent and role of a reached item come from the Open API links.
 2. **Page model**: documents (reuse `shared/vm/documents.vm`), the reached items once (id, title, type, document, level) and
@@ -107,8 +107,8 @@ docCoverage (`pairCap`, `itemCap`).
 
 Q1–Q12 answered on 2026-10-29 (decisions log).
 
-Open: the spike results (run 1 on 2512: nested SQL, `linkedWorkItemsOf` and the level-by-level SQL give the same 7 items on a
-small set; the other runs follow the run sheet in `tests/advImpact-v0.1.x/spike-tests.md`); the in-widget picker design (later version).
+Open: the spike results (run 1 and part A on 2512: all methods give the same items on a small set; choice of method after the
+large set, part C; the other runs follow the run sheet in `tests/advImpact-v0.1.x/spike-tests.md`); the in-widget picker design (later version).
 
 ## 9. Decisions log
 

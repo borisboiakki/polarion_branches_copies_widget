@@ -255,7 +255,21 @@
   #elseif($sqlKind == "join3")
     #set($sqlOut = "SELECT DISTINCT w3.c_uri FROM struct_workitem_linkedworkitems l1 INNER JOIN struct_workitem_linkedworkitems l2 ON l2.fk_uri_workitem = l1.fk_uri_p_workitem INNER JOIN struct_workitem_linkedworkitems l3 ON l3.fk_uri_workitem = l2.fk_uri_p_workitem INNER JOIN workitem w3 ON w3.c_uri = l3.fk_uri_p_workitem INNER JOIN workitem w0 ON w0.c_uri = l1.fk_uri_workitem INNER JOIN module m ON m.c_uri = w0.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE l1.c_role IN (${roleSql}) AND l2.c_role IN (${roleSql}) AND l3.c_role IN (${roleSql}) AND p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}'")
   #elseif($sqlKind == "rec")
-    #set($sqlOut = "WITH RECURSIVE t(u, lvl) AS (SELECT l.fk_uri_p_workitem, 1 FROM struct_workitem_linkedworkitems l INNER JOIN workitem w0 ON w0.c_uri = l.fk_uri_workitem INNER JOIN module m ON m.c_uri = w0.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE l.c_role IN (${roleSql}) AND p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}' UNION SELECT l.fk_uri_p_workitem, t.lvl + 1 FROM struct_workitem_linkedworkitems l INNER JOIN t ON l.fk_uri_workitem = t.u WHERE l.c_role IN (${roleSql}) AND t.lvl < ${levels}) SELECT w.c_uri FROM workitem w WHERE w.c_uri IN (SELECT u FROM t)")
+    ## Recursive, direction down or up ("both" runs down). Near = column on the side of the previous level, far = result.
+    #set($recNear = "fk_uri_workitem")
+    #set($recFar = "fk_uri_p_workitem")
+    #if($direction == "up")
+      #set($recNear = "fk_uri_p_workitem")
+      #set($recFar = "fk_uri_workitem")
+    #end
+    #set($recType = "")
+    #if($typeSql != "")
+      #set($recType = " AND w.c_type NOT IN (${typeSql})")
+    #end
+    #set($sqlOut = "WITH RECURSIVE t(u, lvl) AS (SELECT l.${recFar}, 1 FROM struct_workitem_linkedworkitems l INNER JOIN workitem w0 ON w0.c_uri = l.${recNear} INNER JOIN module m ON m.c_uri = w0.fk_uri_module INNER JOIN project p ON p.c_uri = m.fk_uri_project WHERE l.c_role IN (${roleSql}) AND p.c_id = '${projectQ}' AND m.c_modulefolder = '${sdFolderQ}' AND m.c_id = '${sdNameQ}' UNION SELECT l.${recFar}, t.lvl + 1 FROM struct_workitem_linkedworkitems l INNER JOIN t ON l.${recNear} = t.u WHERE l.c_role IN (${roleSql}) AND t.lvl < ${levels}) SELECT w.c_uri FROM workitem w WHERE w.c_uri IN (SELECT u FROM t)${recType}")
+    #if($direction == "both")
+      <p class="ko">The recursive variant runs one direction: "both" is run as downstream (run it again with "up").</p>
+    #end
   #else
     ## nested: level 1 = links whose far end is in the start document; each further level wraps the previous one.
     ## down: the result is the link SOURCE (fk_uri_p_workitem), the previous level is the TARGET (fk_uri_workitem).
@@ -292,7 +306,7 @@
     #end
   #end
   #if($sqlKind == "rec")
-    #set($sqlMeaning = "levels 1..${levels} downstream, intermediate excluded types followed, no type filter on the result")
+    #set($sqlMeaning = "levels 1..${levels}, direction ${direction}, intermediate excluded types followed, excluded types filtered on the result")
   #elseif($sqlKind == "join3")
     #set($sqlMeaning = "exactly 3 hops downstream (paths of length 3), no type filter")
   #elseif($sqlKind == "nested")

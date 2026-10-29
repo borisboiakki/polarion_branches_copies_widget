@@ -53,7 +53,7 @@ public class AdvImpactSpikeHarness {
         p.put("paths", new WidgetHarness.Param("yes", null));
         p.put("startMode", new WidgetHarness.Param(startMode, null));
         p.put("startQuery", new WidgetHarness.Param("type:systemRequirement", null));
-        p.put("sqlKind", new WidgetHarness.Param("nested", null));
+        p.put("sqlKind", new WidgetHarness.Param(name.startsWith("sql-rec") ? "rec" : "nested", null));
         p.put("customLucene", new WidgetHarness.Param("", null));
         p.put("customSql", new WidgetHarness.Param("select w.c_uri from workitem w", null));
         p.put("excludedTypes", new WidgetHarness.Param("heading", null));
@@ -97,6 +97,9 @@ public class AdvImpactSpikeHarness {
             && h.contains("VforIA/Requirements/SRS_Test</td><td>1</td>"), "bfs both: combined documents A and E at level 1");
         h = run(dir, out, "bfs-both-api", "bfs", "both", "api", 3, "all", "SRS_Test_Reuse_TestB");
         WidgetHarness.check(h.contains("Combined result: <b>15</b> items"), "bfs both api: same combined result");
+        h = run(dir, out, "sql-rec-up", "sql", "up", "sql", 3, "all");
+        WidgetHarness.check(h.contains("SELECT l.fk_uri_workitem, 1 FROM struct_workitem_linkedworkitems l INNER JOIN workitem w0 ON w0.c_uri = l.fk_uri_p_workitem")
+            && h.contains("INNER JOIN t ON l.fk_uri_p_workitem = t.u") && h.contains("AND w.c_type NOT IN ('heading')"), "sql rec up: upstream recursion with type filter");
         h = run(dir, out, "lucene", "lucene", "down", "sql", 3, "all");
         WidgetHarness.check(h.contains("linkedWorkItemsOf:([{&quot;filter&quot;:&quot;SQL:(SELECT w.c_uri FROM workitem w") && h.contains("&quot;follows&quot;:[&quot;duplicates&quot;],&quot;steps&quot;:3}])"), "lucene: linkedWorkItemsOf query built");
         h = run(dir, out, "sql-nested", "sql", "down", "sql", 3, "all");
