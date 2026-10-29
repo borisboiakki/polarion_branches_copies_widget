@@ -27,7 +27,9 @@ Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks
    - Widget & parameters: §2 · Velocity: §3 · Lucene: §6 · SQL: §7 · REST: §8 · Java/SDK: §9
    - Checklist before submitting: §13
    - Findings verified in this project are also in the guide: selectors (§2.1), collection context (§2.8, §12.5),
-     Velocity 1.4 behaviours (§3.1.9), link role names (§10.4), page model size (§11.5)
+     Velocity 1.4 behaviours (§3.1.9), link role names (§10.4), page model size (§11.5), multi-level link traversal and
+     Back links (§3.3), `linkedWorkItemsOf` direction (§6.4), document-restricted queries (§6.3), recursive SQL (§7.1),
+     interactive widget UI on 2512 (§11.7)
 2. `docs/ARCHITECTURE.md` — how the widgets are built (Velocity side, page model, shared client core, tests).
    Keep it up to date when the structure, the page model or the shared hooks change.
 3. `widgets/<widget>/SPECIFICATION.md` — requirements and open questions of the widget you touch. If a task conflicts
