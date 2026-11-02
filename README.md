@@ -58,9 +58,13 @@ Requires Java (for Velocity 1.4), Python 3 and Node with Playwright (for the bro
   3. the workflow tests that widget, stamps the version and attaches **`<widget>-N.N.N.zip`** to the release.
      Upload that zip in Polarion (see the widget's install guide).
 
-  One release = one widget: to release both widgets, publish two releases, one per tag.
+  **Collection release** (all widgets in one go): publish one release with a tag **`V1`, `V2`, …** (plain `V` and a
+  number, next free number). The workflow tests all widgets and attaches one zip per widget, each named with the
+  version in its own `widgets/<widget>/VERSION` (`docBranches-0.4.2.zip`, …), plus a `MANIFEST.md` listing them.
+  Widget versions are unchanged; the collection number only groups a set of them. Ad hoc widget releases (above)
+  remain available at any time.
 
-  A tag that is not `<widget>-vN.N.N` fails the workflow. The workflow can also be re-run by hand
+  A tag that is neither `<widget>-vN.N.N` nor `VN` fails the workflow. The workflow can also be re-run by hand
   (*Actions → Release → Run workflow*) with an existing tag. Releases up to `v0.2.0` (tags `vN.N.N`) are docBranches
   releases made before the repository held several widgets.
 
