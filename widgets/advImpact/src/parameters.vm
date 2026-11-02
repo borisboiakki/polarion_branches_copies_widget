@@ -9,3 +9,4 @@ $parameters.put("extraFields", $factory.customEnum("Extra document fields shown 
 $parameters.put("height", $factory.integer("Graph height in pixels").value(600).build())
 $parameters.put("collectionMode", $factory.customEnum("Collection context").addEnumItem("use", "Use: documents of the collection at its revisions").addEnumItem("ignore", "Ignore: current documents (HEAD)").allowNoValue(false).allowMultipleValues(false).singleValue("use").build())
 $parameters.put("collection", $factory.enumeration("Collection (used when the page is not opened in a collection, e.g. PDF export)", "@collection").allowNoValue(true).allowMultipleValues(true).build())
+$parameters.put("compareWith", $factory.customEnum("Changed start items: compare the start document of the collection with HEAD").addEnumItem("none", "No comparison").addEnumItem("head", "Compare with HEAD (the current start document)").allowNoValue(false).allowMultipleValues(false).singleValue("none").build())

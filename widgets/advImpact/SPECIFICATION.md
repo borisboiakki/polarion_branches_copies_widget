@@ -3,7 +3,9 @@
 **Status:** v0.3, 2026-10-29: PO answers Q1–Q12 recorded (§9), reviewed against the dev guide, **spike closed** on 2512
 (`tests/advImpact-v0.1.x/spike-tests.md`, conclusion at its end). **0.1.0 implemented** (`widgets/advImpact/src`), tested
 with Velocity 1.4 on mocks and in Chromium (`tools/vtest/advImpact/`); to be validated on 2512. Install guide:
-`docs/advImpact/install.md`. **0.2.0**: in-widget start item picker (F17), validated by the PO on 2512.
+`docs/advImpact/install.md`. **0.2.0**: in-widget start item picker (F17), validated by the PO on 2512. **0.3.0**: collection
+context (F18), validated by the PO on 2512. **0.4.0**: changed start items since the collection, compared with
+HEAD (F19), validated by the PO on 2512 (browser view).
 
 ## 1. Goal
 
@@ -63,6 +65,8 @@ It reuses `shared/` (client core, params, common, documents macros) and the conv
 | F16 | Warning in the widget when a traversal was cut off (level cap, item cap per level, Q11). After a cut-off the browser recomputation of F9 is incomplete: the warning stays shown | Must |
 | F17 | **Start item picker** (0.2.0): toolbar panel *Start items (k/N)* listing the server start items (F2), with a search on id or title, a filter by type, *Select shown* / *Clear shown*; the analysis is recomputed in the browser from the selected items (as F9). It can only narrow the server start set: the server reached everything reachable from it, so the result is exact (except after a cut-off, F16). Excel adds a *Start items* sheet (selected items, start query). The PDF view uses the server start set | Must |
 | F18 | **Collection context** (0.3.0), as docCoverage F17: when the LiveReport is opened in a **collection** (or the parameter **Collection** is set, needed for the Polarion PDF export, which has no context), the analysis runs on the work items and links of the collection documents, each at the revision the collection pins, **upstream collections** included; documents without a pinned revision are read at HEAD and marked "HEAD". The start document (selector) must be a document of the collection, matched by project, space and name; otherwise a message. The **start query** is evaluated by Polarion on the current items (HEAD) of the start document; the matching items are taken at the collection revision (items not in the pinned revision are dropped). Items, links and documents outside the collection are not followed. A parameter "Collection context" (use / ignore, default use) switches it off. Links, details and Excel open in the collection; Excel *Documents* sheet with a *Revision* column; scope line shows the collection. Outside a collection: unchanged | Should (done, validated on 2512) |
+| F19 | **Changed start items** (0.4.0): compare the start document of the collection with **HEAD**. **A** = the collection (F18: page context, or the parameter *Collection*), at the revision it pins; **B** = HEAD. Parameter *Compare with*: *No comparison* / *HEAD*. When set, the **whole analysis runs on HEAD** (current items and links, scope line of the project). A start item **changed** when any of its fields changed between A and HEAD: its *Updated* date differs (its data revision when a date is missing). Items of the start document in HEAD that are not in it at A are marked *not in A* and are not counted as changed; items removed since A are not listed. Browser: toolbar toggle **Changed only** (on by default) keeps the changed items as start items; with the start query and the picker (F17) it combines as AND (query on the server, then changed only, then the picker). Marks: picker entries and the details of the start document show the change and the revisions at A and in HEAD; Excel *Start items* sheet with the columns *Changed A > HEAD*, *Revision in A*, *Revision in HEAD*; comparison line under the scope line. PDF / print: only the changed start items are analysed, with a table of them and their revisions. Messages when there is no collection A or the start document is not in A (no comparison then). Comparison with a later point than HEAD: F20 | Should (0.4.0, validated on 2512) |
+| F20 | **Compare with another baseline of the collection** (instead of HEAD): point B = a later baseline (revision) of the same collection, not another collection. Removed from 0.4.0 after the PO's test (a first version compared with a second collection, which is not the right model); to be studied (how baselines of a collection are read in a widget, how B's revision is chosen) | Idea, to study after user feedback |
 
 ## 5. Non-functional requirements
 
@@ -104,7 +108,14 @@ docCoverage (`pairCap`, `itemCap`).
    matched by id with the collection items (the target object of a link is the current item). The traversal (same levels,
    visited sets and caps) then runs in Velocity on these link maps. The collection-context reading (parameters, context,
    name and upstream collections) is the shared snippet `shared/vm/collection.vm`, moved unchanged from docCoverage.
-6. Shared macros extended only when needed; any change in `shared/` rebuilds and retests all widgets (CLAUDE.md).
+6. **Changed start items (F19, 0.4.0)**: point A is read as in item 5 (`col_workitem` of collection A, kept for the start
+   document); the analysis then runs on HEAD as without a collection (`colRef` set back to false). Per start
+   item, the signature at A and at B is its *Updated* date (`getUpdated()`) and its data revision (`getDataRevision()`,
+   Open API: revision of its last change); changed = different *Updated* dates (revisions when a date is missing). The
+   page model carries the change and both revisions of each start item; the browser filters, the PDF view analyses only
+   the changed items. Verified by the PO on 2512 (0.4.0, browser view): items read at the collection revision give the
+   revision of that point (changed items `85266 > 85980`, unchanged ones detected, items added since marked; R8).
+7. Shared macros extended only when needed; any change in `shared/` rebuilds and retests all widgets (CLAUDE.md).
 
 ## 7. Risks
 
@@ -117,6 +128,7 @@ docCoverage (`pairCap`, `itemCap`).
 | R5 | "Impact" semantic differs per role (direction) | explicit direction parameter + viewer toggle |
 | R6 | "Both" doubles the queries (two analyses) | each analysis is bounded by the levels and the item cap per level |
 | R7 | Collection context (F18) reads the items of every collection document and the links of every link source, not only the reached ones | one query each, a few ms per document in the docCoverage spike (K3/K4); render time with a large collection to check on 2512 |
+| R8 | F19 relies on `getUpdated()` / `getDataRevision()` of an item read at a collection revision (Open API object of `getOldApi()`; no spike, PO decision). If they gave HEAD values, every item would look unchanged against HEAD | **Closed** (PO test of 0.4.0 on 2512): changed items show their revision in the collection and in HEAD, unchanged items are detected, items added since the collection are marked |
 
 ## 8. Open questions for the PO
 
@@ -145,6 +157,21 @@ collection (pinned documents, upstream collection, a document changed after pinn
 - links of boxes, details, picker and Excel open in the collection; Excel *Revision* column; rendering time with a large
   collection.
 
+Checks on 2512 for 0.4.0 (changed start items, F19), e.g. with the docCoverage spike collection, after changing one
+item of its start document (a field), adding one and leaving the others unchanged:
+- *Compare with* = HEAD, page opened in the collection: comparison line (revision of the start document in the collection,
+  *x of N changed*), *Changed only* on: the changed item only; the analysis follows the current links (HEAD); the
+  revisions at A and B of the changed item match its history, an unchanged item shows the same revision twice, the added
+  item is marked *not in* the collection;
+- *Changed only* off: all start items; picker and query combined (AND); Excel *Start items* columns;
+- Polarion PDF export with the parameters *Collection* and *Compare with*: only the changed items analysed, table of them;
+- messages: no collection, start document not in the collection; rendering time.
+
+PO test of 0.4.0 on 2512 (2026-11-02): HEAD comparison works as expected, with and without *Changed only* (start items
+2 of 8 changed, 2 marked *not in* the collection, the analysis limited to the changed items). Not reported: PDF export.
+
+Future ideas (to study after user feedback): F20, comparison with another baseline of the collection.
+
 ## 9. Decisions log
 
 | Date | Decision | By |
@@ -169,3 +196,6 @@ collection (pinned documents, upstream collection, a document changed after pinn
 | 2026-10-29 | 0.2.0 validated on 2512: the start item picker works as expected | PO |
 | 2026-10-29 | Collection context (F18, 0.3.0) built as docCoverage F17 (same parameters, upstream collections, HEAD mark), reusing the collection queries verified by its spike: items and links of the collection read once, traversal in Velocity. Start document matched by key (must be in the collection); start query evaluated on HEAD and intersected with the pinned items. The collection-context block moved to `shared/vm/collection.vm` (docCoverage package unchanged) and the collection mocks to `tools/vtest/docBranches/` | Dev (user request) |
 | 2026-10-29 | 0.3.0 validated on 2512: the collection context works as expected | PO |
+| 2026-11-02 | Changed start items (F19, 0.4.0), PO answers one by one: a start item is *changed* when **any field** changed; point **A** = the start document's revision pinned by the collection; point **B** = **HEAD or a later collection**, chosen by the user (parameter; the later collection was removed after the PO test, see below); the filter is a **browser toolbar toggle**; with the start query and the picker it combines as **AND**; the traversal runs on the **data of B**; output: **changed items marked**, **Excel column**, **revisions at A and B** per item; parameter *Compare with* (None / HEAD / collection) agreed (collection removed later); **PDF** = changed items only; **no spike** (implement, PO tests the release on 2512) | PO |
+| 2026-11-02 | F19 implementation: change = different *Updated* dates (data revisions when a date is missing); items not in the start document at A marked *not in A*, not counted as changed (the PO chose "any field changed" only); *Changed only* on by default (same as the PDF view) | Dev |
+| 2026-11-02 | PO test of 0.4.0 on 2512: comparison with **HEAD** validated (browser view, with and without *Changed only*). The comparison with **a later collection** is removed: the right model is **another baseline of the same collection**, not another collection; noted as future idea F20, to study after user feedback. Parameters *Compare with* (options *No comparison* / *HEAD*, ids unchanged) and no *Later collection* parameter | PO |
