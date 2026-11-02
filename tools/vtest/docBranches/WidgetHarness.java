@@ -103,6 +103,12 @@ public class WidgetHarness {
         public boolean isUnresolvable() { return unresolvable; }
         public String getProjectId() { return module.project; }
         public List<Link> getLinkedWorkItemsStructsDirect() { return links; }
+        /** Updated date and data revision (revision of the last change) of this item as read (HEAD or a collection
+         *  revision); null updated = no date (advImpact F19 then compares the revisions). */
+        Date updated = new Date(1793000000000L);
+        String dataRevision = "50";
+        public Date getUpdated() { return updated; }
+        public String getDataRevision() { return dataRevision; }
         /** Incoming links as Link objects whose linked item is the link source (assumption of the advImpact spike, I3; not verified on 2512). */
         public List<Link> getLinkedWorkItemsStructsBack() {
             List<Link> out = new ArrayList<Link>();

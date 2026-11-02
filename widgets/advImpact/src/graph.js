@@ -12,6 +12,11 @@
    * cap cut the traversal off (warning F16). Columns: upstream levels on the left, the start
    * document, downstream levels on the right. Edges: o = document of the link targets (left), c = document of the link
    * sources; arrows follow the link direction (arrowAtOrigin).
+   *
+   * Comparison (SPEC F19, data-cmp = head / collection): each start item carries its change between point A (the
+   * collection) and point B (HEAD or a later collection): c = changed, u = unchanged, n = not in the start document at A,
+   * with its revisions at A and B. The toggle "Changed only" (on by default) keeps the changed items as start items; the
+   * picker then narrows among them.
    */
 
   var ROLE_STYLES = [
@@ -61,15 +66,16 @@
     var byIndex = [];
     for (var i = 0; i < nEls.length; i++) { byIndex.push(model.byKey[nEls[i].dataset.k] || null); }
     model.start = model.byKey[root.dataset.start] || null;
-    // Items "id|doc index|type|start|title;"
+    // Items "id|doc index|type|start|change|revision A|revision B|title;"
     model.items = [];
     model.byId = {};
     var it = root.querySelector('.bw-model .ai-it');
     ((it && it.dataset.v) || '').split(';').forEach(function (part) {
       var f = part.split('|');
-      if (f.length < 5 || !f[0] || model.byId[f[0]]) { return; }
+      if (f.length < 8 || !f[0] || model.byId[f[0]]) { return; }
       var item = {
-        id: f[0], doc: byIndex[toInt(f[1])] || null, type: f[2], start: f[3] === '1', title: f.slice(4).join('|')
+        id: f[0], doc: byIndex[toInt(f[1])] || null, type: f[2], start: f[3] === '1',
+        chg: f[4], revA: f[5], revB: f[6], title: f.slice(7).join('|')
       };
       if (toInt(f[1]) < 0) { item.doc = null; }
       model.items.push(item);
@@ -106,6 +112,9 @@
     this.arrowAtOrigin = true;
     this.warn = root.dataset.warn || '';
     this.query = root.dataset.query || '';
+    this.cmp = root.dataset.cmp === 'head' || root.dataset.cmp === 'collection' ? root.dataset.cmp : '';
+    this.cmpA = root.dataset.cmpA || 'A';
+    this.cmpB = root.dataset.cmpB || 'B';
     this.dirParam = root.dataset.dir === 'up' || root.dataset.dir === 'both' ? root.dataset.dir : 'down';
     this.levels = Math.max(1, Math.min(7, toInt(root.dataset.levels) || 3));
     var st = this.state;
@@ -118,14 +127,43 @@
     this.startItems = this.model.items.filter(function (it) { return it.start; }).sort(function (a, b) { return idCompare(a.id, b.id); });
     st.starts = {};
     this.startItems.forEach(function (it) { st.starts[it.id] = true; });
+    st.chgOnly = !!this.cmp;
     this.build();
     this.render(true);
   }
   extendBase(Widget);
 
+  // Start items the analysis may use: all server start items, or the changed ones with the toggle "Changed only" (F19).
+  Widget.prototype.eligible = function (it) {
+    return !this.state.chgOnly || it.chg === 'c';
+  };
+  Widget.prototype.eligibleStarts = function () {
+    var self = this;
+    return this.startItems.filter(function (it) { return self.eligible(it); });
+  };
+  Widget.prototype.activeStarts = function () {
+    var st = this.state;
+    return this.eligibleStarts().filter(function (it) { return st.starts[it.id]; });
+  };
+  // Change of a start item between the two points, as text ('' without a comparison).
+  Widget.prototype.changeLabel = function (it) {
+    if (!this.cmp || !it.start) { return ''; }
+    if (it.chg === 'c') { return 'changed (revision ' + (it.revA || DASH) + ' ' + GT + ' ' + (it.revB || DASH) + ')'; }
+    if (it.chg === 'n') { return 'not in ' + this.cmpA; }
+    return 'unchanged';
+  };
+
   Widget.prototype.build = function () {
     var self = this;
     var bar = el('div', { 'class': 'bw-toolbar' }, this.root);
+    if (this.cmp) {
+      var cbox = el('span', { 'class': 'bw-fields' }, bar);
+      this.checkbox(cbox, 'Changed only', true, function (on) {
+        self.state.chgOnly = on;
+        if (self.pickRefresh) { self.pickRefresh(); }
+        self.render(true);
+      }).title = 'Start the analysis only from the start items changed between ' + this.cmpA + ' and ' + this.cmpB;
+    }
     this.startPicker(bar);
     this.docPicker(bar);
     this.kindChecks(bar, 'Roles:');
@@ -199,7 +237,7 @@
   Widget.prototype.startPicker = function (bar) {
     var self = this;
     var st = this.state;
-    var all = this.startItems;
+    var all = this.eligibleStarts();
     var wrap = el('span', { 'class': 'ai-pick' }, bar);
     var btn = this.button(wrap, 'Start items', 'Choose the start items of the analysis among the items of the start document (or of the start query)', function () {
       panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
@@ -211,7 +249,7 @@
     this.button(row, 'Select shown', 'Select the start items the search and the type filter show', function () { setShown(true); });
     this.button(row, 'Clear shown', 'Unselect the start items the search and the type filter show', function () { setShown(false); });
     var types = [];
-    all.forEach(function (it) { if (types.indexOf(it.type) < 0) { types.push(it.type); } });
+    self.startItems.forEach(function (it) { if (types.indexOf(it.type) < 0) { types.push(it.type); } });
     types.sort(function (a, b) { return self.typeLabel(a).localeCompare(self.typeLabel(b)); });
     var typeOn = {};
     if (types.length > 1) {
@@ -237,7 +275,8 @@
       box.textContent = '';
       var items = shownItems();
       items.slice(0, PICK_CAP).forEach(function (it) {
-        var lab = self.checkbox(box, it.id + ': ' + it.title + (types.length > 1 ? ' [' + self.typeLabel(it.type) + ']' : ''), !!st.starts[it.id], function (on) {
+        var chg = self.changeLabel(it);
+        var lab = self.checkbox(box, it.id + ': ' + it.title + (types.length > 1 ? ' [' + self.typeLabel(it.type) + ']' : '') + (chg ? ' [' + chg + ']' : ''), !!st.starts[it.id], function (on) {
           if (on) { st.starts[it.id] = true; } else { delete st.starts[it.id]; }
           update();
         });
@@ -251,11 +290,20 @@
       list();
       update();
     }
+    function label() {
+      btn.textContent = 'Start items (' + self.activeStarts().length + '/' + all.length + ')';
+    }
     function update() {
-      btn.textContent = 'Start items (' + Object.keys(st.starts).length + '/' + all.length + ')';
+      label();
       self.render(true);
     }
-    btn.textContent = 'Start items (' + all.length + '/' + all.length + ')';
+    // The toggle "Changed only" changes the list of the picker.
+    this.pickRefresh = function () {
+      all = self.eligibleStarts();
+      list();
+      label();
+    };
+    label();
     list();
   };
 
@@ -268,6 +316,7 @@
   // ------------------------------------------------------------------ analysis (current roles, directions, levels)
 
   Widget.prototype.compute = function () {
+    var self = this;
     var st = this.state;
     var m = this.model;
     var res = { lvl: {}, dir: {}, parents: {}, pathLinks: [], docs: {} };
@@ -276,7 +325,7 @@
       if (!st.dirs[d]) { return; }
       var lv = {};
       var frontier = [];
-      m.items.forEach(function (it) { if (it.start && st.starts[it.id]) { lv[it.id] = 0; frontier.push(it.id); } });
+      m.items.forEach(function (it) { if (it.start && st.starts[it.id] && self.eligible(it)) { lv[it.id] = 0; frontier.push(it.id); } });
       for (var k = 1; k <= st.maxLevel && frontier.length; k++) {
         var next = [];
         frontier.forEach(function (id) {
@@ -315,7 +364,7 @@
     });
     // Documents: side and level of their lowest item (start document: 0), impacted items.
     var start = m.start;
-    if (start && Object.keys(st.starts).length) { res.docs[start.key] = { side: 'start', level: 0, items: [], starts: 0 }; }
+    if (start && this.activeStarts().length) { res.docs[start.key] = { side: 'start', level: 0, items: [], starts: 0 }; }
     m.items.forEach(function (it) {
       if (!it.doc || res.lvl[it.id] === undefined) { return; }
       var L = res.lvl[it.id];
@@ -452,8 +501,11 @@
   };
 
   Widget.prototype.render = function (refit) {
-    var nStarts = Object.keys(this.state.starts).length;
-    this.emptyText = nStarts ? 'No document to show.' : 'No start item selected: choose them with the Start items button.';
+    var nStarts = this.activeStarts().length;
+    var nAll = this.eligibleStarts().length;
+    this.emptyText = nStarts ? 'No document to show.' :
+      (this.state.chgOnly && !nAll ? 'No start item changed between ' + this.cmpA + ' and ' + this.cmpB + ': clear Changed only to analyse all start items.' :
+        'No start item selected: choose them with the Start items button.');
     this.res = this.compute();
     var edges = this.relations(this.res);
     this.layoutAndDraw(edges, refit);
@@ -468,7 +520,7 @@
     var dirs = [];
     if (this.state.dirs.down) { dirs.push('downstream'); }
     if (this.state.dirs.up) { dirs.push('upstream'); }
-    this.status.textContent = (nStarts === this.startItems.length ? nStarts : nStarts + ' of ' + this.startItems.length) + ' start items' + (this.query ? ' (query: ' + this.query + ')' : '') + ', ' +
+    this.status.textContent = (nStarts === nAll ? nStarts : nStarts + ' of ' + nAll) + (this.state.chgOnly ? ' changed' : '') + ' start items' + (this.query ? ' (query: ' + this.query + ')' : '') + ', ' +
       nImp + ' impacted work items in ' + nDocs + ' documents, ' + (dirs.join(' and ') || 'no direction') + ', ' +
       st.maxLevel + ' of ' + this.levels + ' levels shown (deepest reached: ' + deepest + ')' +
       (this.warn ? ' ' + DASH + ' ' + this.warn : '');
@@ -514,6 +566,7 @@
     });
     b.style.marginLeft = '8px';
     el('div', null, box, n.title + ' ' + DASH + ' ' + (this.multi ? n.project + ' / ' : '') + n.space + ' ' + DASH + ' ' + posLabel(info));
+    if (this.cmp && info && info.side === 'start') { this.changedStartList(box, n); }
     if (!info || !info.items.length) {
       el('div', { 'class': 'bw-muted' }, box, info && info.side === 'start' ? info.starts + ' start items, no other work item of this document is reached.' : 'No impacted work item.');
       return;
@@ -529,6 +582,25 @@
     });
     if (info.items.length > DETAIL_CAP) {
       el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (info.items.length - DETAIL_CAP) + ' more (Excel lists all of them)');
+    }
+  };
+
+  // Start items of the analysis with their change between the two points (F19), in the details of the start document.
+  Widget.prototype.changedStartList = function (box, n) {
+    var self = this;
+    var act = this.activeStarts();
+    var nChg = this.startItems.filter(function (it) { return it.chg === 'c'; }).length;
+    el('div', null, box, nChg + ' of ' + this.startItems.length + ' start items changed between ' + this.cmpA + ' and ' + this.cmpB +
+      '; ' + act.length + ' used as start items:');
+    var ul = el('ul', { 'class': 'bw-items ai-chg' }, box);
+    act.slice(0, DETAIL_CAP).forEach(function (it) {
+      var li = el('li', null, ul);
+      el('a', { href: itemUrl(n.project, it.id, n.col), target: '_top' }, li, it.id);
+      el('span', null, li, ' ' + it.title + ' ');
+      el('span', { 'class': 'bw-muted' }, li, DASH + ' ' + self.changeLabel(it));
+    });
+    if (act.length > DETAIL_CAP) {
+      el('div', { 'class': 'bw-muted' }, box, ELLIPSIS + ' and ' + (act.length - DETAIL_CAP) + ' more (Excel lists all of them)');
     }
   };
 
@@ -622,22 +694,26 @@
         pathLinks.push({ r: paths.length - 1, c: 0, url: absUrl(itemUrl(n.project, it.id, n.col)) });
       });
     });
-    var starts = [['Start item', 'Title', 'Type', 'Document']];
+    var cmp = this.cmp;
+    var starts = [['Start item', 'Title', 'Type', 'Document'].concat(cmp ? ['Changed ' + this.cmpA + ' ' + GT + ' ' + this.cmpB,
+      'Revision in ' + this.cmpA, 'Revision in ' + this.cmpB] : [])];
     var startLinks = [];
     var sd = this.model.start;
-    this.startItems.forEach(function (it) {
-      if (!self.state.starts[it.id]) { return; }
-      starts.push([it.id, it.title, self.typeLabel(it.type), it.doc ? self.docLabel(it.doc) : '']);
+    this.activeStarts().forEach(function (it) {
+      var row = [it.id, it.title, self.typeLabel(it.type), it.doc ? self.docLabel(it.doc) : ''];
+      if (cmp) { row = row.concat([it.chg === 'c' ? 'yes' : (it.chg === 'n' ? 'not in ' + self.cmpA : 'no'), it.revA, it.revB]); }
+      starts.push(row);
       if (sd) { startLinks.push({ r: starts.length - 1, c: 0, url: absUrl(itemUrl(sd.project, it.id, sd.col)) }); }
     });
     if (this.query) { starts.push(['(start query)', this.query, '', '']); }
+    if (cmp) { starts.push(['(comparison)', (this.state.chgOnly ? 'Changed only: ' : 'All start items; ') + 'compared ' + this.cmpA + ' with ' + this.cmpB, '', '']); }
     this.exportWorkbook([
       { name: 'Relations', what: 'relations', rows: rel, links: relLinks,
         widths: [14, 14, 28, 34, 24, 14, 14, 28, 34].concat(cats.map(function () { return 10; })).concat([8]) },
       { name: 'Documents', rows: docs, links: docLinks, widths: [14, 14, 28, 40, 14, 14, 12, 12, 11, 20, 12, 7, 12, 10, 12] },
       { name: 'Impacted items', rows: items, links: itemLinks, widths: [16, 50, 16, 34, 12, 7, 40] },
       { name: 'Impact paths', rows: paths, links: pathLinks, widths: [16, 50, 34, 12, 7, 50, 50] },
-      { name: 'Start items', rows: starts, links: startLinks, widths: [16, 50, 20, 34] }
+      { name: 'Start items', rows: starts, links: startLinks, widths: [16, 50, 20, 34].concat(cmp ? [22, 14, 14] : []) }
     ]);
   };
 

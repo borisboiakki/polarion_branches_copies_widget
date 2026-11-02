@@ -157,8 +157,8 @@ public class ImpactHarness {
             "downstream 3 levels: start items and levels 1-3 reached, heading and level 4 left out: " + itemIds(br));
         WidgetHarness.check(br.contains("data-dir=\"down\" data-levels=\"3\" data-start=\"VforIA/Specs/CustomerSpec\""), "root: direction, levels, start document");
         WidgetHarness.check(br.contains("data-roles=\"satisfies|satisfies|is satisfied by;verifies|verifies|is verified by\""), "roles with names and opposite names");
-        WidgetHarness.check(attr(br, "ai-it").startsWith("VIA-1|0|customerRequirement|1|Title VIA-1;"), "start item flagged, document index 0 = start document");
-        WidgetHarness.check(attr(br, "ai-it").contains("VIA-12|1|systemRequirement|0|Title   with  separators;"), "separators in titles replaced");
+        WidgetHarness.check(attr(br, "ai-it").startsWith("VIA-1|0|customerRequirement|1||||Title VIA-1;"), "start item flagged, document index 0 = start document");
+        WidgetHarness.check(attr(br, "ai-it").contains("VIA-12|1|systemRequirement|0||||Title   with  separators;"), "separators in titles replaced");
         WidgetHarness.check(attr(br, "ai-ty").contains("customerRequirement|customerRequirement;") && attr(br, "ai-ty").contains("systemRequirement|systemRequirement;"),
             "type names of the reached items (start item picker)");
         String links = attr(br, "ai-ln");
@@ -267,7 +267,7 @@ public class ImpactHarness {
         String cl = attr(cb, "ai-ln");
         WidgetHarness.check(cl.contains("VIA-13|VIA-1|satisfies;") && !cl.contains("VIA-13|VIA-2|") && cl.contains("VIA-12|VIA-11|satisfies;")
             && cl.contains("VIA-31|VIA-11|satisfies;") && !cl.contains("VIA-5"), "collection: links of the pinned revision, same-document link kept, heading left out");
-        WidgetHarness.check(attr(cb, "ai-it").contains("VIA-11|1|systemRequirement|0|Pinned title 11;"), "collection: titles of the pinned revision");
+        WidgetHarness.check(attr(cb, "ai-it").contains("VIA-11|1|systemRequirement|0||||Pinned title 11;"), "collection: titles of the pinned revision");
         WidgetHarness.check(cb.contains("data-items=\"3\" data-rev=\"100\"") && cb.contains("data-rev=\"90\"")
             && !cb.contains("Test_T") && !cb.contains("SysReq_B"), "collection: documents at their revision, upstream collection included, others ignored");
 
@@ -301,6 +301,97 @@ public class ImpactHarness {
         String ign = WidgetHarness.render(dir, ig, false, out + "/velocity-collectionignore.log");
         WidgetHarness.check(ign.contains("data-col=\"\"") && itemIds(ign).equals("VIA-1,VIA-11,VIA-12,VIA-13,VIA-2,VIA-21,VIA-22,VIA-3,VIA-31,VIA-32,VIA-4,VIA-41"),
             "collection context ignored: current items (HEAD)");
+        compareChecks(dir, out, col);
         WidgetHarness.TRANSACTION = null;
+    }
+
+    /**
+     * Comparison of the start items (F19). Point A = collection "Release 1" (CustomerSpec @100, items VIA-1, 2, 3 with
+     * data revision 50). HEAD: VIA-1 updated later (revision 120), VIA-3 without Updated date and revision 61 (compared by
+     * revision), VIA-2 unchanged, VIA-4 not in A. Collection "Release 2" (VforIA/8): CustomerSpec @130 with VIA-2 changed
+     * (revision 130), VIA-1 and VIA-3 unchanged, SysReq_A @131 with VIA-12 satisfies 2.
+     */
+    static void compareChecks(String dir, String out, CollectionMocks.Collection col) throws Exception {
+        WidgetHarness.ITEMS.get("VIA-1").updated = new Date(1793500000000L);
+        WidgetHarness.ITEMS.get("VIA-1").dataRevision = "120";
+        WidgetHarness.ITEMS.get("VIA-3").updated = null;
+        WidgetHarness.ITEMS.get("VIA-3").dataRevision = "61";
+        for (WidgetHarness.Module m : col.docs) {
+            for (WidgetHarness.WorkItem w : m.items) { if (w.getId().equals("VIA-3")) { w.updated = null; } }
+        }
+
+        // HEAD, page opened in Release 1: analysis on HEAD, all start items in the model with their change.
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
+        Map<String, WidgetHarness.Param> h = params(spec, "down", 3, "satisfies", "verifies");
+        h.put("compareWith", new WidgetHarness.Param("head", null));
+        String hb = WidgetHarness.render(dir, h, false, out + "/velocity-comparehead.log");
+        WidgetHarness.write(out + "/compare-fragment.html", hb);
+        String hit = attr(hb, "ai-it");
+        WidgetHarness.check(hb.contains("data-col=\"\"") && hb.contains("data-cmp=\"head\" data-cmp-a=\"Release 1\" data-cmp-b=\"HEAD\""),
+            "compare with HEAD: analysis on HEAD, points A and B on the root");
+        WidgetHarness.check(itemIds(hb).equals("VIA-1,VIA-11,VIA-12,VIA-13,VIA-2,VIA-21,VIA-22,VIA-3,VIA-31,VIA-32,VIA-4,VIA-41"),
+            "compare with HEAD: HEAD items reached from all start items: " + itemIds(hb));
+        WidgetHarness.check(hit.contains("VIA-1|0|customerRequirement|1|c|50|120|") && hit.contains("VIA-2|0|customerRequirement|1|u|50|50|")
+            && hit.contains("VIA-3|0|customerNote|1|c|50|61|") && hit.contains("VIA-4|0|customerNote|1|n||50|")
+            && hit.contains("VIA-11|1|systemRequirement|0||||"), "compare with HEAD: changed by date, unchanged, changed by revision, not in A; other items unmarked: " + hit);
+        WidgetHarness.check(hb.contains("Changed start items: 2 of 4 changed between Release 1 (start document revision 100) and HEAD. 1 not in the start document of Release 1"),
+            "compare with HEAD: comparison line");
+
+        // PDF: collection A from the parameter, only the changed start items (VIA-1, VIA-3) analysed.
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(null);
+        h.put("collection", new WidgetHarness.Param(null, list(new CollectionMocks.ColOpt(col))));
+        String hp = WidgetHarness.render(dir, h, true, out + "/velocity-compareheadpdf.log");
+        WidgetHarness.write(out + "/compare-pdf-fragment.html", hp);
+        WidgetHarness.check(hp.contains("Start: Specs / CustomerSpec (2 work items)") && hp.contains("<td>VIA-1</td><td>Title VIA-1</td><td>50</td><td>120</td>")
+            && hp.contains("<td>VIA-3</td><td>Title VIA-3</td><td>50</td><td>61</td>") && !hp.contains("<td>VIA-2</td>") && !hp.contains("<script"),
+            "compare PDF: changed start items only, with their revisions");
+        WidgetHarness.check(hp.contains("<td>VIA-21</td>") && hp.contains("<td>VIA-11</td>") && !hp.contains("<td>VIA-4</td>"), "compare PDF: traversal from the changed items");
+
+        // Later collection Release 2: analysis on its pinned data, VIA-2 changed.
+        CollectionMocks.Collection col2 = new CollectionMocks.Collection("VforIA", "8", "Release 2");
+        CollectionMocks.RevModule specB = new CollectionMocks.RevModule("VforIA", "Specs", "CustomerSpec", "130");
+        CollectionMocks.RevModule aB = new CollectionMocks.RevModule("VforIA", "_default", "SysReq_A", "131");
+        WidgetHarness.WorkItem b1 = new WidgetHarness.WorkItem("VIA-1", "customerRequirement", specB);
+        WidgetHarness.WorkItem b2 = new WidgetHarness.WorkItem("VIA-2", "customerRequirement", specB);
+        WidgetHarness.WorkItem b3 = new WidgetHarness.WorkItem("VIA-3", "customerNote", specB);
+        b3.updated = null;
+        b2.updated = new Date(1793600000000L);
+        b2.dataRevision = "130";
+        WidgetHarness.WorkItem b12 = new WidgetHarness.WorkItem("VIA-12", "systemRequirement", aB);
+        b12.links.add(new WidgetHarness.Link("satisfies", b2));
+        col2.docs.add(specB);
+        col2.docs.add(aB);
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
+        Map<String, WidgetHarness.Param> c2 = params(spec, "down", 3, "satisfies", "verifies");
+        c2.put("compareWith", new WidgetHarness.Param("collection", null));
+        c2.put("compareCollection", new WidgetHarness.Param(null, list(new CollectionMocks.ColOpt(col2))));
+        String cb = WidgetHarness.render(dir, c2, false, out + "/velocity-comparecol.log");
+        String cit = attr(cb, "ai-it");
+        WidgetHarness.check(cb.contains("data-col=\"VforIA/8\"") && cb.contains(">Collection: Release 2<") && itemIds(cb).equals("VIA-1,VIA-12,VIA-2,VIA-3"),
+            "compare with a collection: analysis on the later collection: " + itemIds(cb));
+        WidgetHarness.check(cit.contains("VIA-2|0|customerRequirement|1|c|50|130|") && cit.contains("VIA-1|0|customerRequirement|1|u|50|50|")
+            && cit.contains("VIA-3|0|customerNote|1|u|50|50|"), "compare with a collection: VIA-2 changed: " + cit);
+        WidgetHarness.check(cb.contains("Changed start items: 1 of 3 changed between Release 1 (start document revision 100) and Release 2 (start document revision 130)."),
+            "compare with a collection: comparison line with both revisions");
+        String cbp = WidgetHarness.render(dir, c2, true, out + "/velocity-comparecolpdf.log");
+        WidgetHarness.check(cbp.contains("1 impacted work items in 1 documents") && cbp.contains("<td>VIA-2</td><td>Title VIA-2</td><td>50</td><td>130</td>"),
+            "compare with a collection, PDF: VIA-2 only, VIA-12 impacted");
+
+        // Messages: no collection, no later collection, start document not in A.
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(null);
+        Map<String, WidgetHarness.Param> n1 = params(spec, "down", 3, "satisfies");
+        n1.put("compareWith", new WidgetHarness.Param("head", null));
+        String nb = WidgetHarness.render(dir, n1, false, out + "/velocity-comparenone.log");
+        WidgetHarness.check(nb.contains("data-cmp=\"\"") && nb.contains("No comparison of the start items: it needs a collection"), "compare without a collection: message");
+        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
+        Map<String, WidgetHarness.Param> n2 = params(spec, "down", 3, "satisfies");
+        n2.put("compareWith", new WidgetHarness.Param("collection", null));
+        String nb2 = WidgetHarness.render(dir, n2, false, out + "/velocity-comparenob.log");
+        WidgetHarness.check(nb2.contains("data-cmp=\"\"") && nb2.contains("select the later collection to compare with") && nb2.contains("data-col=\"VforIA/7\""),
+            "compare with a collection not selected: message, analysis on collection A");
+        Map<String, WidgetHarness.Param> n3 = params(d, "down", 3, "satisfies");
+        n3.put("compareWith", new WidgetHarness.Param("head", null));
+        String nb3 = WidgetHarness.render(dir, n3, false, out + "/velocity-comparenotina.log");
+        WidgetHarness.check(nb3.contains("data-cmp=\"\"") && nb3.contains("the start document is not in the collection Release 1"), "compare: start document not in A: message");
     }
 }
