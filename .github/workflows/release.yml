@@ -1,7 +1,8 @@
-# Package a widget for deployment when a GitHub release is published.
-# The release tag names the widget and the version: <widget>-vN.N.N (e.g. docCoverage-v0.1.0,
-# docBranches-v0.2.1). Releases up to v0.2.0 used plain vN.N.N tags (docBranches only, old layout).
-# The version is stamped into the widget, the tests run, and <widget>-N.N.N.zip is attached to the release.
+# Package widgets for deployment when a GitHub release is published. Two kinds of tags:
+# - <widget>-vN.N.N (e.g. docCoverage-v0.1.0): ad hoc release of one widget; the tag version is stamped into it.
+#   Releases up to v0.2.0 used plain vN.N.N tags (docBranches only, old layout).
+# - VN (e.g. V3): collection release of ALL widgets, each with the version of its widgets/<w>/VERSION file.
+# The tests run and <widget>-N.N.N.zip (plus MANIFEST.md for a collection) are attached to the release.
 name: Release
 
 on:
@@ -22,23 +23,26 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
-      - name: Check the widget and version number
+      - name: Check the tag (widget release or collection release)
         id: version
         run: |
-          if [[ "$TAG" =~ ^([A-Za-z][A-Za-z0-9]*)-v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            widget="${BASH_REMATCH[1]}"; version="${BASH_REMATCH[2]}"
+          if [[ "$TAG" =~ ^V[0-9]+$ ]]; then
+            echo "mode=collection" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" =~ ^([A-Za-z][A-Za-z0-9]*)-v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "mode=widget" >> "$GITHUB_OUTPUT"
+            echo "widget=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "version=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Release tag '$TAG' is not <widget>-vN.N.N (e.g. docBranches-v0.2.1)"
+            echo "::error::Release tag '$TAG' is neither <widget>-vN.N.N (e.g. docBranches-v0.2.1) nor a collection tag VN (e.g. V3)"
             exit 1
           fi
-          echo "widget=$widget" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
 
       - name: Check the widget exists and warn if its VERSION differs from the tag
+        if: steps.version.outputs.mode == 'widget'
         run: |
           f="widgets/${{ steps.version.outputs.widget }}/VERSION"
           if [ ! -f "$f" ]; then
@@ -73,17 +77,36 @@ jobs:
           npm install --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
 
-      - name: Test the widget
-        run: tools/test-widget.sh "${{ steps.version.outputs.widget }}" "$RUNNER_TEMP/widget-test"
-
-      - name: Build the release package
+      - name: Test the widget(s)
         run: |
-          w="${{ steps.version.outputs.widget }}"; v="${{ steps.version.outputs.version }}"
-          python3 tools/build-widget.py --widget "$w" --version "$v"
-          cp "widgets/$w/dist/$w.zip" "$w-$v.zip"
-          unzip -l "$w-$v.zip"
+          if [ "${{ steps.version.outputs.mode }}" = collection ]; then
+            tools/test-widget.sh all "$RUNNER_TEMP/widget-test"
+          else
+            tools/test-widget.sh "${{ steps.version.outputs.widget }}" "$RUNNER_TEMP/widget-test"
+          fi
 
-      - name: Attach the package to the release
+      - name: Build the release package(s)
+        run: |
+          mkdir -p release-out
+          if [ "${{ steps.version.outputs.mode }}" = collection ]; then
+            # Every widget of widgets/ with the version of its VERSION file.
+            { echo "# Collection $TAG"; echo; } > release-out/MANIFEST.md
+            for d in widgets/*/; do
+              w="$(basename "$d")"; v="$(tr -d '[:space:]' < "$d/VERSION")"
+              [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::widgets/$w/VERSION '$v' is not N.N.N"; exit 1; }
+              python3 tools/build-widget.py --widget "$w" --version "$v"
+              cp "widgets/$w/dist/$w.zip" "release-out/$w-$v.zip"
+              echo "- $w $v" >> release-out/MANIFEST.md
+            done
+          else
+            w="${{ steps.version.outputs.widget }}"; v="${{ steps.version.outputs.version }}"
+            python3 tools/build-widget.py --widget "$w" --version "$v"
+            cp "widgets/$w/dist/$w.zip" "release-out/$w-$v.zip"
+          fi
+          for z in release-out/*.zip; do unzip -l "$z"; done
+          [ ! -f release-out/MANIFEST.md ] || cat release-out/MANIFEST.md
+
+      - name: Attach the package(s) to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" "${{ steps.version.outputs.widget }}-${{ steps.version.outputs.version }}.zip" --clobber
+        run: gh release upload "$TAG" release-out/* --clobber
