@@ -203,6 +203,38 @@ async function clickDoc(p, name) {
   const revCol = colDocs[0].indexOf('Revision');
   expect(revCol >= 0 && colDocs.slice(1).map(r => r[2] + '@' + r[revCol]).sort().join(',') === 'CustomerSpec@100,SwReq_C@90,SysReq_A@101',
     'collection: Excel Documents sheet with the revisions');
+  // Comparison with HEAD (F19): VIA-1 and VIA-3 changed, VIA-2 unchanged, VIA-4 not in collection A.
+  await p.goto('file://' + dir + '/compare.html');
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: dir + '/shot-compare.png', fullPage: true });
+  expect((await p.textContent('.ai-cmp')).indexOf('Changed start items: 2 of 4 changed between Release 1') === 0 &&
+    await p.isChecked('label:has-text("Changed only") input'), 'compare: comparison line, Changed only on by default');
+  expect((await status()).startsWith('2 changed start items, 7 impacted work items in 4 documents'), 'compare: analysis from the changed start items');
+  expect((await pickIds()).join(',') === 'VIA-1,VIA-3' &&
+    (await p.$$eval('.ai-st-list label', ls => ls.map(l => l.textContent))).some(t => t.indexOf('[changed (revision 50 > 120)]') >= 0),
+    'compare: picker lists the changed start items with their revisions');
+  await clickDoc(p, 'CustomerSpec');
+  const cmpDet = await p.textContent('.bw-details');
+  expect(cmpDet.indexOf('2 of 4 start items changed between Release 1 and HEAD; 2 used as start items') >= 0 && cmpDet.indexOf('VIA-3') >= 0,
+    'compare: details of the start document list the changed start items');
+  await p.click('.bw-details button:text-is("Close")');
+  const [dx] = await Promise.all([p.waitForEvent('download'), p.click('.bw-toolbar button:text-is("Excel")')]);
+  await dx.saveAs(dir + '/export-compare.xlsx');
+  const cmpStarts = (await readBook(p, dir + '/export-compare.xlsx'))[4].rows;
+  expect(cmpStarts[0].slice(4).join('|') === 'Changed Release 1 > HEAD|Revision in Release 1|Revision in HEAD' &&
+    cmpStarts.some(r => r[0] === 'VIA-1' && r[4] === 'yes' && String(r[5]) === '50' && String(r[6]) === '120') && !cmpStarts.some(r => r[0] === 'VIA-2'),
+    'compare: Excel Start items sheet with the change and the revisions');
+  await p.click('label:has-text("Changed only") input');
+  await p.waitForTimeout(150);
+  expect((await status()).startsWith('4 start items, 8 impacted work items') && (await pickIds()).join(',') === 'VIA-1,VIA-2,VIA-3,VIA-4' &&
+    (await p.$$eval('.ai-st-list label', ls => ls.map(l => l.textContent))).some(t => t.indexOf('VIA-4') === 0 && t.indexOf('[not in Release 1]') > 0),
+    'compare: Changed only off, all start items with their change');
+  await p.click('.ai-pick button:has-text("Start items")');
+  await p.click('.ai-st-row button:has-text("Clear shown")');
+  await p.click('label:has-text("Changed only") input');
+  await p.waitForTimeout(150);
+  expect((await status()).startsWith('0 of 2 changed start items') && (await p.textContent('.ai-pick button')).indexOf('(0/2)') > 0,
+    'compare: picker selection and Changed only combined (AND)');
   await p.goto('file://' + dir + '/pdf.html');
   await p.screenshot({ path: dir + '/shot-pdf.png', fullPage: true });
   expect((await p.$$('script')).length === 0 && (await p.textContent('body')).indexOf('Downstream level 3') >= 0, 'PDF view: static, no script');

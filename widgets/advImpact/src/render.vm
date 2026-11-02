@@ -49,6 +49,33 @@
 ## (project/id) and colText (scope line).
 ## BW_SHARED collection.vm
 
+## ======================================================================= comparison (F19)
+## "Changed start items": point A = the collection above (its pinned start document), point B = HEAD. The analysis runs
+## on HEAD; the start items changed between A and B are marked, the browser toggle "Changed only" keeps them as start
+## items (the PDF view keeps only them). Sets cmpMode (head / ""), cmpRefA, cmpNameA, cmpNameB; colRef is then false
+## (HEAD) and colKey / colText empty.
+#set($tmp = $bwUnset)
+#set($tmp = $parameters.compareWith.singleValue)
+#set($tmp = $parameters.compareWith.singleValue())
+#set($cmpMode = "")
+#if("$tmp" == "head")
+  #set($cmpMode = "head")
+#end
+#set($cmpRefA = false)
+#set($cmpNameA = "")
+#set($cmpNameB = "HEAD")
+#if($cmpMode != "" && !$colRef)
+  #set($scopeWarn = "${scopeWarn} No comparison of the start items: it needs a collection (open the page in a collection, or set the parameter Collection, and Collection context = Use).")
+  #set($cmpMode = "")
+#end
+#if($cmpMode != "")
+  #set($cmpRefA = $colRef)
+  #set($cmpNameA = $colName)
+  #set($colRef = false)
+  #set($colKey = "")
+  #set($colText = "")
+#end
+
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.direction.singleValue)
 #set($tmp = $parameters.direction.singleValue())
@@ -142,6 +169,29 @@
     #end
   #end
 #end
+## Comparison (F19): the start document must be in collection A too; cmpDocRevA = its revision there.
+#set($cmpDocRevA = "")
+#if($cmpMode != "" && $startKey != "")
+  #set($cmpStartInA = false)
+  #foreach($cd in $transaction.objects().searchBySql("select c_uri, c_col_rev from col_module").collection($cmpRefA))
+    #set($m = false)
+    #set($m = $cd.getOldApi())
+    #bwKey($m)
+    #if($bwKeyOut == $startKey && !$cmpStartInA)
+      #set($cmpStartInA = true)
+      #set($cmpDocRevA = "")
+      #set($cmpDocRevA = $m.getRevision())
+      #set($cmpDocRevA = "$cmpDocRevA")
+      #if($cmpDocRevA == "")
+        #set($cmpDocRevA = "HEAD")
+      #end
+    #end
+  #end
+  #if(!$cmpStartInA)
+    #set($scopeWarn = "${scopeWarn} No comparison of the start items: the start document is not in the collection ${cmpNameA}.")
+    #set($cmpMode = "")
+  #end
+#end
 
 ## Link roles: selector values (id() = role id). At most maxRoles. Names and opposite names from the project's
 ## link role enumeration (docCoverage spike C2); the id when not found.
@@ -223,6 +273,22 @@
       #set($aiOk = true)
     #end
   #end
+#end
+
+## Change signature of a work item (F19), as read at a point (collection revision or HEAD): aiUpdOut = its Updated date
+## (milliseconds), aiRevOut = its data revision (Open API getDataRevision(): the revision of its last change). The item
+## changed between two points when the Updated dates differ (the revisions when a date is missing).
+#macro(aiSig $aiS)
+  #set($aiUpdOut = "")
+  #set($aiRevOut = "")
+  #set($aiSU = false)
+  #set($aiSU = $aiS.getUpdated())
+  #if($aiSU)
+    #set($aiUpdOut = "$aiSU.getTime()")
+  #end
+  #set($aiSR = "")
+  #set($aiSR = $aiS.getDataRevision())
+  #set($aiRevOut = "$aiSR")
 #end
 
 #if(!$projectOk)
@@ -357,6 +423,38 @@
 #else
   #set($startCand = $ds.sqlSearch($startSql))
 #end
+## Comparison (F19): cmpA = id -> [Updated, data revision] of the items of the start document in collection A (same
+## query as the collection items above, kept for the start document).
+#set($cmpA = $objectFactory.newMap())
+#if($cmpMode != "")
+  #set($cmpSql = "select w.c_uri, w.c_col_rev from col_workitem w inner join col_module m on m.c_uri = w.fk_uri_module")
+  #if($typeSql != "")
+    #set($cmpSql = "${cmpSql} where w.c_type not in (${typeSql})")
+  #end
+  #foreach($cw in $transaction.objects().searchBySql($cmpSql).collection($cmpRefA))
+    #set($cwi = false)
+    #set($cwi = $cw.getOldApi())
+    #aiItem($cwi)
+    #if($aiOk && !$cmpA.containsKey($aiId))
+      #set($cwm = false)
+      #set($cwm = $cwi.getModule())
+      #bwKey($cwm)
+      #if($bwKeyOut == $startKey)
+        #aiSig($cwi)
+        #set($cmpSigA = [$aiUpdOut, $aiRevOut])
+        #set($void = $cmpA.put($aiId, $cmpSigA))
+      #end
+    #end
+  #end
+#end
+## cmpChg: start item id -> c (changed between A and B), u (unchanged), n (not in the start document at A); cmpRevA /
+## cmpRevB: its revisions at A and B. cmpAll / cmpChanged / cmpNew: counts over the start items at B.
+#set($cmpChg = $objectFactory.newMap())
+#set($cmpRevA = $objectFactory.newMap())
+#set($cmpRevB = $objectFactory.newMap())
+#set($cmpAll = 0)
+#set($cmpChanged = 0)
+#set($cmpNew = 0)
 ## items: id -> work item (all reached items, start items first); itemDoc: id -> document key
 #set($items = $objectFactory.newMap())
 #set($itemOrder = [])
@@ -364,7 +462,43 @@
 #set($startIds = $objectFactory.newMap())
 #foreach($w in $startCand)
   #aiItem($w)
-  #if($aiOk && !$items.containsKey($aiId))
+  #set($startKeep = true)
+  #if($aiOk && !$items.containsKey($aiId) && $cmpMode != "")
+    #set($wm = false)
+    #set($wm = $w.getModule())
+    #bwKey($wm)
+    #if($bwKeyOut == $startKey && !$cmpChg.containsKey($aiId))
+      #set($cmpAll = $cmpAll + 1)
+      #aiSig($w)
+      #set($chg = "n")
+      #set($rA = "")
+      #if($cmpA.containsKey($aiId))
+        #set($sA = $cmpA.get($aiId))
+        #set($rA = $sA.get(1))
+        #set($chg = "u")
+        #if($sA.get(0) != "" && $aiUpdOut != "")
+          #if($sA.get(0) != $aiUpdOut)
+            #set($chg = "c")
+          #end
+        #elseif($rA != $aiRevOut)
+          #set($chg = "c")
+        #end
+      #end
+      #if($chg == "c")
+        #set($cmpChanged = $cmpChanged + 1)
+      #elseif($chg == "n")
+        #set($cmpNew = $cmpNew + 1)
+      #end
+      #set($void = $cmpChg.put($aiId, $chg))
+      #set($void = $cmpRevA.put($aiId, $rA))
+      #set($void = $cmpRevB.put($aiId, $aiRevOut))
+      ## PDF / print: no toggle, only the changed start items are analysed.
+      #if($isStatic && $chg != "c")
+        #set($startKeep = false)
+      #end
+    #end
+  #end
+  #if($aiOk && !$items.containsKey($aiId) && $startKeep)
     #set($wm = false)
     #set($wm = $w.getModule())
     #bwKey($wm)
@@ -516,6 +650,14 @@
   #end
   #set($docList = $aicDocList)
   #set($scopeText = $colText)
+#end
+## Comparison line (F19): collection A with the revision of the start document there, changed start items.
+#set($cmpText = "")
+#if($cmpMode != "")
+  #set($cmpText = "Changed start items: ${cmpChanged} of ${cmpAll} changed between ${cmpNameA} (start document revision ${cmpDocRevA}) and HEAD.")
+  #if($cmpNew > 0)
+    #set($cmpText = "${cmpText} ${cmpNew} not in the start document of ${cmpNameA} (not counted as changed).")
+  #end
 #end
 ## Items outside any document (not in a LiveDoc) are grouped under a pseudo document key "".
 
@@ -789,6 +931,9 @@
   #set($startTxt = "${bwDocLabelOut} ($startIds.size() work items, query: ${startQuery})")
 #end
 <div class="bw-muted">Start: $esc.html($startTxt). Upstream documents on the left, downstream on the right; arrows follow the link direction. Line style: $esc.html($legend).</div>
+#if($cmpText != "")
+<div class="bw-muted">$esc.html($cmpText) Only the changed start items are analysed here.</div>
+#end
 #if($warn.trim() != "")
 <div class="bw-warn">$esc.html($warn.trim())</div>
 #end
@@ -796,6 +941,9 @@
 #set($noStartTxt = "No start work item: the start document has no work item (excluded types left out).")
 #if($startQuery != "")
   #set($noStartTxt = "No start work item: no work item of the start document matches the query (excluded types left out).")
+#end
+#if($cmpMode != "" && $cmpAll > 0)
+  #set($noStartTxt = "No start work item: no start item changed between ${cmpNameA} and ${cmpNameB}.")
 #end
 <p>$esc.html($noStartTxt)</p>
 #elseif($impTotal == 0)
@@ -936,6 +1084,24 @@
 #end
 </table>
 #end
+#if($cmpMode != "" && $startIds.size() > 0)
+<table class="bw-table">
+<tr><th>Changed start item</th><th>Title</th><th>Revision in $esc.html($cmpNameA)</th><th>Revision in $esc.html($cmpNameB)</th></tr>
+#set($shownN = 0)
+#foreach($id in $itemOrder)
+  #if($startIds.containsKey($id) && $shownN < 200)
+    #set($w = $items.get($id))
+    #set($wT = "")
+    #set($wT = $w.getTitle())
+<tr><td>$esc.html($id)</td><td>$!esc.html($wT)</td><td>$esc.html($cmpRevA.get($id))</td><td>$esc.html($cmpRevB.get($id))</td></tr>
+    #set($shownN = $shownN + 1)
+  #end
+#end
+</table>
+#if($startIds.size() > 200)
+<p class="bw-muted">First 200 of $startIds.size() changed start items (the browser view and the Excel export list all of them).</p>
+#end
+#end
 #if($impTotal > 0)
 <table class="bw-table">
 <tr><th>Impacted work item</th><th>Title</th><th>Document</th><th>Direction</th><th>Level</th></tr>
@@ -996,16 +1162,20 @@
 #set($void = $docIdx.put($d.get("key"), $di))
 #set($di = $di + 1)
 #end
-<div class="ai-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-col="$esc.html($colKey)" data-mode="all" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-dir="$direction" data-levels="$levels" data-start="$esc.html($startKey)" data-query="$esc.html($startQuery)" data-warn="$esc.html($warn.trim())">
+<div class="ai-root" data-project="$esc.html($projectId)" data-projects="$esc.html($projectsStr)" data-col="$esc.html($colKey)" data-mode="all" data-counts="$countsFlag" data-extras="$extrasStr" data-height="$graphHeight" data-version="$bwVersion" data-roles="$esc.html($rolesStr)" data-dir="$direction" data-levels="$levels" data-start="$esc.html($startKey)" data-query="$esc.html($startQuery)" data-cmp="$cmpMode" data-cmp-a="$esc.html($cmpNameA)" data-cmp-b="$esc.html($cmpNameB)" data-warn="$esc.html($warn.trim())">
   <div class="bw-muted">$esc.html($scopeText)</div>
+#if($cmpText != "")
+  <div class="bw-muted ai-cmp">$esc.html($cmpText)</div>
+#end
   <div class="bw-model" style="display:none">
 #foreach($d in $docList)
     <i class="bw-n" data-k="$esc.html($d.get('key'))" data-p="$esc.html($d.get('project'))" data-id="$esc.html($d.get('id'))" data-title="$esc.html($d.get('title'))" data-space="$esc.html($d.get('space'))" data-type="$esc.html($d.get('type'))" data-status="$esc.html($d.get('status'))" data-created="$esc.html($d.get('created'))" data-updated="$esc.html($d.get('updated'))" data-items="$d.get('items')" data-rev="$esc.html($d.get('rev'))"></i>
 #end
 ## Type names of the reached items, filled by the item loop: "id|name;" (start item picker).
 #set($typeNames = $objectFactory.newMap())
-## Reached items "id|document index|type|start flag|title;" (separators in titles replaced) and links "source|target|role;".
-    <i class="ai-it" data-v="#foreach($id in $itemOrder)#set($w = $items.get($id))#set($wT = '')#set($wT = $w.getTitle())#set($wT = "$wT")#set($wT = $wT.replace('|', ' '))#set($wT = $wT.replace(';', ' '))#set($wTy = '')#set($wTyO = false)#set($wTyO = $w.getType())#if($wTyO)#set($wTy = "$wTyO.getId()")#if(!$typeNames.containsKey($wTy))#set($wTyN = '')#set($wTyN = $wTyO.getName())#set($wTyN = "$wTyN")#set($wTyN = $wTyN.replace('|', ' '))#set($wTyN = $wTyN.replace(';', ' '))#set($void = $typeNames.put($wTy, $wTyN))#end#end#set($dk = $itemDoc.get($id))#set($dx = -1)#if($docIdx.containsKey($dk))#set($dx = $docIdx.get($dk))#end#set($sf = 0)#if($startIds.containsKey($id))#set($sf = 1)#end$esc.html("${id}|${dx}|${wTy}|${sf}|${wT}");#end"></i>
+## Reached items "id|document index|type|start flag|change|revision A|revision B|title;" (change c / u / n of a start item
+## when comparing, F19; separators in titles replaced) and links "source|target|role;".
+    <i class="ai-it" data-v="#foreach($id in $itemOrder)#set($w = $items.get($id))#set($wT = '')#set($wT = $w.getTitle())#set($wT = "$wT")#set($wT = $wT.replace('|', ' '))#set($wT = $wT.replace(';', ' '))#set($wTy = '')#set($wTyO = false)#set($wTyO = $w.getType())#if($wTyO)#set($wTy = "$wTyO.getId()")#if(!$typeNames.containsKey($wTy))#set($wTyN = '')#set($wTyN = $wTyO.getName())#set($wTyN = "$wTyN")#set($wTyN = $wTyN.replace('|', ' '))#set($wTyN = $wTyN.replace(';', ' '))#set($void = $typeNames.put($wTy, $wTyN))#end#end#set($dk = $itemDoc.get($id))#set($dx = -1)#if($docIdx.containsKey($dk))#set($dx = $docIdx.get($dk))#end#set($sf = 0)#set($ic = '')#set($ira = '')#set($irb = '')#if($startIds.containsKey($id))#set($sf = 1)#if($cmpChg.containsKey($id))#set($ic = $cmpChg.get($id))#set($ira = $cmpRevA.get($id))#set($irb = $cmpRevB.get($id))#end#end$esc.html("${id}|${dx}|${wTy}|${sf}|${ic}|${ira}|${irb}|${wT}");#end"></i>
     <i class="ai-ty" data-v="#foreach($ty in $typeNames.keySet())#set($tyN = $typeNames.get($ty))$esc.html("${ty}|${tyN}");#end"></i>
     <i class="ai-ln" data-v="#foreach($ln in $links)#set($s = $ln.get(0))#set($t = $ln.get(1))#set($role = $ln.get(2))$esc.html("${s}|${t}|${role}");#end"></i>
   </div>
