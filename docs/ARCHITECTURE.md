@@ -145,7 +145,9 @@ only the changed start items.
   `node.rev` is `HEAD`, `docSortKey`, `download`;
 - **model helpers**: `readNodes`, `parseSamples`, `restrictEdge`, `relFromData`, `kindsLabel`;
 - **`layout(model, state, edges)`**: a layered layout. Origin/upstream documents go on the left, using the longest
-  path. Barycentre ordering reduces crossings. Documents without an edge go in a grid when `state.mode === 'all'`.
+  path. The edges closing a loop (back edges of a depth-first search, `e.back`) are left out of the levels and drawn
+  backwards (arc below the boxes); no level exceeds the number of linked documents minus one (before, a loop raised its
+  levels at every pass and the graph became very wide). Barycentre ordering reduces crossings. Documents without an edge go in a grid when `state.mode === 'all'`.
   Documents in `state.hidden` are skipped.
 - **`Base` mixin**: toolbar parts (`kindChecks`, `countsCheck`, `fieldChecks`, `searchBox`, `viewButtons`),
   `buildAreas`, `layoutAndDraw`, `drawGraph`, `nodeLines`, `docLabel` (`space / name`, with the project first when
@@ -195,8 +197,10 @@ Widget-specific client logic:
 
 This view is drawn entirely in Velocity when `$isStatic` is true. It uses only `rect`, `line`, `polygon` and `text`,
 which are verified to render in the PDF export. It uses integer arithmetic only.
-- Levels come from the longest path over the shown edges. Columns are placed as in the browser layout, in a simpler
-  form.
+- Levels come from the longest path over the shown edges, without the edges closing a loop (macro `bwBackEdges` in
+  `common.vm`: depth-first search with an explicit stack, Velocity 1.4 has no recursion) and capped at the number of
+  linked documents minus one. Columns are placed as in the browser layout, in a simpler form. An edge whose other end
+  is in a column to the left is drawn along a lane below the boxes.
 - Each widget has a static table: relations for both widgets, plus coverage and the uncovered items for docCoverage.
 - docCoverage percentages (macro `cwPct`) are rounded the same way as in the browser (`(part*200+whole)/(2*whole)`), so the
   PDF and the screen agree.

@@ -479,6 +479,17 @@ public class WidgetHarness {
         String pdf = render(widgetDir, params, true, outDir + "/velocity-pdf.log");
         write(outDir + "/pdf-fragment.html", pdf);
         check(pdf.contains("Project: VforIA &mdash;"), "PDF: scope in the header");
+        // Loop of relations (SRS_Test item copies an item of its own copy): the static graph keeps a bounded width.
+        java.util.regex.Pattern vb = java.util.regex.Pattern.compile("<svg [^>]*viewBox=\"0 0 ([0-9]+) ");
+        java.util.regex.Matcher m0 = vb.matcher(pdf);
+        check(m0.find(), "PDF: static graph present");
+        link(509, "duplicates", 516);
+        String loopPdf = render(widgetDir, params, true, outDir + "/velocity-looppdf.log");
+        ITEMS.get("VIA-509").links.remove(ITEMS.get("VIA-509").links.size() - 1);
+        write(outDir + "/looppdf-fragment.html", loopPdf);
+        java.util.regex.Matcher m1 = vb.matcher(loopPdf);
+        check(m1.find() && Integer.parseInt(m1.group(1)) <= Integer.parseInt(m0.group(1)) + 400,
+            "PDF: loop of relations, static graph width bounded (" + m0.group(1) + " -> " + (m1.find(0) ? m1.group(1) : "?") + ")");
         // Two projects: documents of both, cross-project copy (same space and name in both projects).
         params.put("projects", new Param(null, new ArrayList<Object>(Arrays.asList(new RoleOpt("VforIA"), new RoleOpt("VforIB")))));
         String multi = render(widgetDir, params, false, outDir + "/velocity-multi.log");

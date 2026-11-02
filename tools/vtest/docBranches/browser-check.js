@@ -80,6 +80,28 @@ const { chromium } = require('playwright');
   const tbl = await p.textContent('.bw-table-wrap');
   if (tbl.indexOf('VforIA / Requirements / SRS_Test') < 0 || tbl.indexOf('VforIB / Requirements / SRS_Test') < 0) { throw new Error('two projects: table labels'); }
   console.log('two projects: scope line, boxes, links and table ok');
+
+  // Loop of relations (A copy of B and B copy of A): the layout leaves the edge closing the loop out of the levels and
+  // draws it backwards, so the graph keeps its width (ported from PolDataModelChecker, dmDefine 0.9.1). Before, the
+  // levels of the loop grew at every pass and the graph became many columns wide.
+  const fs = require('fs');
+  const page = fs.readFileSync(dir + '/browser.html', 'utf8');
+  const first = page.match(/<i class="bw-e" data-o="([^"]*)" data-c="([^"]*)"[^>]*data-ind="0"[^>]*>/);
+  const reversed = first[0].replace('data-o="' + first[1] + '" data-c="' + first[2] + '"', 'data-o="' + first[2] + '" data-c="' + first[1] + '"');
+  fs.writeFileSync(dir + '/loop.html', page.replace(first[0], first[0] + '</i>' + reversed));
+  await p.goto('file://' + dir + '/browser.html');
+  await p.waitForTimeout(300);
+  const w0 = Number((await p.getAttribute('.bw-svg', 'viewBox')).split(' ')[2]);
+  const n0 = (await p.$$('.bw-edge')).length;
+  await p.goto('file://' + dir + '/loop.html');
+  await p.waitForTimeout(300);
+  const w1 = Number((await p.getAttribute('.bw-svg', 'viewBox')).split(' ')[2]);
+  const n1 = (await p.$$('.bw-edge')).length;
+  console.log('loop: width', w0, '->', w1, 'edges', n0, '->', n1);
+  if (n1 !== n0 + 1) { throw new Error('loop: the reversed relation is not drawn'); }
+  if (w1 > w0) { throw new Error('loop: the graph got wider (' + w0 + ' -> ' + w1 + ')'); }
+  await p.screenshot({ path: dir + '/shot-loop.png', fullPage: true });
+  console.log('loop of relations: compact layout, edge closing the loop drawn');
   console.log('errors:', JSON.stringify(errors));
   await b.close();
 })();
