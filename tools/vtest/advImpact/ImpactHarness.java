@@ -308,8 +308,7 @@ public class ImpactHarness {
     /**
      * Comparison of the start items (F19). Point A = collection "Release 1" (CustomerSpec @100, items VIA-1, 2, 3 with
      * data revision 50). HEAD: VIA-1 updated later (revision 120), VIA-3 without Updated date and revision 61 (compared by
-     * revision), VIA-2 unchanged, VIA-4 not in A. Collection "Release 2" (VforIA/8): CustomerSpec @130 with VIA-2 changed
-     * (revision 130), VIA-1 and VIA-3 unchanged, SysReq_A @131 with VIA-12 satisfies 2.
+     * revision), VIA-2 unchanged, VIA-4 not in A.
      */
     static void compareChecks(String dir, String out, CollectionMocks.Collection col) throws Exception {
         WidgetHarness.ITEMS.get("VIA-1").updated = new Date(1793500000000L);
@@ -347,48 +346,13 @@ public class ImpactHarness {
             "compare PDF: changed start items only, with their revisions");
         WidgetHarness.check(hp.contains("<td>VIA-21</td>") && hp.contains("<td>VIA-11</td>") && !hp.contains("<td>VIA-4</td>"), "compare PDF: traversal from the changed items");
 
-        // Later collection Release 2: analysis on its pinned data, VIA-2 changed.
-        CollectionMocks.Collection col2 = new CollectionMocks.Collection("VforIA", "8", "Release 2");
-        CollectionMocks.RevModule specB = new CollectionMocks.RevModule("VforIA", "Specs", "CustomerSpec", "130");
-        CollectionMocks.RevModule aB = new CollectionMocks.RevModule("VforIA", "_default", "SysReq_A", "131");
-        WidgetHarness.WorkItem b1 = new WidgetHarness.WorkItem("VIA-1", "customerRequirement", specB);
-        WidgetHarness.WorkItem b2 = new WidgetHarness.WorkItem("VIA-2", "customerRequirement", specB);
-        WidgetHarness.WorkItem b3 = new WidgetHarness.WorkItem("VIA-3", "customerNote", specB);
-        b3.updated = null;
-        b2.updated = new Date(1793600000000L);
-        b2.dataRevision = "130";
-        WidgetHarness.WorkItem b12 = new WidgetHarness.WorkItem("VIA-12", "systemRequirement", aB);
-        b12.links.add(new WidgetHarness.Link("satisfies", b2));
-        col2.docs.add(specB);
-        col2.docs.add(aB);
-        WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
-        Map<String, WidgetHarness.Param> c2 = params(spec, "down", 3, "satisfies", "verifies");
-        c2.put("compareWith", new WidgetHarness.Param("collection", null));
-        c2.put("compareCollection", new WidgetHarness.Param(null, list(new CollectionMocks.ColOpt(col2))));
-        String cb = WidgetHarness.render(dir, c2, false, out + "/velocity-comparecol.log");
-        String cit = attr(cb, "ai-it");
-        WidgetHarness.check(cb.contains("data-col=\"VforIA/8\"") && cb.contains(">Collection: Release 2<") && itemIds(cb).equals("VIA-1,VIA-12,VIA-2,VIA-3"),
-            "compare with a collection: analysis on the later collection: " + itemIds(cb));
-        WidgetHarness.check(cit.contains("VIA-2|0|customerRequirement|1|c|50|130|") && cit.contains("VIA-1|0|customerRequirement|1|u|50|50|")
-            && cit.contains("VIA-3|0|customerNote|1|u|50|50|"), "compare with a collection: VIA-2 changed: " + cit);
-        WidgetHarness.check(cb.contains("Changed start items: 1 of 3 changed between Release 1 (start document revision 100) and Release 2 (start document revision 130)."),
-            "compare with a collection: comparison line with both revisions");
-        String cbp = WidgetHarness.render(dir, c2, true, out + "/velocity-comparecolpdf.log");
-        WidgetHarness.check(cbp.contains("1 impacted work items in 1 documents") && cbp.contains("<td>VIA-2</td><td>Title VIA-2</td><td>50</td><td>130</td>"),
-            "compare with a collection, PDF: VIA-2 only, VIA-12 impacted");
-
-        // Messages: no collection, no later collection, start document not in A.
+        // Messages: no collection, start document not in A.
         WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(null);
         Map<String, WidgetHarness.Param> n1 = params(spec, "down", 3, "satisfies");
         n1.put("compareWith", new WidgetHarness.Param("head", null));
         String nb = WidgetHarness.render(dir, n1, false, out + "/velocity-comparenone.log");
         WidgetHarness.check(nb.contains("data-cmp=\"\"") && nb.contains("No comparison of the start items: it needs a collection"), "compare without a collection: message");
         WidgetHarness.TRANSACTION = new CollectionMocks.Transaction(col);
-        Map<String, WidgetHarness.Param> n2 = params(spec, "down", 3, "satisfies");
-        n2.put("compareWith", new WidgetHarness.Param("collection", null));
-        String nb2 = WidgetHarness.render(dir, n2, false, out + "/velocity-comparenob.log");
-        WidgetHarness.check(nb2.contains("data-cmp=\"\"") && nb2.contains("select the later collection to compare with") && nb2.contains("data-col=\"VforIA/7\""),
-            "compare with a collection not selected: message, analysis on collection A");
         Map<String, WidgetHarness.Param> n3 = params(d, "down", 3, "satisfies");
         n3.put("compareWith", new WidgetHarness.Param("head", null));
         String nb3 = WidgetHarness.render(dir, n3, false, out + "/velocity-comparenotina.log");

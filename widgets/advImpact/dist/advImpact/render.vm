@@ -369,104 +369,30 @@
 #end
 
 ## ======================================================================= comparison (F19)
-## "Changed start items": point A = the collection above (its pinned start document), point B = HEAD or a later
-## collection (parameter). The analysis runs on the data of B; the start items changed between A and B are marked, the
-## browser toggle "Changed only" keeps them as start items (the PDF view keeps only them). Sets cmpMode (head /
-## collection / ""), cmpRefA, cmpNameA, cmpNameB; colRef, colKey, colName, colText then describe B (colRef false = HEAD).
+## "Changed start items": point A = the collection above (its pinned start document), point B = HEAD. The analysis runs
+## on HEAD; the start items changed between A and B are marked, the browser toggle "Changed only" keeps them as start
+## items (the PDF view keeps only them). Sets cmpMode (head / ""), cmpRefA, cmpNameA, cmpNameB; colRef is then false
+## (HEAD) and colKey / colText empty.
 #set($tmp = $bwUnset)
 #set($tmp = $parameters.compareWith.singleValue)
 #set($tmp = $parameters.compareWith.singleValue())
 #set($cmpMode = "")
-#if("$tmp" == "head" || "$tmp" == "collection")
-  #set($cmpMode = "$tmp")
+#if("$tmp" == "head")
+  #set($cmpMode = "head")
 #end
 #set($cmpRefA = false)
-#set($cmpRefB = false)
 #set($cmpNameA = "")
 #set($cmpNameB = "HEAD")
 #if($cmpMode != "" && !$colRef)
   #set($scopeWarn = "${scopeWarn} No comparison of the start items: it needs a collection (open the page in a collection, or set the parameter Collection, and Collection context = Use).")
   #set($cmpMode = "")
 #end
-#if($cmpMode == "collection")
-  #set($cmpVals = false)
-  #set($cmpVals = $parameters.compareCollection.values)
-  #set($cmpVals = $parameters.compareCollection.values())
-  #set($cmpValN = 0)
-  #if($cmpVals)
-    #foreach($v in $cmpVals)
-      #set($cmpValN = $cmpValN + 1)
-      #if(!$cmpRefB)
-        #set($cmpMo = false)
-        #set($cmpMo = $v.getModelObject())
-        #set($cmpMoUr = "unknown")
-        #if($cmpMo)
-          #set($cmpMoUr = $cmpMo.isUnresolvable())
-        #end
-        #if("$cmpMoUr" == "false")
-          #set($cmpRefB = $cmpMo.getReference())
-        #end
-      #end
-    #end
-  #end
-  #if(!$cmpRefB)
-    #set($scopeWarn = "${scopeWarn} No comparison of the start items: select the later collection to compare with in the widget parameters.")
-    #set($cmpMode = "")
-  #elseif($cmpValN > 1)
-    #set($scopeWarn = "${scopeWarn} Several collections to compare with selected: the first one is used.")
-  #end
-#end
 #if($cmpMode != "")
   #set($cmpRefA = $colRef)
   #set($cmpNameA = $colName)
-  #if($cmpMode == "head")
-    #set($colRef = false)
-    #set($colKey = "")
-    #set($colText = "")
-  #else
-    ## Collection B: key, name and upstream collections, as collection.vm does for A.
-    #set($colRef = $cmpRefB)
-    #set($colP = "")
-    #set($colP = $colRef.projectId())
-    #set($colI = "")
-    #set($colI = $colRef.id())
-    #set($colKey = "${colP}/${colI}")
-    #set($colName = "")
-    #set($colOld = false)
-    #set($colObj = false)
-    #set($colObj = $colRef.get($transaction))
-    #if($colObj)
-      #set($colOld = $colObj.getOldApi())
-    #end
-    #if($colOld)
-      #set($colName = $colOld.getName())
-    #end
-    #if("$colName" == "")
-      #set($colName = "$colKey")
-    #end
-    #set($cmpNameB = $colName)
-    #set($colText = "Collection: ${colName}")
-    #set($colUps = "")
-    #if($colOld)
-      #set($colUpList = false)
-      #set($colUpList = $colOld.getUpstreamCollections())
-      #if($colUpList)
-        #foreach($u in $colUpList)
-          #set($uName = "")
-          #set($uName = $u.getName())
-          #if("$uName" != "")
-            #if($colUps != "")
-              #set($colUps = "${colUps}, ")
-            #end
-            #set($colUps = "${colUps}${uName}")
-          #end
-        #end
-      #end
-    #end
-    #if($colUps != "")
-      #set($colText = "${colText} (with upstream: ${colUps})")
-    #end
-  #end
+  #set($colRef = false)
+  #set($colKey = "")
+  #set($colText = "")
 #end
 
 #set($tmp = $bwUnset)
@@ -1210,18 +1136,10 @@
   #set($docList = $aicDocList)
   #set($scopeText = $colText)
 #end
-## Comparison line (F19): points A and B with the revisions of the start document, changed start items.
+## Comparison line (F19): collection A with the revision of the start document there, changed start items.
 #set($cmpText = "")
 #if($cmpMode != "")
-  #set($cmpB = "HEAD")
-  #if($cmpMode == "collection")
-    #set($cmpDocRevB = "")
-    #if($docByKey.containsKey($startKey))
-      #set($cmpDocRevB = $docByKey.get($startKey).get("rev"))
-    #end
-    #set($cmpB = "${cmpNameB} (start document revision ${cmpDocRevB})")
-  #end
-  #set($cmpText = "Changed start items: ${cmpChanged} of ${cmpAll} changed between ${cmpNameA} (start document revision ${cmpDocRevA}) and ${cmpB}.")
+  #set($cmpText = "Changed start items: ${cmpChanged} of ${cmpAll} changed between ${cmpNameA} (start document revision ${cmpDocRevA}) and HEAD.")
   #if($cmpNew > 0)
     #set($cmpText = "${cmpText} ${cmpNew} not in the start document of ${cmpNameA} (not counted as changed).")
   #end
@@ -2548,8 +2466,8 @@
    * document, downstream levels on the right. Edges: o = document of the link targets (left), c = document of the link
    * sources; arrows follow the link direction (arrowAtOrigin).
    *
-   * Comparison (SPEC F19, data-cmp = head / collection): each start item carries its change between point A (the
-   * collection) and point B (HEAD or a later collection): c = changed, u = unchanged, n = not in the start document at A,
+   * Comparison (SPEC F19, data-cmp = head): each start item carries its change between point A (the collection) and
+   * point B (HEAD): c = changed, u = unchanged, n = not in the start document at A,
    * with its revisions at A and B. The toggle "Changed only" (on by default) keeps the changed items as start items; the
    * picker then narrows among them.
    */
@@ -2647,7 +2565,7 @@
     this.arrowAtOrigin = true;
     this.warn = root.dataset.warn || '';
     this.query = root.dataset.query || '';
-    this.cmp = root.dataset.cmp === 'head' || root.dataset.cmp === 'collection' ? root.dataset.cmp : '';
+    this.cmp = root.dataset.cmp === 'head' ? 'head' : '';
     this.cmpA = root.dataset.cmpA || 'A';
     this.cmpB = root.dataset.cmpB || 'B';
     this.dirParam = root.dataset.dir === 'up' || root.dataset.dir === 'both' ? root.dataset.dir : 'down';

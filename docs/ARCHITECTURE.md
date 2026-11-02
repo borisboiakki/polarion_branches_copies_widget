@@ -123,16 +123,16 @@ the spike, `tests/advImpact-v0.1.x/spike-tests.md`):
 | Static view | the browser computation done in Velocity: item level = lowest over the directions, document side and level of its lowest item; relations = links along a path (downstream: source level = target level + 1; upstream: target level = source level + 1), `o` = document of the target, `c` = of the source; columns: upstream levels, start document, downstream levels |
 
 Page model of advImpact: root `<div class="ai-root">` with `data-dir`, `data-levels`, `data-start` (start document
-key), `data-query`, `data-roles`, `data-warn`, `data-col` (as docCoverage; with a comparison, the collection of point B or empty
-for HEAD), `data-cmp` (`head` / `collection` / empty, F19), `data-cmp-a` / `data-cmp-b` (names of the two points) and the common `data-*`; `bw-n` per document (common attributes and `data-rev`, as docCoverage);
+key), `data-query`, `data-roles`, `data-warn`, `data-col` (as docCoverage; empty with a comparison: the analysis runs on HEAD), `data-cmp` (`head` / empty, F19),
+`data-cmp-a` / `data-cmp-b` (collection name / `HEAD`) and the common `data-*`; `bw-n` per document (common attributes and `data-rev`, as docCoverage);
 one `<i class="ai-it" data-v="id|document index|type|start flag|change|revision A|revision B|title;…">` (document index = position of the `bw-n`,
 -1 outside a document; change of a start item when comparing: `c` changed, `u` unchanged, `n` not in the start document at A; `|` and `;` in titles replaced), one `<i class="ai-ty" data-v="type id|type name;…">` (types of
 the reached items, for the start item picker) and one `<i class="ai-ln" data-v="source|target|role;…">`. The browser
 starts the analysis from the start items selected in the *Start items* panel (`state.starts`, a subset of the flagged ones),
 and, with the toggle *Changed only* (`state.chgOnly`), changed ones (`eligible()` / `activeStarts()`).
-Comparison (F19) on the Velocity side: after collection.vm, `colRef` is switched to point B (false = HEAD, or the later
-collection) and point A is kept in `cmpRefA`; `cmpA` = id → [Updated, data revision] of the start document's items in A
-(`col_workitem`), compared in the start item loop with the same signature at B (macro `aiSig`); the static view keeps
+Comparison (F19) on the Velocity side: after collection.vm, `colRef` is set to false (the analysis runs on HEAD) and
+the collection (point A) is kept in `cmpRefA`; `cmpA` = id → [Updated, data revision] of the start document's items in A
+(`col_workitem`), compared in the start item loop with the same signature in HEAD (macro `aiSig`); the static view keeps
 only the changed start items.
 
 ## 4. Client side: `core.js` + `graph.js`

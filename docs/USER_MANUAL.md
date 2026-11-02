@@ -180,8 +180,7 @@ depends on them, level after level.
 | Graph height in pixels | 600 | Height of the graph area | — |
 | Collection context | Use | *Use*: when the page is opened in a **collection**, the analysis follows the work items and links of the collection documents (and of its upstream collections), each at the revision the collection pins. *Ignore*: always the current work items | — |
 | Collection | none | Used only when the page is **not** opened in a collection, e.g. for the **PDF export**. Choose the same collection as the page | — |
-| Changed start items: compare the start document of the collection with | No comparison | *HEAD* or *A later collection*: find the start items changed since the collection (see below) | **Changed only** toggle |
-| Later collection to compare with | none | The later collection, for *A later collection* | — |
+| Changed start items: compare the start document of the collection with HEAD | No comparison | *Compare with HEAD*: find the start items changed since the collection (see below) | **Changed only** toggle |
 
 When you hide a role or a direction, or choose fewer levels, the analysis is **recalculated**: items reached only
 through the hidden links disappear, and the others can move to a higher level. Hiding a document with the **Documents**
@@ -201,14 +200,13 @@ in the collection revision are kept. Documents without a fixed revision are mark
 items open in the collection. The Excel *Documents* sheet gives each document's collection revision.
 
 **Changed start items.** Typical use: a collection holds the released baseline; what did the changes made since then
-impact? Open the page in the collection (or set *Collection*) and set *Compare with* to **HEAD** (the current document)
-or to **A later collection**. The analysis then runs on the current work items (or on the later collection), and the
-line under the scope says how many start items changed between the two, with the revision of the start document in
-each. A start item counts as **changed** when any of its fields changed (its *Updated* date differs). The toolbar box
+impact? Open the page in the collection (or set *Collection*) and set the comparison parameter to **Compare with HEAD** (the
+current document). The analysis then runs on the current work items, and the line under the scope says how many start
+items changed since the collection, with the revision of the start document in the collection. A start item counts as **changed** when any of its fields changed (its *Updated* date differs). The toolbar box
 **Changed only** (on by default) starts the analysis from the changed items only; clear it to start from all of them.
 The *Start items* button then narrows further among them; the query of the parameters applies first. The start items
 list, the details of the start document and the Excel *Start items* sheet show each item's change and its revisions
-in the two points; items added to the document since the collection are marked *not in* the collection. The PDF export
+in the collection and in HEAD; items added to the document since the collection are marked *not in* the collection. The PDF export
 analyses the changed items only and lists them with their revisions.
 
 For very large analyses a direction stops after a level with more than 5 000 new work items, or when 20 000 work
@@ -223,7 +221,7 @@ items are reached; a warning in the status line says so.
 | Control | What it does |
 |---|---|
 | *Only documents with relations* / *All documents* | Show only the connected documents, or every analysed document (unconnected ones in a grid below) |
-| **Changed only** (Impact, *Compare with* set) | Start the analysis from the start items changed between the collection and HEAD / the later collection |
+| **Changed only** (Impact, *Compare with* set) | Start the analysis from the start items changed between the collection and HEAD |
 | **Start items (k/N)** (Impact) | Choose the start items of the analysis among the start document's items (or the query's): search, type filter, *Select shown* / *Clear shown* |
 | **Documents (n/m)** (Coverage, Impact) | Choose which of the analysed documents are shown |
 | **Indirect relations** (Branches only) | Show the relations inherited through an intermediate copy |
@@ -285,7 +283,7 @@ The workbook follows the current toolbar choices, and every item and document ha
 |---|---|
 | Branches and Copies | Relations, Documents, Linked items (up to 30 per document pair) |
 | Coverage | Relations, Documents (with coverage and the collection revision), Uncovered items (up to 500 per document), Linked items (all links of the shown lines) |
-| Impact | Relations, Documents (position, level, impacted items, collection revision), Impacted items (direction, level, reached from), Impact paths (one path from a start item to each impacted item, with the links along it), Start items (the chosen start items and the query; with *Compare with*: changed yes / no and the revisions in the two points) |
+| Impact | Relations, Documents (position, level, impacted items, collection revision), Impacted items (direction, level, reached from), Impact paths (one path from a start item to each impacted item, with the links along it), Start items (the chosen start items and the query; with the HEAD comparison: changed yes / no and the revisions in the collection and in HEAD) |
 
 If the browser blocks the Excel library, the button downloads the relations as a CSV file instead, and the status line
 says so.

@@ -13,8 +13,8 @@
    * document, downstream levels on the right. Edges: o = document of the link targets (left), c = document of the link
    * sources; arrows follow the link direction (arrowAtOrigin).
    *
-   * Comparison (SPEC F19, data-cmp = head / collection): each start item carries its change between point A (the
-   * collection) and point B (HEAD or a later collection): c = changed, u = unchanged, n = not in the start document at A,
+   * Comparison (SPEC F19, data-cmp = head): each start item carries its change between point A (the collection) and
+   * point B (HEAD): c = changed, u = unchanged, n = not in the start document at A,
    * with its revisions at A and B. The toggle "Changed only" (on by default) keeps the changed items as start items; the
    * picker then narrows among them.
    */
@@ -112,7 +112,7 @@
     this.arrowAtOrigin = true;
     this.warn = root.dataset.warn || '';
     this.query = root.dataset.query || '';
-    this.cmp = root.dataset.cmp === 'head' || root.dataset.cmp === 'collection' ? root.dataset.cmp : '';
+    this.cmp = root.dataset.cmp === 'head' ? 'head' : '';
     this.cmpA = root.dataset.cmpA || 'A';
     this.cmpB = root.dataset.cmpB || 'B';
     this.dirParam = root.dataset.dir === 'up' || root.dataset.dir === 'both' ? root.dataset.dir : 'down';

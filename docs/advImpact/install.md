@@ -32,8 +32,7 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
 | Graph height in pixels | 600 | Height of the scrollable graph area |
 | Collection context | Use | Use: on a page opened in a collection, the work items and links of the collection documents and of its upstream collections, at their collection revisions (the start document must be in the collection). Ignore: current work items |
 | Collection | none | `@collection` selector, used when the page has no collection context: Polarion PDF export, or a page outside the collection |
-| Changed start items: compare the start document of the collection with | No comparison | 0.4.0. *HEAD*: the current start document; *A later collection*: the collection of the next parameter. Needs a collection (point A: page context or *Collection*). The analysis then runs on HEAD or on the later collection, and the start items changed since the collection can be kept with the toolbar toggle **Changed only** |
-| Later collection to compare with | none | `@collection` selector, used with *A later collection* (the first one selected) |
+| Changed start items: compare the start document of the collection with HEAD | No comparison | 0.4.0. *Compare with HEAD*: needs a collection (page context or *Collection*). The analysis then runs on the current items (HEAD), and the start items changed since the collection can be kept with the toolbar toggle **Changed only** |
 
 ## How the analysis works
 
@@ -49,9 +48,9 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
   are read once from the collection tables, at the revisions the collection pins (queries verified by the docCoverage
   spike); the levels are then followed on them. The start query runs on the current items of the start document, and
   the matching items are taken at the collection revision. Documents without a pinned revision are marked (HEAD).
-- **Changed start items** (0.4.0): with *Compare with* set, the items of the start document are read in the collection
-  (point A) and in HEAD or the later collection (point B), where the analysis runs. A start item changed when its
-  *Updated* date differs between A and B (its revision when a date is missing). **Changed only** (toolbar, on by default)
+- **Changed start items** (0.4.0): with *Compare with HEAD*, the items of the start document are read in the collection
+  and in HEAD, where the analysis runs. A start item changed when its *Updated* date differs between the two (its
+  revision when a date is missing). **Changed only** (toolbar, on by default)
   starts the analysis from the changed items; the PDF export analyses only them.
 
 ## Using the widget
@@ -81,8 +80,8 @@ Method verified by the spike on 2512: [`tests/advImpact-v0.1.x/spike-tests.md`](
 - The **Start items** picker narrows the start items of the page (whole document or query); it cannot add other items
   without changing the query. The PDF export uses all start items.
 - Work items outside a LiveDoc are followed but not drawn (they have no document).
-- Changed start items (0.4.0) not yet validated on 2512: that an item read at a collection revision gives the *Updated*
-  date and revision of that revision is assumed (SPEC R8). Items added to the start document after the collection are
+- Changed start items (0.4.0, validated on 2512 in the browser view): compared with HEAD only; a comparison with another
+  baseline of the collection is a future idea (SPEC F20). Items added to the start document after the collection are
   marked *not in* the collection and not counted as changed; items removed since are not listed. Changes of the document
   itself (structure, text outside work items) are not compared.
 - Permission filtering for viewers who cannot read some documents has not been checked (same open check as the other widgets).

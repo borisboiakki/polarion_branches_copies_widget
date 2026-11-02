@@ -17,8 +17,8 @@ one build and one test setup:
   links, SPEC §6.1). **0.1.1 validated by the PO on 2512**; **0.2.0** adds the in-widget start item picker (SPEC F17, browser
   only, narrows the server start set; validated by the PO on 2512); **0.3.0** adds the collection context (SPEC F18, as
   docCoverage F17 with its verified collection queries; validated by the PO on 2512); **0.4.0** adds the changed start items
-  (SPEC F19: collection A vs. HEAD or a later collection B, analysis on B, toolbar toggle *Changed only*; not yet validated,
-  `getUpdated()` / `getDataRevision()` at a collection revision unverified, SPEC R8); harness `tools/vtest/advImpact/`;
+  since the collection, compared with HEAD (SPEC F19: analysis on HEAD, toolbar toggle *Changed only*; validated by the PO
+  on 2512; comparison with another baseline of the collection = future idea F20); harness `tools/vtest/advImpact/`;
   the spec (PO answers Q1–Q12 recorded; "both" = downstream and upstream analyses combined) is in its `SPECIFICATION.md`, the spike plan and the diagnostic widget `aiSpike` in `tests/advImpact-v0.1.x/`
   (`tools/vtest/aiSpike/` smoke-tests it; rebuild `aiSpike.zip` after edits).
 Each widget has its own `SPECIFICATION.md` (requirements, decisions, open checks) and `VERSION`. `README.md` is the overview.
