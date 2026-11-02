@@ -248,16 +248,33 @@
       else if (state.mode === 'all') { isolated.push(n); }
     }
 
-    // Levels: longest path over direct edges (sources on the left).
+    // Levels: longest path over direct edges (sources on the left). Edges closing a loop (back edges of a depth-first
+    // search) are left out, otherwise the levels of the loop grow without end and the graph gets very wide; they are
+    // still drawn (backwards, marked e.back). No level exceeds the number of linked nodes.
     var lvl = {};
     for (var a = 0; a < linked.length; a++) { lvl[linked[a].key] = 0; }
     var direct = [];
     for (var b = 0; b < edges.length; b++) { if (!edges[b].indirect) { direct.push(edges[b]); } }
+    var outs = {};
+    direct.forEach(function (e0) { e0.back = false; (outs[e0.o] = outs[e0.o] || []).push(e0); });
+    var dfsState = {};
+    function dfs(k) {
+      dfsState[k] = 1;
+      (outs[k] || []).forEach(function (e1) {
+        if (dfsState[e1.c] === 1) { e1.back = true; } else if (!dfsState[e1.c]) { dfs(e1.c); }
+      });
+      dfsState[k] = 2;
+    }
+    var starts = linked.map(function (n1) { return n1.key; }).sort();
+    starts.forEach(function (k) { if (!dfsState[k] && !direct.some(function (e2) { return e2.c === k; })) { dfs(k); } });
+    starts.forEach(function (k) { if (!dfsState[k]) { dfs(k); } });
+    var forward = direct.filter(function (e3) { return !e3.back; });
+    var maxLvl = Math.max(0, linked.length - 1);
     for (var pass = 0; pass <= linked.length; pass++) {
       var changed = false;
-      for (var c = 0; c < direct.length; c++) {
-        var e = direct[c];
-        if (lvl[e.c] < lvl[e.o] + 1 && lvl[e.o] + 1 < 50) { lvl[e.c] = lvl[e.o] + 1; changed = true; }
+      for (var c = 0; c < forward.length; c++) {
+        var e = forward[c];
+        if (lvl[e.c] < lvl[e.o] + 1 && lvl[e.o] + 1 <= maxLvl) { lvl[e.c] = lvl[e.o] + 1; changed = true; }
       }
       if (!changed) { break; }
     }
@@ -321,6 +338,7 @@
     }
     var width = MARGIN * 2 + Math.max(1, cols.length) * NODE_W + Math.max(0, cols.length - 1) * COL_GAP;
     var height = MARGIN * 2 + topPad + maxRows * (h + ROW_GAP);
+    if (direct.some(function (e4) { return e4.back; })) { height += 50; }
     var isoTop = linked.length ? height + ROW_GAP : MARGIN + 18;
     var gridCols = Math.max(3, cols.length);
     if (isolated.length) {
@@ -527,13 +545,22 @@
       var x1 = p.x + NODE_W, y1 = p.y + h / 2, x2 = q.x, y2 = q.y + h / 2;
       var dx = x2 > x1 ? Math.max(30, (x2 - x1) / 2) : 70;
       var c1x = x1 + dx, c2x = x2 - dx, c1y = y1, c2y = y2;
-      if (x2 - x1 > COL_GAP + NODE_W) {
+      var backward = q.x + NODE_W <= p.x;
+      if (backward) {
+        // Edge closing a loop (origin on the right): from the left side of the origin to the right side of the other
+        // end, arcing below both boxes.
+        x1 = p.x;
+        x2 = q.x + NODE_W;
+        c1x = x1 - COL_GAP / 2;
+        c2x = x2 + COL_GAP / 2;
+        c1y = c2y = Math.max(y1, y2) + h / 2 + 30;
+      } else if (x2 - x1 > COL_GAP + NODE_W) {
         // Skips at least one level: arc above the graph instead of crossing documents.
         c1x = x1 + COL_GAP;
         c2x = x2 - COL_GAP;
         c1y = c2y = Math.max(4, Math.min(y1, y2) - h / 2 - lay.topPad - 30);
       }
-      var d = 'M' + x1 + ',' + y1 + ' C' + c1x + ',' + c1y + ' ' + c2x + ',' + c2y + ' ' + (x2 - 2) + ',' + y2;
+      var d = 'M' + x1 + ',' + y1 + ' C' + c1x + ',' + c1y + ' ' + c2x + ',' + c2y + ' ' + (x2 - 2 * (backward ? -1 : 1)) + ',' + y2;
       var cat = mainKind(e, self.cats);
       var color = e.indirect ? INDIRECT_COLOR : cat.color;
       var g = svg('g', { 'class': 'bw-edge' }, gEdges);
@@ -544,9 +571,10 @@
       }, g);
       // Arrow head at the target document, or at the origin when the widget draws arrows backwards
       // (docCoverage: origin = upstream on the left, arrow in the link direction downstream -> upstream).
+      var hs = backward ? -1 : 1;
       var head = self.arrowAtOrigin ?
-        (x1 + 10) + ',' + (y1 - 5) + ' ' + x1 + ',' + y1 + ' ' + (x1 + 10) + ',' + (y1 + 5) :
-        (x2 - 10) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 + 5);
+        (x1 + 10 * hs) + ',' + (y1 - 5) + ' ' + x1 + ',' + y1 + ' ' + (x1 + 10 * hs) + ',' + (y1 + 5) :
+        (x2 - 10 * hs) + ',' + (y2 - 5) + ' ' + x2 + ',' + y2 + ' ' + (x2 - 10 * hs) + ',' + (y2 + 5);
       svg('polygon', { points: head, fill: color }, g);
       var hit = svg('path', { d: d, fill: 'none', stroke: 'rgb(0,0,0)', 'stroke-opacity': 0, 'stroke-width': 12, 'class': 'bw-hit' }, g);
       // Label near the target end (one per edge there, while several edges can share an origin).
@@ -560,7 +588,7 @@
       try {
         var bb = t.getBBox();
         // Keep the label clear of the target document box.
-        var over = bb.x + bb.width + 6 - x2;
+        var over = backward ? 0 : bb.x + bb.width + 6 - x2;
         if (over > 0) { setAttrs(t, { x: mx - over }); bb = t.getBBox(); }
         setAttrs(bg, { x: bb.x - 3, y: bb.y - 1, width: bb.width + 6, height: bb.height + 2 });
       } catch (err) { /* not rendered yet */ }

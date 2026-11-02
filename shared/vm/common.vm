@@ -129,3 +129,78 @@
     #set($bwDocLabelOut = "${bwDocLabelOut} (HEAD)")
   #end
 #end
+
+## Edges closing a loop (back edges of a depth-first search), for the static layered layout: the longest-path levels
+## leave them out, otherwise the levels of a loop grow at every pass (same rule as layout() in shared/js/core.js).
+## Input: $bwLvEdges (edge maps with "o" and "c"), $lvl (keys of the linked documents). Output: "back" = true on those
+## edges. Velocity 1.4 has no recursion and no break: explicit stack (map depth -> key) and bounded loops.
+#macro(bwBackEdges)
+  #set($bwAdj = $objectFactory.newMap())
+  #set($bwHasIn = $objectFactory.newMap())
+  #foreach($bwE in $bwLvEdges)
+    #set($void = $bwE.put("back", false))
+    #if(!$bwAdj.containsKey($bwE.get("o")))
+      #set($void = $bwAdj.put($bwE.get("o"), []))
+    #end
+    #set($void = $bwAdj.get($bwE.get("o")).add($bwE))
+    #set($void = $bwHasIn.put($bwE.get("c"), true))
+  #end
+  #set($bwRoots = [])
+  #set($bwKeys = [])
+  #foreach($bwK in $lvl.keySet())
+    #set($void = $bwKeys.add($bwK))
+  #end
+  #foreach($bwK in $bwKeys)
+    #if(!$bwHasIn.containsKey($bwK))
+      #set($void = $bwRoots.add($bwK))
+    #end
+  #end
+  #foreach($bwK in $bwKeys)
+    #if($bwHasIn.containsKey($bwK))
+      #set($void = $bwRoots.add($bwK))
+    #end
+  #end
+  #set($bwState = $objectFactory.newMap())
+  #set($bwPtr = $objectFactory.newMap())
+  #set($bwStack = $objectFactory.newMap())
+  #set($bwSteps = $bwLvEdges.size() + $bwKeys.size() + 2)
+  #foreach($bwR in $bwRoots)
+    #if(!$bwState.containsKey($bwR))
+      #set($void = $bwState.put($bwR, 1))
+      #set($void = $bwPtr.put($bwR, 0))
+      #set($bwDepth = 1)
+      #set($void = $bwStack.put(1, $bwR))
+      #foreach($bwStep in [1..$bwSteps])
+        #if($bwDepth > 0)
+          #set($bwTop = $bwStack.get($bwDepth))
+          #set($bwI = $bwPtr.get($bwTop))
+          #set($bwOuts = [])
+          #if($bwAdj.containsKey($bwTop))
+            #set($bwOuts = $bwAdj.get($bwTop))
+          #end
+          #if($bwI < $bwOuts.size())
+            #set($bwE = $bwOuts.get($bwI))
+            #set($bwI1 = $bwI + 1)
+            #set($void = $bwPtr.put($bwTop, $bwI1))
+            #set($bwC = $bwE.get("c"))
+            #set($bwSt = 0)
+            #if($bwState.containsKey($bwC))
+              #set($bwSt = $bwState.get($bwC))
+            #end
+            #if($bwSt == 1)
+              #set($void = $bwE.put("back", true))
+            #elseif($bwSt == 0)
+              #set($void = $bwState.put($bwC, 1))
+              #set($void = $bwPtr.put($bwC, 0))
+              #set($bwDepth = $bwDepth + 1)
+              #set($void = $bwStack.put($bwDepth, $bwC))
+            #end
+          #else
+            #set($void = $bwState.put($bwTop, 2))
+            #set($bwDepth = $bwDepth - 1)
+          #end
+        #end
+      #end
+    #end
+  #end
+#end

@@ -107,6 +107,18 @@ public class CoverageHarness {
         WidgetHarness.write(out + "/pdf-fragment.html", pdf);
         WidgetHarness.check(pdf.contains("Coverage: 67% (4/6)") && !pdf.contains("<script"), "PDF: static graph with coverage, no script");
         WidgetHarness.check(pdf.contains("VIA-5, VIA-6"), "PDF: uncovered items listed");
+        // Loop (SysReq_A item satisfies a SwReq_C item, while SwReq_C satisfies SysReq_A): the static graph keeps its
+        // width (the edge closing the loop is left out of the levels) and draws that edge backwards.
+        java.util.regex.Pattern vb = java.util.regex.Pattern.compile("<svg [^>]*viewBox=\"0 0 ([0-9]+) ([0-9]+)\"");
+        java.util.regex.Matcher m0 = vb.matcher(pdf);
+        WidgetHarness.check(m0.find(), "PDF: static graph present");
+        WidgetHarness.link(11, "satisfies", 31);
+        String loopPdf = WidgetHarness.render(dir, params(docs, roles), true, out + "/velocity-looppdf.log");
+        WidgetHarness.ITEMS.get("VIA-11").links.remove(WidgetHarness.ITEMS.get("VIA-11").links.size() - 1);
+        WidgetHarness.write(out + "/looppdf-fragment.html", loopPdf);
+        java.util.regex.Matcher m1 = vb.matcher(loopPdf);
+        WidgetHarness.check(m1.find() && m1.group(1).equals(m0.group(1)) && Integer.parseInt(m1.group(2)) == Integer.parseInt(m0.group(2)) + 24,
+            "PDF: loop, same width (" + m0.group(1) + "), one lane below the boxes for the backward edge");
 
         // No excluded type selected: headings are counted (link to the heading VIA-7, 7 items).
         Map<String, WidgetHarness.Param> allTypes = params(docs, roles);

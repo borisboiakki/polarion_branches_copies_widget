@@ -459,12 +459,23 @@
     #set($void = $lvl.put($d.get("key"), 0))
   #end
 #end
+## Edges closing a loop are left out of the levels (bwBackEdges, as the browser layout); safety net: no level beyond
+## the number of linked documents minus one.
+#set($bwLvEdges = [])
+#foreach($k in $edgeKeys)
+  #set($void = $bwLvEdges.add($edges.get($k)))
+#end
+#bwBackEdges()
+#set($capLvl = $lvl.size() - 1)
+#if($capLvl > 30)
+  #set($capLvl = 30)
+#end
 #foreach($pass in [1..15])
   #foreach($k in $edgeKeys)
     #set($e = $edges.get($k))
     #set($lo = $lvl.get($e.get("o")))
     #set($lc = $lvl.get($e.get("c")))
-    #if($lc <= $lo && $lo < 30)
+    #if($lc <= $lo && $lo < $capLvl && !$e.get("back"))
       #set($nl = $lo + 1)
       #set($void = $lvl.put($e.get("c"), $nl))
     #end
@@ -527,6 +538,18 @@
 #end
 #set($cw = 2 * $mg + ($maxLevel + 1) * $nW + $maxLevel * $cGap)
 #set($ch = 2 * $mg + $maxRows * ($nH + $rGap))
+## Edges drawn backwards (a loop: the other end is in a column to the left) run along a lane below the boxes.
+#set($laneY = $ch)
+#set($hasBack = false)
+#foreach($k in $edgeKeys)
+  #set($e = $edges.get($k))
+  #if($px.get($e.get("c")) + $nW <= $px.get($e.get("o")))
+    #set($hasBack = true)
+  #end
+#end
+#if($hasBack)
+  #set($ch = $ch + 24)
+#end
 #set($outW = $cw)
 #set($outH = $ch)
 #if($cw > 700)
@@ -595,11 +618,30 @@
   ## Label at the downstream end (one per line there; several lines can share the upstream end)
   #set($lx = $xm + 3)
   #set($ly = $y2 - 4)
+  #if($x2 + $nW <= $x1 - $nW)
+    ## Backwards (loop): from the right side of the downstream document, along the lane below, into the left side of
+    ## the upstream one (arrow there, as for the other lines).
+    #set($x1 = $x1 - $nW)
+    #set($x2 = $x2 + $nW)
+    #set($bx1 = $x1 - $cGap / 3)
+    #set($bx2 = $x2 + $cGap / 3)
+    #set($ax = $x1 - 9)
+    #set($lx = $bx2 + 3)
+    #set($ly = $laneY - 4)
+<line x1="$x2" y1="$y2" x2="$bx2" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$bx2" y1="$y2" x2="$bx2" y2="$laneY" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$bx2" y1="$laneY" x2="$bx1" y2="$laneY" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$bx1" y1="$laneY" x2="$bx1" y2="$y1" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<line x1="$bx1" y1="$y1" x2="$ax" y2="$y1" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
+<polygon points="$ax,$ay1 $x1,$y1 $ax,$ay2" fill="$color"/>
+<text x="$lx" y="$ly" font-family="Arial" font-size="9" fill="$color">$esc.html($cwLabel)</text>
+  #else
 <line x1="$ax" y1="$y1" x2="$xm" y2="$y1" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
 <line x1="$xm" y1="$y1" x2="$xm" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
 <line x1="$xm" y1="$y2" x2="$x2" y2="$y2" stroke="$color" stroke-width="2" stroke-dasharray="$dash"/>
 <polygon points="$ax,$ay1 $x1,$y1 $ax,$ay2" fill="$color"/>
 <text x="$lx" y="$ly" font-family="Arial" font-size="9" fill="$color">$esc.html($cwLabel)</text>
+  #end
 #end
 #foreach($col in $cols)
   #foreach($d in $col)
